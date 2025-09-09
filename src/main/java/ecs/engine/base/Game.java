@@ -1,13 +1,12 @@
 package ecs.engine.base;
 
+import javafx.animation.AnimationTimer;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Paint;
-import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -65,41 +64,34 @@ public class Game {
   }
 
   private void startGameLoop() {
-    // Start the Logic loop
-    Thread gameLoopThread = new Thread(() -> {
-      while (true) {
-        long beginTime = System.nanoTime();
-        double elapsedTime = (beginTime - lastLogicUpdateTime) / 1_000_000_000.0;
-        double fixedElapsedTime = (beginTime - lastFixedUpdateTime) / 1_000_000_000.0;
+    lastLogicUpdateTime = System.nanoTime();
+    lastFixedUpdateTime = System.nanoTime();
 
-        if (beginTime - lastLogicUpdateTime >= 1_000_000_000 * TIME_PER_FRAME) {
-          // Step the game logic
-          GameScene.step(elapsedTime);
-
-          // Calculate the last time
-          lastLogicUpdateTime = beginTime;
-        }
-
-        if (beginTime - lastFixedUpdateTime >= 1_000_000_000 * FIXED_TIME_STEP) {
-          // Step the fixed game logic
-          GameScene.fixedStep(FIXED_TIME_STEP);
-
-          // Calculate the last time
-          lastFixedUpdateTime = beginTime;
-        }
-      }
-    });
-    gameLoopThread.setDaemon(true);
-    gameLoopThread.start();
-
-    // Start the render loop
-    Timeline renderLoop = new Timeline();
-    renderLoop.setCycleCount(Timeline.INDEFINITE);
-    renderLoop.getKeyFrames().add(new KeyFrame(
-        Duration.seconds(TIME_PER_FRAME),
-        event -> GameScene.renderStep()
+    // Start the fixed loop
+    Timeline fixedLoop = new Timeline();
+    fixedLoop.setCycleCount(Timeline.INDEFINITE);
+    fixedLoop.getKeyFrames().add(new KeyFrame(
+        Duration.seconds(FIXED_TIME_STEP),
+        event -> GameScene.fixedStep(FIXED_TIME_STEP)
     ));
-    renderLoop.play();
+    fixedLoop.play();
+
+    // Start the regular loop
+    AnimationTimer gameLoop = new AnimationTimer() {
+      @Override
+      public void handle(long now) {
+        double elapsedTime = (now - lastLogicUpdateTime) / 1_000_000_000.0;
+
+        // Max Frame Rate Check
+        if (elapsedTime < TIME_PER_FRAME) { return; }
+        lastLogicUpdateTime = now;
+
+        // Updates
+        GameScene.step(elapsedTime);
+        GameScene.renderStep();
+      }
+    };
+    gameLoop.start();
   }
 
   /* API HERE */

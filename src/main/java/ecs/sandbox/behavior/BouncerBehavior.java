@@ -7,7 +7,7 @@ import javafx.geometry.Point2D;
 
 public class BouncerBehavior extends EntityBehavior {
 
-  // The components references
+  // The components reference
   private PhysicsHandler physicsHandler;
   private CircleCollider collider;
 
