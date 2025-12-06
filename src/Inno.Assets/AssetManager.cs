@@ -4,7 +4,6 @@ namespace Inno.Assets;
 
 public static class AssetManager
 {
-    private static readonly string ASSET_TYPES_NAMESPACE = "Inno.Assets.AssetTypes";
     private static readonly Dictionary<string, Guid> PATH_GUID_PAIRS = new();
     private static readonly Dictionary<Guid, InnoAsset> LOADED_ASSETS = new();
     private static FileSystemWatcher? m_watcher;

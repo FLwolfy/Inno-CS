@@ -33,6 +33,7 @@ public class EditorLayer: Layer
         // Panel Registration
         EditorManager.RegisterPanel(new SceneViewPanel());
         EditorManager.RegisterPanel(new GameViewPanel());
+        EditorManager.RegisterPanel(new FileBrowserPanel());
         EditorManager.RegisterPanel(new HierarchyPanel());
         EditorManager.RegisterPanel(new InspectorPanel());
     }
