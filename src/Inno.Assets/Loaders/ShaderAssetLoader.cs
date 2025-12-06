@@ -1,20 +1,31 @@
+using Inno.Assets.AssetTypes;
 using Veldrid.SPIRV;
-
-using Inno.Assets.Types;
+using Inno.Platform.Graphics;
 
 namespace Inno.Assets.Loaders;
 
 internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
 {
-    private const string C_SHADER_ASSET_POSTFIX = ".shader";
-    
-    protected override ShaderAsset? LoadRaw(string relativeSourcePath, Guid guid)
-    {
-        string absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativeSourcePath);
-        if (!File.Exists(absoluteSourcePath)) return null;
+    public override string[] validExtensions => [".vert", ".frag"];
 
+    protected override ShaderAsset LoadRaw(string relativePath, Guid guid)
+    {
+        var asset = new ShaderAsset(
+            guid,
+            relativePath,
+            DetectShaderStage(relativePath)
+        );
+        
+        return asset;
+    }
+    
+    protected override byte[]? CompileRaw(string relativePath)
+    {
+        string absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
+        if (!File.Exists(absoluteSourcePath)) return null;
+        
         string glsl = File.ReadAllText(absoluteSourcePath);
-        Veldrid.ShaderStages stage = DetectShaderStage(absoluteSourcePath);
+        Veldrid.ShaderStages stage = (Veldrid.ShaderStages)DetectShaderStage(absoluteSourcePath);
 
         var compileResult = SpirvCompilation.CompileGlslToSpirv(
             glsl,
@@ -23,38 +34,16 @@ internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
             new GlslCompileOptions(true)
         );
 
-        byte[] spirv = compileResult.SpirvBytes;
-        string absShaderPath = Path.Combine(AssetManager.libraryDirectory, relativeSourcePath + C_SHADER_ASSET_POSTFIX);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(absShaderPath)!);
-        File.WriteAllBytes(absShaderPath, spirv);
-
-        var asset = new ShaderAsset(
-            guid,
-            relativeSourcePath,
-            relativeSourcePath + C_SHADER_ASSET_POSTFIX
-        );
-
-        return asset;
+        return compileResult.SpirvBytes;
     }
 
-    protected override void UnloadRaw(string relativePath)
-    {
-        string absShaderPath = Path.Combine(AssetManager.libraryDirectory, relativePath + C_SHADER_ASSET_POSTFIX);
-        
-        Console.WriteLine("Unloading " + absShaderPath);
-
-        if (File.Exists(absShaderPath))
-            File.Delete(absShaderPath);
-    }
-
-    private static Veldrid.ShaderStages DetectShaderStage(string path)
+    private static ShaderStage DetectShaderStage(string path)
     {
         string ext = Path.GetExtension(path).ToLowerInvariant();
         return ext switch
         {
-            ".vert" => Veldrid.ShaderStages.Vertex,
-            ".frag" => Veldrid.ShaderStages.Fragment,
+            ".vert" => ShaderStage.Vertex,
+            ".frag" => ShaderStage.Fragment,
             _ => throw new Exception("Unknown shader stage: " + ext)
         };
     }

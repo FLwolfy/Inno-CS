@@ -1,3 +1,4 @@
+using Inno.Assets.Loaders;
 using Inno.Core.Utility;
 
 namespace Inno.Assets;
@@ -8,6 +9,7 @@ namespace Inno.Assets;
 internal static class AssetLoaderRegistry
 {
     private static readonly Dictionary<Type, IAssetLoader> LOADERS = new();
+    private static readonly Dictionary<string, IAssetLoader> EXTENSION_LOADERS = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Initializes the registry by scanning for IAssetLoader implementations.
@@ -17,6 +19,7 @@ internal static class AssetLoaderRegistry
         TypeCacheManager.OnRefreshed += () =>
         {
             LOADERS.Clear();
+            EXTENSION_LOADERS.Clear();
             
             foreach (var type in TypeCacheManager.GetTypesImplementing<IAssetLoader>())
             {
@@ -42,6 +45,15 @@ internal static class AssetLoaderRegistry
             {
                 var genericArg = baseType.GetGenericArguments()[0];
                 LOADERS[genericArg] = instance;
+                
+                var prop = type.GetProperty("validExtensions");
+                if (prop != null && prop.GetValue(instance) is string[] extensions)
+                {
+                    foreach (var ext in extensions)
+                    {
+                        EXTENSION_LOADERS[ext] = instance;
+                    }
+                }
             }
         }
     }
@@ -52,5 +64,13 @@ internal static class AssetLoaderRegistry
     internal static bool TryGetLoader(Type assetType, out IAssetLoader? loader)
     {
         return LOADERS.TryGetValue(assetType, out loader);
+    }
+    
+    /// <summary>
+    /// Tries to get a loader for the specified file extensions.
+    /// </summary>
+    internal static bool TryGetLoader(string extension, out IAssetLoader? loader)
+    {
+        return EXTENSION_LOADERS.TryGetValue(extension, out loader);
     }
 }

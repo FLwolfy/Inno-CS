@@ -1,18 +1,19 @@
 using System.Security.Cryptography;
+using Inno.Assets.Serializers;
 
-namespace Inno.Assets;
-
+namespace Inno.Assets.AssetTypes;
 
 public abstract class InnoAsset
 {
-    public Guid guid { get; internal set; } = Guid.Empty;
-    public string sourcePath { get; internal set; } = null!;
-    public string sourceHash { get; private set; } = null!;
-    
-    protected internal InnoAsset() {}
+    [AssetProperty] private string type { get; set; }
+    [AssetProperty] public Guid guid { get; private set; }
+    [AssetProperty] public string sourceHash { get; private set; } = string.Empty;
+    [AssetProperty] public string sourcePath { get; private set; }
     
     protected internal InnoAsset(Guid guid, string sourcePath)
     {
+        type = GetType().Name;
+        
         this.guid = guid;
         this.sourcePath = sourcePath;
         RecomputeHash();
@@ -25,4 +26,6 @@ public abstract class InnoAsset
         var hashBytes = sha.ComputeHash(stream);
         sourceHash = Convert.ToHexString(hashBytes);
     }
+
+    internal virtual void OnBinaryLoaded(byte[] data) {}
 }

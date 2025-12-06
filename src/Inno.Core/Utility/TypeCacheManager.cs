@@ -99,7 +99,7 @@ public static class TypeCacheManager
     }
 
     /// <summary>
-    /// Gets all types with the specified attribute in the Assembly Company specified above.
+    /// Gets all types with the specified attribute in the Assembly Namespace specified above.
     /// </summary>
     public static IReadOnlyList<Type> GetTypesWithAttribute<TAttr>() where TAttr : Attribute
     {

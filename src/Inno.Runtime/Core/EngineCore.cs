@@ -66,6 +66,7 @@ public abstract class EngineCore
             assetDir: "Project/Assets",
             libraryDir: "Project/Library"
         );
+        AssetManager.LoadAllAssets();
         
         // Graphics Resources
         Renderer2D.LoadResources();

@@ -1,5 +1,3 @@
-using Inno.Assets;
-using Inno.Assets.Types;
 using Inno.Core.ECS;
 using Inno.Core.Layers;
 using Inno.Core.Math;
@@ -27,9 +25,6 @@ public class EditorTest
             
             SetWindowSize(1920, 1080);
             SetWindowResizable(true);
-
-            var sa = AssetManager.Load<ShaderAsset>("TestShaders/Vertex.vert");
-            Console.WriteLine("Test Asset Loader: " + sa!.shaderBinaryPath);
         }
         protected override void RegisterLayers(LayerStack layerStack)
         {
