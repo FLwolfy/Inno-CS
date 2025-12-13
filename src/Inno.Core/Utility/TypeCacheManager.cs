@@ -1,4 +1,9 @@
+using System.Reflection;
+
 namespace Inno.Core.Utility;
+
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class TypeCacheRefreshAttribute : Attribute;
 
 public static class TypeCacheManager
 {
@@ -9,16 +14,55 @@ public static class TypeCacheManager
     private static readonly Dictionary<Type, List<Type>> ATTRIBUTE_CACHE = new();
 
     private static bool m_isDirty = true;
-    
-    public static event Action? OnRefreshed;
-
+    private static event Action? OnRefreshed;
 
     public static void Initialize()
     {
+        SubscribeRefreshHooks();
+            
         AppDomain.CurrentDomain.AssemblyLoad += (_, __) =>
         {
             m_isDirty = true;
         };
+        
+        Refresh();
+    }
+    
+    private static void SubscribeRefreshHooks()
+    {
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic);
+
+        var allTypes = assemblies
+            .SelectMany(a =>
+            {
+                try { return a.GetTypes(); }
+                catch { return Type.EmptyTypes; }
+            })
+            .Where(t => t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false)
+            .ToArray();
+        
+        foreach (var type in allTypes)
+        {
+            foreach (var method in type.GetMethods(
+                         BindingFlags.Static |
+                         BindingFlags.Public |
+                         BindingFlags.NonPublic))
+            {
+                if (!method.IsDefined(typeof(TypeCacheRefreshAttribute), false))
+                    continue;
+
+                if (method.ReturnType != typeof(void) ||
+                    method.GetParameters().Length != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"[TypeCacheRefresh] method must be 'static void Method()': " +
+                        $"{type.FullName}.{method.Name}");
+                }
+
+                OnRefreshed += () => method.Invoke(null, null);
+            }
+        }
     }
     
     /// <summary>
@@ -35,7 +79,7 @@ public static class TypeCacheManager
                 try { return a.GetTypes(); }
                 catch { return Type.EmptyTypes; }
             })
-            .Where(t => !t.IsAbstract && (t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false))
+            .Where(t => !t.IsAbstract && !t.IsInterface && (t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false))
             .ToArray();
 
         SUBCLASS_CACHE.Clear();

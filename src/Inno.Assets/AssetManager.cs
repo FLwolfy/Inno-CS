@@ -27,8 +27,6 @@ public static class AssetManager
         m_watcher.Changed += OnFileChanged;
         m_watcher.Deleted += OnFileChanged;
         m_watcher.EnableRaisingEvents = true;
-
-        AssetLoaderRegistry.SubscribeToTypeCache();
     }
     
     public static void LoadAllAssets()

@@ -23,8 +23,6 @@ public class EditorLayer: Layer
     public override void OnAttach()
     {
         // GUI Initialization
-        PropertyRendererRegistry.SubscribeToTypeCache();
-        InspectorEditorRegistry.SubscribeToTypeCache();
         IImGui.Zoom(m_currentZoomRate);
         
         // MenuBar Setup

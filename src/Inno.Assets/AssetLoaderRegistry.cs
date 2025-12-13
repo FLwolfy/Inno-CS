@@ -14,20 +14,16 @@ internal static class AssetLoaderRegistry
     /// <summary>
     /// Initializes the registry by scanning for IAssetLoader implementations.
     /// </summary>
-    internal static void SubscribeToTypeCache()
+    [TypeCacheRefresh]
+    private static void ReloadAll()
     {
-        TypeCacheManager.OnRefreshed += () =>
-        {
-            LOADERS.Clear();
-            EXTENSION_LOADERS.Clear();
-            
-            foreach (var type in TypeCacheManager.GetTypesImplementing<IAssetLoader>())
-            {
-                Register(type);
-            }
-        };
+        LOADERS.Clear();
+        EXTENSION_LOADERS.Clear();
         
-        TypeCacheManager.Refresh();
+        foreach (var type in TypeCacheManager.GetTypesImplementing<IAssetLoader>())
+        {
+            Register(type);
+        }
     }
 
     /// <summary>

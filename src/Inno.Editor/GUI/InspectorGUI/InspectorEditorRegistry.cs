@@ -7,31 +7,23 @@ public static class InspectorEditorRegistry
 {
     private static readonly Dictionary<Type, IInspectorEditor> REGISTRY = new();
 
-    internal static void SubscribeToTypeCache()
+    [TypeCacheRefresh]
+    private static void ReloadAll()
     {
-        TypeCacheManager.OnRefreshed += () =>
-        {
-            REGISTRY.Clear();
-            
-            foreach (var editorType in TypeCacheManager.GetTypesImplementing<IInspectorEditor>())
-            {
-                Register(editorType);
-            }
-        };
+        REGISTRY.Clear();
         
-        TypeCacheManager.Refresh();
+        foreach (var editorType in TypeCacheManager.GetTypesWithAttribute<InspectorEditorGUIAttribute>())
+        {
+            Register(editorType);
+        }
     }
 
     private static void Register(Type type)
     {
-        if (type.IsAbstract || type.IsInterface) return;
-
-        var attr = type.GetCustomAttribute<InspectorEditorGUIAttribute>();
-        if (attr == null) return;
-
         if (Activator.CreateInstance(type) is IInspectorEditor editor)
         {
-            REGISTRY[attr.targetType] = editor;
+            var attr = type.GetCustomAttribute<InspectorEditorGUIAttribute>();
+            REGISTRY[attr!.targetType] = editor;
         }
     }
     
