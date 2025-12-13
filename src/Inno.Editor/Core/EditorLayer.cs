@@ -1,10 +1,9 @@
 using ImGuiNET;
 using Inno.Core.Events;
 using Inno.Core.Layers;
+using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Editor.GUI;
-using Inno.Editor.GUI.InspectorGUI;
-using Inno.Editor.GUI.PropertyGUI;
 using Inno.Editor.Panel;
 using Inno.Platform.ImGui;
 
@@ -32,6 +31,7 @@ public class EditorLayer: Layer
         EditorManager.RegisterPanel(new SceneViewPanel());
         EditorManager.RegisterPanel(new GameViewPanel());
         EditorManager.RegisterPanel(new FileBrowserPanel());
+        EditorManager.RegisterPanel(new LogPanel());
         EditorManager.RegisterPanel(new HierarchyPanel());
         EditorManager.RegisterPanel(new InspectorPanel());
     }

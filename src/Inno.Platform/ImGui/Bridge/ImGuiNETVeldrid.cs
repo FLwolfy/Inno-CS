@@ -228,11 +228,11 @@ internal class ImGuiNETVeldrid : IImGui
 		style.Colors[(int)ImGuiCol.ResizeGrip] = new Vector4(0.61960787f, 0.5764706f, 0.76862746f, 0.54901963f);
 		style.Colors[(int)ImGuiCol.ResizeGripHovered] = new Vector4(0.7372549f, 0.69411767f, 0.8862745f, 0.54901963f);
 		style.Colors[(int)ImGuiCol.ResizeGripActive] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.54901963f);
-		style.Colors[(int)ImGuiCol.Tab] = new Vector4(0.61960787f, 0.5764706f, 0.76862746f, 0.54901963f);
-		style.Colors[(int)ImGuiCol.TabHovered] = new Vector4(0.7372549f, 0.69411767f, 0.8862745f, 0.54901963f);
-		style.Colors[(int)ImGuiCol.TabSelected] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.54901963f);
-		style.Colors[(int)ImGuiCol.TabDimmed] = new Vector4(0.0f, 0.4509804f, 1.0f, 0.0f);
-		style.Colors[(int)ImGuiCol.TabDimmedSelected] = new Vector4(0.13333334f, 0.25882354f, 0.42352942f, 0.0f);
+		style.Colors[(int)ImGuiCol.Tab] = new Vector4(0.61960787f, 0.5764706f, 0.76862746f, 0.24901963f);
+		style.Colors[(int)ImGuiCol.TabHovered] = new Vector4(0.7372549f, 0.69411767f, 0.8862745f, 0.74901963f);
+		style.Colors[(int)ImGuiCol.TabSelected] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.74901963f);
+		style.Colors[(int)ImGuiCol.TabDimmed] = new Vector4(0.61960787f, 0.5764706f, 0.76862746f, 0.24901963f);
+		style.Colors[(int)ImGuiCol.TabDimmedSelected] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.44901963f);
 		style.Colors[(int)ImGuiCol.TabSelectedOverline] = new Vector4(0.13333334f, 0.25882354f, 0.42352942f, 0.0f);
 		style.Colors[(int)ImGuiCol.PlotLines] = new Vector4(0.29411766f, 0.29411766f, 0.29411766f, 1.0f);
 		style.Colors[(int)ImGuiCol.PlotLinesHovered] = new Vector4(0.7372549f, 0.69411767f, 0.8862745f, 0.54901963f);
