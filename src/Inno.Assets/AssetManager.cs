@@ -1,4 +1,5 @@
 using Inno.Assets.AssetTypes;
+using Inno.Core.Logging;
 
 namespace Inno.Assets;
 

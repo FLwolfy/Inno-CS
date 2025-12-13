@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Inno.Core.Events;
+using Inno.Core.Logging;
 using Inno.Core.Utility;
 
 namespace Inno.Core.Application;
@@ -30,6 +31,9 @@ public class Shell
     {
         m_timer = new Stopwatch();
         m_eventDispatcher = new EventDispatcher();
+        
+        TypeCacheManager.Initialize();
+        LogManager.Initialize();
     }
 
     public void Run()
@@ -63,6 +67,7 @@ public class Shell
         }
 
         m_onClose?.Invoke();
+        LogManager.Shutdown();
     }
 
     public void Terminate()

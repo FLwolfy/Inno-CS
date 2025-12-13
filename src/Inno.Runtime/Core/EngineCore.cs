@@ -2,6 +2,7 @@ using Inno.Assets;
 using Inno.Core.Application;
 using Inno.Core.Events;
 using Inno.Core.Layers;
+using Inno.Core.Logging;
 using Inno.Core.Utility;
 using Inno.Graphics;
 using Inno.Graphics.Targets;
@@ -24,6 +25,7 @@ public abstract class EngineCore
     private readonly Shell m_gameShell;
     private readonly LayerStack m_layerStack;
     private readonly EventSnapshot m_eventSnapshot;
+    private readonly FileLogSink m_fileSink;
     
     protected EngineCore(bool imGui = true)
     {
@@ -36,12 +38,23 @@ public abstract class EngineCore
         }, WindowBackend.Veldrid_Sdl2);
         m_mainWindow.resizable = DEFAULT_WINDOW_RESIZABLE;
         m_graphicsDevice = PlatformAPI.CreateGraphicsDevice(m_mainWindow, GraphicsBackend.Metal);
-        if (imGui) PlatformAPI.CreateImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
+        if (imGui) PlatformAPI.SetupImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
         
-        // Initialize members
+        // Initialize lifecycle
         m_gameShell = new Shell();
         m_layerStack = new LayerStack();
         m_eventSnapshot = new EventSnapshot();
+        
+        // Initialize Asset
+        AssetManager.Initialize(
+            assetDir: "Project/Assets",
+            libraryDir: "Project/Library"
+        );
+        
+        // Initialize Logging
+        m_fileSink = new FileLogSink("Project/Logs", 5 * 1024 * 1024, 20);
+        LogManager.RegisterSink(m_fileSink);
+        LogManager.RegisterSink(new ConsoleLogSink());
         
         // Initialize Render
         RenderTargetPool.Initialize(m_graphicsDevice);
@@ -58,14 +71,7 @@ public abstract class EngineCore
     
     private void OnLoad()
     {
-        // Type Cache Initial Refresh
-        TypeCacheManager.Initialize();
-        
         // InnoAsset Initialization
-        AssetManager.Initialize(
-            assetDir: "Project/Assets",
-            libraryDir: "Project/Library"
-        );
         AssetManager.LoadAllAssets();
         
         // Graphics Resources
@@ -121,6 +127,7 @@ public abstract class EngineCore
         
         // Dispose Resources
         IImGui.DisposeImpl();
+        m_fileSink.Dispose();
         m_graphicsDevice.Dispose();
     }
     
