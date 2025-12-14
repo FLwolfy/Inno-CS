@@ -12,33 +12,51 @@ public class LogPanel : EditorPanel, ILogSink
 
     public override string title => "Log";
 
+    private readonly Queue<LogEntry> m_pendingEntries = new();
     private readonly List<LogEntry> m_entries = new();
     private readonly HashSet<LogLevel> m_filterLevels = Enum.GetValues(typeof(LogLevel)).Cast<LogLevel>().ToHashSet();
     private readonly LogLevel[] m_levels = (LogLevel[])Enum.GetValues(typeof(LogLevel));
 
     private bool m_collapse = true;
+
     public LogPanel()
     {
         LogManager.RegisterSink(this);
     }
-
+    
     public void Receive(LogEntry entry)
     {
-        m_entries.Add(entry);
-        
-        if (m_entries.Count > C_MAX_LOG_ENTRIES)
+        lock (m_pendingEntries)
         {
-            m_entries.RemoveAt(0);
+            m_pendingEntries.Enqueue(entry);
         }
     }
 
     internal override void OnGUI()
     {
-        ImGui.BeginChild("LogChild", new Vector2(0, 0));
+        // -------------------
+        // Add entries
+        // -------------------
+        lock(m_pendingEntries)
+        {
+            while (m_pendingEntries.Count > 0)
+            {
+                m_entries.Add(m_pendingEntries.Dequeue());
+            }
+
+            while (m_entries.Count > C_MAX_LOG_ENTRIES)
+            {
+                m_entries.RemoveAt(0);
+            }
+        }
+        
 
         // -------------------
         // Top Options
         // -------------------
+        ImGui.BeginChild("LogChild", new Vector2(0, 0));
+        
+        bool oldCollapse = m_collapse;
         ImGui.Checkbox("Collapse", ref m_collapse);
         ImGui.SameLine();
 
@@ -57,7 +75,7 @@ public class LogPanel : EditorPanel, ILogSink
             }
             ImGui.EndCombo();
         }
-        
+
         ImGui.SameLine();
         if (ImGui.Button("Clear"))
         {
@@ -70,74 +88,40 @@ public class LogPanel : EditorPanel, ILogSink
         // Scrollable log region
         // -------------------
         ImGui.BeginChild("LogRegion", new Vector2(0, 0));
-
         bool scrollAtBottom = ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 1.0f;
 
-        string? lastMessage = null;
-        LogLevel? lastLevel = null;
-        int repeatCount = 1;
+        LogEntry? collapsedEntry = null;
+        int repeatCount = 0;
 
-        for (int i = 0; i < m_entries.Count; i++)
+        foreach (var entry in m_entries)
         {
-            var entry = m_entries[i];
-
             if (!m_filterLevels.Contains(entry.level))
-            {
                 continue;
-            }
 
-            if (m_collapse && entry.level == lastLevel && entry.message == lastMessage)
+            if (m_collapse &&
+                collapsedEntry != null &&
+                entry.level == collapsedEntry.Value.level &&
+                entry.message == collapsedEntry.Value.message)
             {
+                collapsedEntry = entry;
                 repeatCount++;
                 continue;
             }
 
-            if (repeatCount > 1)
+            if (collapsedEntry != null)
             {
-                ImGui.Text($"(Repeated {repeatCount} times)");
-                repeatCount = 1;
+                if (oldCollapse && !m_collapse) ImGui.SetNextItemOpen(false);
+                DrawLogEntry(collapsedEntry.Value, repeatCount);
             }
 
-            lastMessage = entry.message;
-            lastLevel = entry.level;
-
-            Vector4 color = entry.level switch
-            {
-                LogLevel.Debug => new Vector4(0.5f, 0.5f, 0.5f, 1f),
-                LogLevel.Info  => new Vector4(0.2f, 1f, 0.2f, 1f),
-                LogLevel.Warn  => new Vector4(1f, 1f, 0.2f, 1f),
-                LogLevel.Error => new Vector4(1f, 0.2f, 0.2f, 1f),
-                LogLevel.Fatal => new Vector4(1f, 0.2f, 1f, 1f),
-                _ => new Vector4(1f, 1f, 1f, 1f)
-            };
-
-            ImGui.PushID(entry.time.GetHashCode().ToString() + i);
-
-            var open = ImGui.CollapsingHeader("");
-            IImGui.UseFont(ImGuiFontStyle.Bold);
-            ImGui.PushStyleColor(ImGuiCol.Text, color);
-            ImGui.SameLine();
-            ImGui.Text($"[{entry.level}]");
-            ImGui.PopStyleColor();
-            IImGui.UseFont(ImGuiFontStyle.Regular);
-            ImGui.SameLine();
-            ImGui.Text($"{entry.message}");
-
-            if (open)
-            {
-                ImGui.TextWrapped($"Time: {entry.time:HH:mm:ss}");
-                ImGui.TextWrapped($"File: {entry.file}");
-                ImGui.TextWrapped($"Line: {entry.line}");
-                ImGui.Dummy(new Vector2(0, 10));
-            }
-
-            ImGui.PopID();
+            collapsedEntry = entry;
+            repeatCount = 1;
         }
 
-        // Draw last repeated entry if any
-        if (repeatCount > 1)
+        // Draw last collapsed entry
+        if (collapsedEntry != null)
         {
-            ImGui.Text($"(Repeated {repeatCount} times)");
+            DrawLogEntry(collapsedEntry.Value, repeatCount);
         }
 
         if (scrollAtBottom)
@@ -147,5 +131,48 @@ public class LogPanel : EditorPanel, ILogSink
 
         ImGui.EndChild();
         ImGui.EndChild();
+    }
+
+    private void DrawLogEntry(LogEntry entry, int repeatCount)
+    {
+        Vector4 color = entry.level switch
+        {
+            LogLevel.Debug => new Vector4(0.5f, 0.5f, 0.5f, 1f),
+            LogLevel.Info  => new Vector4(0.2f, 1f, 0.2f, 1f),
+            LogLevel.Warn  => new Vector4(1f, 1f, 0.2f, 1f),
+            LogLevel.Error => new Vector4(1f, 0.2f, 0.2f, 1f),
+            LogLevel.Fatal => new Vector4(1f, 0.2f, 1f, 1f),
+            _              => Vector4.ONE
+        };
+
+        ImGui.PushID(entry.time.GetHashCode());
+
+        bool open = ImGui.CollapsingHeader("");
+
+        IImGui.UseFont(ImGuiFontStyle.Bold);
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.SameLine();
+        ImGui.Text($"[{entry.level}]");
+        ImGui.PopStyleColor();
+        IImGui.UseFont(ImGuiFontStyle.Regular);
+
+        ImGui.SameLine();
+        ImGui.Text(entry.message);
+
+        if (repeatCount > 1)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled($"(x{repeatCount})");
+        }
+
+        if (open)
+        {
+            ImGui.TextWrapped($"Time: {entry.time:HH:mm:ss}");
+            ImGui.TextWrapped($"File: {entry.file}");
+            ImGui.TextWrapped($"Line: {entry.line}");
+            ImGui.Dummy(new Vector2(0, 8));
+        }
+
+        ImGui.PopID();
     }
 }
