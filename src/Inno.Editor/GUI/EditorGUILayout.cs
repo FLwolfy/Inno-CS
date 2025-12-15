@@ -1,6 +1,7 @@
 using ImGuiNET;
 using Inno.Core.Math;
 using Inno.Editor.Core;
+using Inno.Platform.ImGui;
 
 namespace Inno.Editor.GUI;
 
@@ -11,10 +12,13 @@ namespace Inno.Editor.GUI;
 public static class EditorGUILayout
 {
     public enum LayoutAlign { Front, Center, Back }
+    [Flags] public enum FontStyle { None, Bold, Italic }
 
+    private static readonly Stack<FontStyle> FONTSTYLE_STACK = new();
     private static readonly Stack<int> SCOPE_STACK = new();
     private static readonly Stack<LayoutAlign> ALIGN_STACK = new();
     private static readonly Stack<bool> COLUMN_DIRTY_STACK = new();
+    
     private static readonly Dictionary<int, int> COLUMN_COUNT_MAP = new();
     private static readonly Dictionary<int, float> COLUMN_TOTAL_WEIGHT_MAP = new();
     private static readonly Dictionary<int, List<float>> COLUMN_WEIGHT_MAP = new();
@@ -170,6 +174,38 @@ public static class EditorGUILayout
     {
         ImGui.Dummy(new Vector2(pixels, 1));
         ImGui.SameLine();
+    }
+    
+    /// <summary>
+    /// Begin a specific font style.
+    /// </summary>
+    public static void BeginFont(FontStyle style)
+    {
+        FONTSTYLE_STACK.Push(style);
+        
+        FontStyle result = FontStyle.None;
+        foreach (var s in FONTSTYLE_STACK) result |= s;
+        
+        if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
+        else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
+        else if (result == (FontStyle.Bold | FontStyle.Italic)) IImGui.UseFont(ImGuiFontStyle.BoldItalic);
+        else IImGui.UseFont(ImGuiFontStyle.Regular);
+    }
+
+    /// <summary>
+    /// End and pop the current font style.
+    /// </summary>
+    public static void EndFont()
+    {
+        FONTSTYLE_STACK.Pop();
+        
+        FontStyle result = FontStyle.None;
+        foreach (var s in FONTSTYLE_STACK) result |= s;
+        
+        if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
+        else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
+        else if (result == (FontStyle.Bold | FontStyle.Italic)) IImGui.UseFont(ImGuiFontStyle.BoldItalic);
+        else IImGui.UseFont(ImGuiFontStyle.Regular);
     }
     
     /// <summary>
@@ -420,11 +456,18 @@ public static class EditorGUILayout
         bool result;
         if (onClose == null)
         {
+            BeginFont(FontStyle.Bold);
             result = ImGui.CollapsingHeader(label, openFlag);
+            EndFont();
         }
         else
         {
-            using (new DrawScope(enabled)) { result = ImGui.CollapsingHeader(label, ref visibility, openFlag); }
+            using (new DrawScope(enabled))
+            {
+                BeginFont(FontStyle.Bold);
+                result = ImGui.CollapsingHeader(label, ref visibility, openFlag);
+                EndFont();
+            }
             if (!visibility) { onClose.Invoke(); }
         }
         

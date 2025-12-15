@@ -1,7 +1,8 @@
+using Inno.Assets;
 using Inno.Core.Application;
-using Inno.Core.Asset;
 using Inno.Core.Events;
 using Inno.Core.Layers;
+using Inno.Core.Logging;
 using Inno.Core.Utility;
 using Inno.Graphics;
 using Inno.Graphics.Targets;
@@ -23,6 +24,8 @@ public abstract class EngineCore
     
     private readonly Shell m_gameShell;
     private readonly LayerStack m_layerStack;
+    private readonly EventSnapshot m_eventSnapshot;
+    private readonly FileLogSink m_fileSink;
     
     protected EngineCore(bool imGui = true)
     {
@@ -35,11 +38,23 @@ public abstract class EngineCore
         }, WindowBackend.Veldrid_Sdl2);
         m_mainWindow.resizable = DEFAULT_WINDOW_RESIZABLE;
         m_graphicsDevice = PlatformAPI.CreateGraphicsDevice(m_mainWindow, GraphicsBackend.Metal);
-        if (imGui) PlatformAPI.CreateImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
+        if (imGui) PlatformAPI.SetupImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
         
-        // Initialize members
+        // Initialize lifecycle
         m_gameShell = new Shell();
         m_layerStack = new LayerStack();
+        m_eventSnapshot = new EventSnapshot();
+        
+        // Initialize Asset
+        AssetManager.Initialize(
+            assetDir: "Project/Assets",
+            libraryDir: "Project/Library"
+        );
+        
+        // Initialize Logging
+        m_fileSink = new FileLogSink("Project/Logs", 5 * 1024 * 1024, 20);
+        LogManager.RegisterSink(m_fileSink);
+        LogManager.RegisterSink(new ConsoleLogSink());
         
         // Initialize Render
         RenderTargetPool.Initialize(m_graphicsDevice);
@@ -56,9 +71,8 @@ public abstract class EngineCore
     
     private void OnLoad()
     {
-        // Asset Initialization
-        AssetManager.SetRootDirectory("Assets");
-        AssetRegistry.LoadFromDisk();
+        // InnoAsset Initialization
+        AssetManager.LoadAllAssets();
         
         // Graphics Resources
         Renderer2D.LoadResources();
@@ -68,9 +82,6 @@ public abstract class EngineCore
     {
         Setup();
         RegisterLayers(m_layerStack);
-        
-        // Type Cache Initialization
-        TypeCacheManager.Initialize();
     }
 
     private void OnStep()
@@ -82,11 +93,16 @@ public abstract class EngineCore
     private void OnEvent(EventDispatcher dispatcher)
     {
         m_mainWindow.PumpEvents(dispatcher);
+        
+        var shouldCloseWindow = false;
+        m_eventSnapshot.Clear();
         dispatcher.Dispatch(e =>
         {
-            m_layerStack.OnEvent(e);
-            if (e.type == EventType.WindowClose) End();
+            m_eventSnapshot.AddEvent(e);
+            if (e.type == EventType.WindowClose) shouldCloseWindow = true;
         });
+        m_layerStack.OnEvent(m_eventSnapshot);
+        if (shouldCloseWindow) End();
     }
 
     private void OnDraw()
@@ -105,14 +121,13 @@ public abstract class EngineCore
 
     private void OnClose()
     {
-        AssetRegistry.SaveToDisk();
-        
         // Clean Graphics Cache
         RenderTargetPool.Clear();
         Renderer2D.CleanResources();
         
         // Dispose Resources
         IImGui.DisposeImpl();
+        m_fileSink.Dispose();
         m_graphicsDevice.Dispose();
     }
     

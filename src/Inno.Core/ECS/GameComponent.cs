@@ -32,9 +32,10 @@ public abstract class GameComponent : Serializable, IComparable<GameComponent>
     /// <summary>
     /// Initialize the gameComponent to bind it with its entity.
     /// </summary>
-    public void Initialize(GameObject obj)
+    protected internal virtual void Initialize(GameObject obj)
     {
         gameObject = obj;
+        OnAttach();
     }
     
     /// <summary>
@@ -51,7 +52,8 @@ public abstract class GameComponent : Serializable, IComparable<GameComponent>
     }
 
     /// <summary>
-    /// Called when the component is first initialized.
+    /// Called once when the component is first initialized during runtime (Play Mode).
+    /// Use this to set up non-serialized data or runtime-only logic.
     /// </summary>
     public virtual void Awake() {}
 
@@ -66,9 +68,19 @@ public abstract class GameComponent : Serializable, IComparable<GameComponent>
     public virtual void Update() {}
 
     /// <summary>
+    /// Called when the component is attached to the gameobject.
+    /// </summary>
+    public virtual void OnAttach() {}
+    
+    /// <summary>
     /// Called when the component is destroyed or removed.
     /// </summary>
     public virtual void OnDetach() {}
+    
+    /// <summary>
+    /// This is called to deactivate the active components right before it get detached.
+    /// </summary>
+    protected internal virtual void OnDeactivate() { }
     
     /// <summary>
     /// Adds a component of type T to its GameObject.

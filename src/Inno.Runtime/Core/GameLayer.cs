@@ -11,7 +11,6 @@ public class GameLayer : Layer
 {
     private readonly RenderTarget m_renderTarget;
     private readonly RenderPassStack m_renderPasses;
-    private readonly StringWriter m_consoleWriter;
 
     public GameLayer() : base("GameLayer")
     {
@@ -39,14 +38,8 @@ public class GameLayer : Layer
         // Render Passes
         m_renderPasses = new RenderPassStack();
         m_renderPasses.PushPass(new ClearScreenPass());
-        m_renderPasses.PushPass(new SpriteRenderPass());
-        
-        // Console Logger
-#if DEBUG
-        m_consoleWriter = new StringWriter();
-        Console.SetOut(m_consoleWriter);
-        Console.SetError(m_consoleWriter); 
-#endif
+        m_renderPasses.PushPass(new RenderOpaqueSpritePass(true));
+        m_renderPasses.PushPass(new RenderAlphaSpritePass(true));
     }
     
     public override void OnAttach()
@@ -74,36 +67,6 @@ public class GameLayer : Layer
         m_renderTarget.GetRenderContext().BeginFrame(camera.viewMatrix * camera.projectionMatrix, camera.aspectRatio);
         m_renderPasses.OnRender(m_renderTarget.GetRenderContext());
         m_renderTarget.GetRenderContext().EndFrame();
-    }
-
-    
-    public override void OnImGui()
-    {
-#if DEBUG
-        ImGuiNET.ImGui.Begin("Console");
-
-        string consoleText = m_consoleWriter.ToString();
-        string[] lines = consoleText.Split('\n');
-
-        if (lines.Length > 1000)
-        {
-            lines = lines[^1000..];
-            consoleText = string.Join("\n", lines);
-        }
-
-        if (m_consoleWriter.GetStringBuilder().Length > 20000)
-        {
-            m_consoleWriter.GetStringBuilder().Clear();
-            m_consoleWriter.Write(consoleText); 
-        }
-
-        ImGuiNET.ImGui.TextUnformatted(consoleText);
-
-        if (ImGuiNET.ImGui.GetScrollY() >= ImGuiNET.ImGui.GetScrollMaxY())
-            ImGuiNET.ImGui.SetScrollHereY(1.0f);
-
-        ImGuiNET.ImGui.End();
-#endif
     }
 
 }

@@ -132,9 +132,11 @@ internal class RenderTest
             vertexShader = vertexShader,
             fragmentShader = fragmentShader,
             vertexLayoutTypes = [typeof(Vector2), typeof(Color)],
+            resourceLayoutSpecifiers = [resourceSetBinding],
+            
+            blendMode = BlendMode.Opaque,
             depthStencilState = DepthStencilState.DepthOnlyLessEqual,
-            primitiveTopology = PrimitiveTopology.TriangleList,
-            resourceLayoutSpecifiers = [resourceSetBinding]
+            primitiveTopology = PrimitiveTopology.TriangleList
         };
 
         m_resourceSet = m_graphicsDevice.CreateResourceSet(resourceSetBinding);

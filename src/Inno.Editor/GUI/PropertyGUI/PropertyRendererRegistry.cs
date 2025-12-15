@@ -7,18 +7,16 @@ public static class PropertyRendererRegistry
     private static readonly Dictionary<Type, IPropertyRenderer> RENDERERS = new();
     private static readonly Dictionary<Type, Type> OPEN_GENERIC_RENDERERS = new();
 
-    internal static void Initialize()
+    [TypeCacheRefresh]
+    private static void ReloadAll()
     {
-        TypeCacheManager.OnRefreshed += () =>
+        RENDERERS.Clear();
+        OPEN_GENERIC_RENDERERS.Clear();
+        
+        foreach (var type in TypeCacheManager.GetTypesImplementing<IPropertyRenderer>())
         {
-            RENDERERS.Clear();
-            OPEN_GENERIC_RENDERERS.Clear();
-            
-            foreach (var type in TypeCacheManager.GetTypesImplementing<IPropertyRenderer>())
-            {
-                Register(type);
-            }
-        };
+            Register(type);
+        }
     }
 
     private static void Register(Type type)

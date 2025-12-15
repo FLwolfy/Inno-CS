@@ -1,13 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Company>Inno</Company>
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Inno.Assets\Inno.Assets.csproj" />
         <ProjectReference Include="..\Inno.Core\Inno.Core.csproj" />
         <ProjectReference Include="..\Inno.Graphics\Inno.Graphics.csproj" />
     </ItemGroup>

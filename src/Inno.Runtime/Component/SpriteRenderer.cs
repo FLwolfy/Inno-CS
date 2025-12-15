@@ -49,7 +49,7 @@ public class SpriteRenderer : GameBehavior
         {
             if (m_layerDepth == value) return;
             m_layerDepth = MathHelper.Clamp(value, 0, MAX_LAYER_DEPTH);
-            // gameObject.scene.GetComponentManager().MarkSortDirty(this);
         }
     }
+
 }

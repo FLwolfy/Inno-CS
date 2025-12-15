@@ -25,7 +25,7 @@ public static class PlatformAPI
         throw new NotSupportedException($"GraphicsDevice for window {window.GetType()} is not supported.");
     }
     
-    public static void CreateImGuiImpl(IWindow window, IGraphicsDevice graphicsDevice, ImGuiColorSpaceHandling colorSpaceHandling)
+    public static void SetupImGuiImpl(IWindow window, IGraphicsDevice graphicsDevice, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         if (window is VeldridSdl2Window vsw && graphicsDevice is VeldridGraphicsDevice vgd)
         {

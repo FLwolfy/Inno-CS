@@ -116,6 +116,7 @@ public class GraphicsResource : IDisposable
                 vertexShader = vertexShader,
                 fragmentShader = fragmentShader,
                 vertexLayoutTypes = GenerateVertexLayoutTypes(m_mesh),
+                blendMode = m_materials[i].renderState.blendMode,
                 depthStencilState = m_materials[i].renderState.depthStencilState,
                 resourceLayoutSpecifiers =
                 [

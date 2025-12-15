@@ -11,7 +11,18 @@ public abstract class GameBehavior : GameComponent
         get => base.isActive;
         private set => base.isActive = value;
     }
-    
+
+    protected internal override void Initialize(GameObject obj)
+    {
+        base.Initialize(obj);
+        if (isActive) OnEnable();
+    }
+
+    protected internal override void OnDeactivate()
+    {
+        OnDisable();
+    }
+
     /// <summary>
     /// This is called when the behavior is set to active.
     /// </summary>
@@ -32,7 +43,7 @@ public abstract class GameBehavior : GameComponent
 
         isActive = active;
 
-        if (active) {OnEnable();}
-        else {OnDisable();}
+        if (active) { OnEnable(); }
+        else { OnDisable(); }
     }
 }

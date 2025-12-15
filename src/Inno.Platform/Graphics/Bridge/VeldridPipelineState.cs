@@ -1,5 +1,8 @@
 using Inno.Core.Math;
 using Veldrid;
+
+using InnoBlendState = Inno.Platform.Graphics.BlendMode;
+using VeldridBlendState = Veldrid.BlendStateDescription;
 using InnoTopology = Inno.Platform.Graphics.PrimitiveTopology;
 using VeldridTopology = Veldrid.PrimitiveTopology;
 using InnoDepthStencilState = Inno.Platform.Graphics.DepthStencilState;
@@ -34,6 +37,7 @@ internal class VeldridPipelineState : IPipelineState
         var vertexShader = ((VeldridShader)desc.vertexShader).inner;
         var fragmentShader = ((VeldridShader)desc.fragmentShader).inner;
         var vertexLayoutDescriptions = new[] { GenerateVertexLayoutFromTypes(desc.vertexLayoutTypes) };
+        var blendState = ToVeldridBlendState(desc.blendMode);
         var depthStencilState = ToVeldridDepthStencil(desc.depthStencilState);
         var primitiveTopology = ToVeldridTopology(desc.primitiveTopology);
         var resourceLayouts = desc.resourceLayoutSpecifiers?.Length > 0 
@@ -53,7 +57,7 @@ internal class VeldridPipelineState : IPipelineState
 
         return new GraphicsPipelineDescription
         {
-            BlendState = BlendStateDescription.SingleAlphaBlend,
+            BlendState = blendState,
             DepthStencilState = depthStencilState,
             RasterizerState = rasterizerState,
             PrimitiveTopology = primitiveTopology,
@@ -90,6 +94,18 @@ internal class VeldridPipelineState : IPipelineState
             InnoDepthStencilState.DepthReadOnlyGreaterEqual 
                 => VeldridDepthStencilState.DepthOnlyGreaterEqualRead,
             _ => throw new NotSupportedException($"Unsupported depth stencil state: {dss}")
+        };
+    }
+    
+    private static VeldridBlendState ToVeldridBlendState(InnoBlendState mode)
+    {
+        return mode switch
+        {
+            InnoBlendState.Opaque => VeldridBlendState.SingleDisabled,
+            InnoBlendState.AlphaBlend => VeldridBlendState.SingleAlphaBlend,
+            InnoBlendState.Additive => VeldridBlendState.SingleAdditiveBlend,
+            InnoBlendState.Override => VeldridBlendState.SingleOverrideBlend,
+            _ => throw new NotSupportedException($"Unsupported blend state: {mode}")
         };
     }
     

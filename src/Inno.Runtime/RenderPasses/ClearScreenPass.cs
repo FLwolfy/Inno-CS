@@ -7,14 +7,15 @@ namespace Inno.Runtime.RenderPasses;
 /// <summary>
 /// Clears the screen before rendering.
 /// </summary>
-public class ClearScreenPass : RenderPass
+public class ClearScreenPass(Color? clearColor = null) : RenderPass
 {
-    private static readonly Color CLEAR_COLOR = Color.CORNFLOWERBLUE;
+    private static readonly Color DEFAULT_CLEAR_COLOR = Color.CORNFLOWERBLUE;
+    private readonly Color m_clearColor = clearColor ?? DEFAULT_CLEAR_COLOR;
     
     public override RenderPassTag orderTag => RenderPassTag.ClearScreen;
 
     public override void OnRender(RenderContext ctx)
     {
-        Renderer2D.ClearColor(ctx, CLEAR_COLOR);
+        Renderer2D.ClearColor(ctx, m_clearColor);
     }
 }

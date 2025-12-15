@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Inno.Core", "src\Inno.Core\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Inno.Platform", "src\Inno.Platform\Inno.Platform.csproj", "{3975A7B6-06F3-432F-A0A4-DD7DB062990B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Inno.Assets", "src\Inno.Assets\Inno.Assets.csproj", "{1F6552CF-9409-4DC7-A9DB-3049F5977046}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{3975A7B6-06F3-432F-A0A4-DD7DB062990B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3975A7B6-06F3-432F-A0A4-DD7DB062990B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3975A7B6-06F3-432F-A0A4-DD7DB062990B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F6552CF-9409-4DC7-A9DB-3049F5977046}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F6552CF-9409-4DC7-A9DB-3049F5977046}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F6552CF-9409-4DC7-A9DB-3049F5977046}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F6552CF-9409-4DC7-A9DB-3049F5977046}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

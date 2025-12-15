@@ -23,7 +23,7 @@ public static class EditorManager
         {
             if (!panel.isOpen) continue;
 
-            ImGui.Begin(panel.title);
+            ImGui.Begin(panel.title, ImGuiWindowFlags.NoCollapse);
             panel.OnGUI();
             ImGui.End();
         }

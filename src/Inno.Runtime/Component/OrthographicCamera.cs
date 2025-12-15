@@ -12,7 +12,7 @@ public class OrthographicCamera : GameCamera
     private const float C_NEAR = 0f;
     private const float C_FAR = 1f;
 
-    private float m_size = 720f;
+    private float m_size = 1080f;
 
     /// <summary>
     /// The size of the camera's view in world units.
@@ -35,7 +35,7 @@ public class OrthographicCamera : GameCamera
     {
         Vector2 cameraPos = new Vector2(
             transform.worldPosition.x, 
-            -transform.worldPosition.y // Flip Y for correct rendering
+            transform.worldPosition.y
         );
         float rotationZ = transform.worldRotation.ToEulerAnglesZYX().z;
 
@@ -61,7 +61,7 @@ public class OrthographicCamera : GameCamera
     {
         Matrix rotation = Matrix.CreateRotationZ(-rotationZ);
         Matrix translation = Matrix.CreateTranslation(-cameraPos.x, -cameraPos.y, 0f);
-        return rotation * translation;
+        return translation * rotation;
     }
 
     private Rect CalculateViewRect(Vector2 cameraPos, float rotationZ)

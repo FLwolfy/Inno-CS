@@ -68,7 +68,8 @@ public class EditorCamera2D
         screenToWorldMatrix = GetScreenToWorldMatrix();
         Vector2 worldPosAfter = Vector2.Transform(localMousePosition, screenToWorldMatrix);
 
-        m_position -= panDelta * m_zoomRate;
+        Vector2 panDeltaFlipY = new Vector2(panDelta.x, -panDelta.y); // Flip Y because ImGui Y increases downward
+        m_position -= panDeltaFlipY * m_zoomRate;
         m_position += worldPosBefore - worldPosAfter;
     }
     
@@ -82,8 +83,9 @@ public class EditorCamera2D
         float halfWidth = m_height * aspectRatio / 2f;
         float halfHeight = m_height / 2f;
 
-        Matrix screenToClip = Matrix.CreateScale(halfWidth, halfHeight, 1f) *
-                              Matrix.CreateTranslation(halfWidth, halfHeight, 0f);
+        Matrix screenToClip = Matrix.CreateScale(halfWidth, -halfHeight, 1f) // Flip Y because ImGui Y increases downward
+                              * Matrix.CreateTranslation(halfWidth, halfHeight, 0f);
+
 
         return viewMatrix * projectionMatrix * screenToClip;
     }

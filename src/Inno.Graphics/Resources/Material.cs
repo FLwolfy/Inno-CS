@@ -4,6 +4,7 @@ namespace Inno.Graphics.Resources;
 
 public struct MaterialRenderState
 {
+    public BlendMode blendMode;
     public DepthStencilState depthStencilState;
 }
 

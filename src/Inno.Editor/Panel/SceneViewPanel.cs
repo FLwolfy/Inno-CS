@@ -94,8 +94,9 @@ public class SceneViewPanel : EditorPanel
     private void EnsureSceneRenderPasses()
     {
         m_renderPasses = new RenderPassStack();
-        m_renderPasses.PushPass(new ClearScreenPass());
-        m_renderPasses.PushPass(new SpriteRenderPass());
+        m_renderPasses.PushPass(new ClearScreenPass(Color.LIGHTGRAY));
+        m_renderPasses.PushPass(new RenderOpaqueSpritePass());
+        m_renderPasses.PushPass(new RenderAlphaSpritePass());
     }
 
     private void CheckRegionChange()
@@ -123,7 +124,7 @@ public class SceneViewPanel : EditorPanel
             var flipYViewMatrix = m_editorCamera2D.viewMatrix;
             flipYViewMatrix.m42 *= -1;
             
-            m_renderTarget.GetRenderContext().BeginFrame(flipYViewMatrix * m_editorCamera2D.projectionMatrix, null);
+            m_renderTarget.GetRenderContext().BeginFrame(m_editorCamera2D.viewMatrix * m_editorCamera2D.projectionMatrix, null);
             m_renderPasses.OnRender(m_renderTarget.GetRenderContext());
             m_renderTarget.GetRenderContext().EndFrame();
         }

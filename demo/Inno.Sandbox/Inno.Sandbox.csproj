@@ -14,9 +14,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="TestShaders\*.*">
-            <LogicalName>%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
-        </EmbeddedResource>
+        <Content Include="Project\**\*.*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
 </Project>

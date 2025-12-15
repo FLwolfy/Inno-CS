@@ -47,9 +47,6 @@ internal class ImGuiNETVeldridController : IDisposable
     private bool m_shiftDown;
     private bool m_altDown;
     private bool m_winKeyDown;
-    private int m_windowWidth;
-    private int m_windowHeight;
-    private readonly SYSVector2 m_scaleFactor = SYSVector2.One;
     
     // Window Delegate
     private Platform_CreateWindow m_createWindow = null!;
@@ -79,6 +76,9 @@ internal class ImGuiNETVeldridController : IDisposable
     private readonly Dictionary<Texture, TextureView> m_autoViewsByTexture = new();
     private readonly Dictionary<IntPtr, ResourceSetInfo> m_viewsById = new();
     private readonly List<IDisposable> m_ownedResources = new();
+    
+    // Font trackers
+    private readonly Dictionary<string, (IntPtr, int)> m_fontCache;
     
     
     // ============================================================
@@ -113,17 +113,10 @@ internal class ImGuiNETVeldridController : IDisposable
         
         // Window Platform Interface
         m_mainWindow = mainWindow;
-        m_windowWidth = mainWindow.Width;
-        m_windowHeight = mainWindow.Height;
         ImGuiPlatformIOPtr platformIo = ImGuiNET.ImGui.GetPlatformIO();
         ImGuiViewportPtr mainViewport = platformIo.Viewports[0];
-        mainViewport.PlatformHandle = mainWindow.Handle;
-        mainWindow.Resized += () =>
-        {
-            m_windowWidth = mainWindow.Width;
-            m_windowHeight = mainWindow.Height;
-        };
         m_mainImGuiWindow = new ImGuiNETVeldridWindow(gd, mainViewport, m_mainWindow);
+        mainViewport.PlatformHandle = mainWindow.Handle;
         mainWindow.FocusGained += () =>
         {
             ImGuiNETVeldridWindow.currentWindow = m_mainImGuiWindow;
@@ -139,6 +132,7 @@ internal class ImGuiNETVeldridController : IDisposable
         io.BackendFlags |= ImGuiBackendFlags.RendererHasViewports;
 
         // Fonts
+        m_fontCache = new Dictionary<string, (IntPtr, int)>();
         ImGuiNET.ImGui.GetIO().Fonts.AddFontDefault();
         ImGuiNET.ImGui.GetIO().Fonts.Flags |= ImFontAtlasFlags.NoBakedLines;
 
@@ -503,6 +497,29 @@ internal class ImGuiNETVeldridController : IDisposable
     
     #region Fonts
     
+    public IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+    {
+        var resources = m_assembly.GetManifestResourceNames();
+        var match = resources.FirstOrDefault(r => r.EndsWith(shortName, StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+            throw new FileNotFoundException($"Embedded resource '{shortName}' not found.");
+
+        byte[] fontData;
+        using (var s = m_assembly.GetManifestResourceStream(match)!)
+        using (var ms = new MemoryStream())
+        {
+            s.CopyTo(ms);
+            fontData = ms.ToArray();
+        }
+
+        var ptr = Marshal.AllocHGlobal(fontData.Length);
+        Marshal.Copy(fontData, 0, ptr, fontData.Length);
+        m_fontCache[shortName] = (ptr, fontData.Length);
+	    
+        length = fontData.Length;
+        return ptr;
+    }
+    
     /// <summary>
     /// Recreates the device texture used to render text.
     /// </summary>
@@ -576,6 +593,8 @@ internal class ImGuiNETVeldridController : IDisposable
                     if (window != null)
                     {
                         cl.SetFramebuffer(window.swapchain.Framebuffer);
+                        var color = ImGuiNET.ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg];
+                        cl.ClearColorTarget(0, new RgbaFloat(color.X, color.Y, color.Z, color.W));
                         RenderImDrawData(vp.DrawData, gd, cl);
                     }
                 }
@@ -723,12 +742,11 @@ internal class ImGuiNETVeldridController : IDisposable
 
             var w = (ImGuiNETVeldridWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
             if (!w.window.Exists || !w.window.Visible) continue;
-            if (focus != null && focusRect.Contains(new Rect(w.window.Bounds.X, w.window.Bounds.Y, w.window.Bounds.Width, w.window.Bounds.Height))) continue;
-
+            
+            if (focusRect.Overlaps(new Rect(w.window.Bounds.X, w.window.Bounds.Y, w.window.Bounds.Width, w.window.Bounds.Height))) continue;
             gd.SwapBuffers(w.swapchain);
         }
     }
-
 
     /// <summary>
     /// Updates ImGui input and IO configuration state.
@@ -789,12 +807,9 @@ internal class ImGuiNETVeldridController : IDisposable
     private void SetPerFrameImGuiData(float deltaSeconds)
     {
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
-        io.DisplaySize = new SYSVector2(
-            m_windowWidth / m_scaleFactor.X,
-            m_windowHeight / m_scaleFactor.Y);
-        io.DisplayFramebufferScale = m_scaleFactor;
+        io.DisplaySize = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
         io.DeltaTime = deltaSeconds; // DeltaTime is in seconds.
-        
+
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new SYSVector2(m_mainWindow.X, m_mainWindow.Y);
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
     }
@@ -1100,11 +1115,9 @@ internal class ImGuiNETVeldridController : IDisposable
         m_pipeline?.Dispose();
         m_mainResourceSet?.Dispose();
         m_fontTextureResourceSet?.Dispose();
-
-        foreach (IDisposable resource in m_ownedResources)
-        {
-            resource.Dispose();
-        }
+        
+	    foreach (var (ptr, _) in m_fontCache.Values) if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr);
+        foreach (IDisposable resource in m_ownedResources) resource.Dispose();
     }
     
     #endregion

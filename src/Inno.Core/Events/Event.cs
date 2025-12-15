@@ -63,19 +63,28 @@ public class WindowCloseEvent : WindowEvent
 }
 
 // Keyboard
-public abstract class KeyEvent(Input.KeyCode key) : Event
+public abstract class KeyEvent(Input.KeyCode key, Input.KeyModifier modifiers = Input.KeyModifier.None)
+    : Event
 {
     public Input.KeyCode key { get; } = key;
+    public Input.KeyModifier modifiers { get; } = modifiers;
+
     public sealed override EventCategory category => EventCategory.Input | EventCategory.Keyboard;
 }
 
-public class KeyPressedEvent(Input.KeyCode key, bool repeat) : KeyEvent(key)
+public class KeyPressedEvent(
+    Input.KeyCode key,
+    Input.KeyModifier modifiers = Input.KeyModifier.None,
+    bool repeat = false)
+    : KeyEvent(key, modifiers)
 {
     public bool repeat { get; } = repeat;
+
     public override EventType type => EventType.KeyPressed;
 }
 
-public class KeyReleasedEvent(Input.KeyCode key) : KeyEvent(key)
+public class KeyReleasedEvent(Input.KeyCode key, Input.KeyModifier modifiers = Input.KeyModifier.None)
+    : KeyEvent(key, modifiers)
 {
     public override EventType type => EventType.KeyReleased;
 }

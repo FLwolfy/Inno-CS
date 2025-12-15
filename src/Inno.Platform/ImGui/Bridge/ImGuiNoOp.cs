@@ -28,6 +28,16 @@ internal class ImGuiNoOp : IImGui
         // Do nothing
     }
 
+    public void UseFontImpl(ImGuiFontStyle style)
+    {
+        // Do nothing
+    }
+
+    public void ZoomImpl(float zoomRate)
+    {
+        // Do nothing
+    }
+
     public IntPtr mainMainContextPtrImpl => IntPtr.Zero;
 
     public IntPtr virtualContextPtrImpl => IntPtr.Zero;

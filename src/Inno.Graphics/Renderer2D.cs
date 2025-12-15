@@ -47,6 +47,7 @@ public static class Renderer2D
         var opaqueMat = new Material("QuadOpaque");
         opaqueMat.renderState = new MaterialRenderState
         {
+            blendMode = BlendMode.Opaque,
             depthStencilState = DepthStencilState.DepthOnlyLessEqual
         };
         opaqueMat.shaders = new ShaderProgram();
@@ -57,6 +58,7 @@ public static class Renderer2D
         var alphaMat = new Material("QuadAlpha");
         alphaMat.renderState = new MaterialRenderState
         {
+            blendMode = BlendMode.AlphaBlend,
             depthStencilState = DepthStencilState.DepthReadOnlyLessEqual
         };
         alphaMat.shaders = new ShaderProgram();

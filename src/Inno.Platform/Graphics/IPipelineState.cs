@@ -17,12 +17,21 @@ public enum DepthStencilState
     DepthReadOnlyGreaterEqual
 }
 
+public enum BlendMode
+{
+    Opaque,
+    AlphaBlend,
+    Additive,
+    Override
+}
+
 public struct PipelineStateDescription
 {
     public IShader vertexShader;
     public IShader fragmentShader;
     public List<Type> vertexLayoutTypes;
     
+    public BlendMode blendMode;
     public PrimitiveTopology primitiveTopology;
     public DepthStencilState depthStencilState;
     

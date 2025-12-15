@@ -23,7 +23,7 @@ public class EditorTest
         {
             m_editorLayer = new TestEditorLayer();
             
-            SetWindowSize(1280, 720);
+            SetWindowSize(1920, 1080);
             SetWindowResizable(true);
         }
         protected override void RegisterLayers(LayerStack layerStack)
@@ -42,6 +42,14 @@ public class EditorTest
             // TEST SCENE SETUP
             GameScene testScene = SceneManager.CreateScene("Test Scene");
             SceneManager.SetActiveScene(testScene);
+            
+            // Camera Setup
+            GameObject cameraObject = new GameObject("Main Camera");
+            cameraObject.transform.worldPosition = new Vector3(200, 0, 0);
+            OrthographicCamera camera = cameraObject.AddComponent<OrthographicCamera>();
+            camera.isMainCamera = true;
+            camera.aspectRatio = 16f / 9f;
+            camera.size = 1080f;
         
             // Object 1
             GameObject testObject = new GameObject("Test Object 1");

@@ -13,6 +13,8 @@ public static class Input
 
     public enum KeyCode
     {
+        Unknown = 0,
+        
         A = 65,
         B = 66,
         C = 67,
@@ -62,6 +64,8 @@ public static class Input
         RightArrow = 39,
         DownArrow = 40,
 
+        LeftSuper = 91, 
+        RightSuper = 92,
         LeftShift = 160,
         RightShift = 161,
         LeftCtrl = 162,
@@ -115,6 +119,16 @@ public static class Input
         Quote = 222,         // ''' key
         LeftBracket = 219,   // '[' key
         RightBracket = 221   // ']' key
+    }
+
+    [Flags]
+    public enum KeyModifier
+    {
+        None = 0,
+        Alt = 1,
+        Control = 2,
+        Shift = 4,
+        Super = 8,
     }
 
 }

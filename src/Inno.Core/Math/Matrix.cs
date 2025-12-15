@@ -117,6 +117,10 @@ public struct Matrix : IEquatable<Matrix>
     /// Creates an orthographic projection matrix with the given width, height, near, and far planes.
     /// This matrix maps the X and Y coordinates linearly to [-1, 1] (NDC),
     /// and maps the Z coordinate linearly from [near, far] to [0, 1] (depth buffer range).
+    ///
+    /// <p>
+    /// Y-axis is oriented upwards, i.e., +Y is the top of the view.
+    /// </p>
     /// 
     /// This is suitable for APIs like Veldrid/Direct3D/Vulkan where the depth buffer expects 0-1.
     /// </summary>

@@ -8,6 +8,7 @@ public enum RenderPassTag
     ClearScreen,
     Background,
     Geometry,
+    Transparent,
     Lighting,
     PostProcessing,
     UI

@@ -105,7 +105,7 @@ public abstract class GameCamera : GameComponent
 
     protected abstract void RebuildMatrix(out Matrix view, out Matrix projection, out Rect visibleRect);
 
-    public override void Awake()
+    public override void OnAttach()
     {
         transform.OnTransformChanged += MarkDirty;
     }

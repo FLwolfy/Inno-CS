@@ -14,10 +14,11 @@ internal static class VeldridSdl2InputAdapter
         foreach (var keyEvent in snapshot.KeyEvents)
         {
             var key = ConvertKey(keyEvent.Key);
-            if (key == 0) continue;
+            if (key == Input.KeyCode.Unknown) continue;
 
+            var modifiers = ConvertKeyModifiers(keyEvent.Modifiers);
             if (keyEvent.Down)
-                onEvent(new KeyPressedEvent(key, keyEvent.Repeat));
+                onEvent(new KeyPressedEvent(key, modifiers, keyEvent.Repeat));
             else
                 onEvent(new KeyReleasedEvent(key));
         }
@@ -135,6 +136,8 @@ internal static class VeldridSdl2InputAdapter
             Key.Down => Input.KeyCode.DownArrow,
 
             // Modifiers
+            Key.LWin => Input.KeyCode.LeftSuper,
+            Key.RWin => Input.KeyCode.RightSuper,
             Key.LShift => Input.KeyCode.LeftShift,
             Key.RShift => Input.KeyCode.RightShift,
             Key.LControl => Input.KeyCode.LeftCtrl,
@@ -170,7 +173,12 @@ internal static class VeldridSdl2InputAdapter
             Key.BracketRight => Input.KeyCode.RightBracket,
             Key.Grave => Input.KeyCode.Tilde,
 
-            _ => 0
+            _ => Input.KeyCode.Unknown
         };
+    }
+
+    private static Input.KeyModifier ConvertKeyModifiers(ModifierKeys modifiers)
+    {
+        return (Input.KeyModifier) (int) modifiers;
     }
 }

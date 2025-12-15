@@ -156,6 +156,7 @@ internal class ComponentManager
         
         // Remove the component from the dictionaries
         component.OnDetach();
+        if (component.isActive) component.OnDeactivate();
         entityComponents.Remove(type);
         m_componentsByTag[component.orderTag].Remove(component);
         RemoveFromTypeMap(component);
@@ -196,6 +197,7 @@ internal class ComponentManager
     
         // Remove the component from the dictionaries
         component.OnDetach();
+        if (component.isActive) component.OnDeactivate();
         entityComponents.Remove(type);
         m_componentsByTag[component.orderTag].Remove(component);
         RemoveFromTypeMap(component);

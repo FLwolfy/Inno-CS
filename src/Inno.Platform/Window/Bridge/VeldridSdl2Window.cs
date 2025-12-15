@@ -58,12 +58,16 @@ internal class VeldridSdl2Window : IWindow
 
     public void PumpEvents(EventDispatcher dispatcher)
     {
-        // Application Events
-        if (m_isWindowSizeDirty) dispatcher.PushEvent(new WindowResizeEvent(width, height));
-        if (!exists) dispatcher.PushEvent(new WindowCloseEvent());
-        
         // Input Events
         inputSnapshot = inner.PumpEvents();
         VeldridSdl2InputAdapter.AdaptInputEvents(inputSnapshot, dispatcher.PushEvent);
+        
+        // Application Events
+        if (m_isWindowSizeDirty)
+        {
+            dispatcher.PushEvent(new WindowResizeEvent(width, height));
+            m_isWindowSizeDirty = false;
+        }
+        if (!exists) dispatcher.PushEvent(new WindowCloseEvent());
     }
 }

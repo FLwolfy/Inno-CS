@@ -1,4 +1,5 @@
 using Inno.Core.ECS;
+using Inno.Core.Logging;
 
 namespace Inno.Editor.Utility;
 
@@ -12,6 +13,8 @@ public class EditorSelection
 
     public void Select(GameObject obj)
     {
+        Log.Debug("Selecting " + obj.name);
+        
         if (m_selectedObject != obj)
         {
             var old = m_selectedObject;

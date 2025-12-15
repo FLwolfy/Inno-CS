@@ -2,23 +2,24 @@ using System.Reflection;
 
 namespace Inno.Core.Utility;
 
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class TypeCacheRefreshAttribute : Attribute;
+
 public static class TypeCacheManager
 {
-    private const string C_ASSEMBLYCOMPANY_NAME = "Inno";
+    private const string C_INNO_NAMESPACE = "Inno";
     
     private static readonly Dictionary<Type, List<Type>> SUBCLASS_CACHE = new();
     private static readonly Dictionary<Type, List<Type>> INTERFACE_CACHE = new();
     private static readonly Dictionary<Type, List<Type>> ATTRIBUTE_CACHE = new();
 
     private static bool m_isDirty = true;
-    
-    public static event Action? OnRefreshed;
+    private static event Action? OnRefreshed;
 
-    /// <summary>
-    /// This needs to wait until all the OnRefreshed methods are set up and subscribe to the event.
-    /// </summary>
     public static void Initialize()
     {
+        SubscribeRefreshHooks();
+            
         AppDomain.CurrentDomain.AssemblyLoad += (_, __) =>
         {
             m_isDirty = true;
@@ -26,16 +27,11 @@ public static class TypeCacheManager
         
         Refresh();
     }
-
-    private static void Refresh()
+    
+    private static void SubscribeRefreshHooks()
     {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a =>
-            {
-                if (a.IsDynamic) return false;
-                var attr = a.GetCustomAttribute<AssemblyCompanyAttribute>();
-                return attr != null && attr.Company == C_ASSEMBLYCOMPANY_NAME;
-            });
+            .Where(a => !a.IsDynamic);
 
         var allTypes = assemblies
             .SelectMany(a =>
@@ -43,6 +39,47 @@ public static class TypeCacheManager
                 try { return a.GetTypes(); }
                 catch { return Type.EmptyTypes; }
             })
+            .Where(t => t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false)
+            .ToArray();
+        
+        foreach (var type in allTypes)
+        {
+            foreach (var method in type.GetMethods(
+                         BindingFlags.Static |
+                         BindingFlags.Public |
+                         BindingFlags.NonPublic))
+            {
+                if (!method.IsDefined(typeof(TypeCacheRefreshAttribute), false))
+                    continue;
+
+                if (method.ReturnType != typeof(void) ||
+                    method.GetParameters().Length != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"[TypeCacheRefresh] method must be 'static void Method()': " +
+                        $"{type.FullName}.{method.Name}");
+                }
+
+                OnRefreshed += () => method.Invoke(null, null);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// This needs to be called when a new type is registered to the cache.
+    /// </summary>
+    public static void Refresh()
+    {
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic);
+
+        var allTypes = assemblies
+            .SelectMany(a =>
+            {
+                try { return a.GetTypes(); }
+                catch { return Type.EmptyTypes; }
+            })
+            .Where(t => !t.IsAbstract && !t.IsInterface && (t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false))
             .ToArray();
 
         SUBCLASS_CACHE.Clear();
@@ -106,7 +143,7 @@ public static class TypeCacheManager
     }
 
     /// <summary>
-    /// Gets all types with the specified attribute in the Assembly Company specified above.
+    /// Gets all types with the specified attribute in the Assembly Namespace specified above.
     /// </summary>
     public static IReadOnlyList<Type> GetTypesWithAttribute<TAttr>() where TAttr : Attribute
     {
