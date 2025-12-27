@@ -8,7 +8,7 @@ internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
 {
     public override string[] validExtensions => [".vert", ".frag"];
 
-    protected override ShaderAsset LoadRaw(string relativePath, Guid guid)
+    protected override ShaderAsset OnLoad(string relativePath, Guid guid)
     {
         var asset = new ShaderAsset(
             guid,
@@ -19,7 +19,7 @@ internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
         return asset;
     }
     
-    protected override byte[]? CompileRaw(string relativePath)
+    protected override byte[]? OnCompile(string relativePath)
     {
         string absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
         if (!File.Exists(absoluteSourcePath)) return null;

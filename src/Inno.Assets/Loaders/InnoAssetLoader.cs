@@ -16,7 +16,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
             if (!File.Exists(absoluteSourcePath)) return null;
             
-            var a = LoadRaw(relativePath, Guid.NewGuid());
+            var a = OnLoad(relativePath, Guid.NewGuid());
             SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
             return a;
         }
@@ -38,7 +38,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
             if (File.Exists(absoluteSourcePath))
             {
-                var a = LoadRaw(relativePath, asset.guid);
+                var a = OnLoad(relativePath, asset.guid);
                 SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
                 return a;
             }
@@ -62,7 +62,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         Directory.CreateDirectory(Path.GetDirectoryName(metaPath)!);
         File.WriteAllText(metaPath, yaml);
 
-        byte[]? binaries = CompileRaw(relativePath);
+        byte[]? binaries = OnCompile(relativePath);
         if (binaries != null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
@@ -83,6 +83,6 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         }
     }
 
-    protected abstract T LoadRaw(string relativePath, Guid guid);
-    protected virtual byte[]? CompileRaw(string relativePath) { return null; }
+    protected abstract T OnLoad(string relativePath, Guid guid);
+    protected virtual byte[]? OnCompile(string relativePath) { return null; }
 }

@@ -11,6 +11,7 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
     private readonly GraphicsDevice m_graphicsDevice;
     internal GraphicsDevice inner => m_graphicsDevice;
 
+    public GraphicsBackend backend { get; }
     public IFrameBuffer swapchainFrameBuffer { get; }
 
     public VeldridGraphicsDevice(VeldridSdl2Window window, GraphicsBackend backend)
@@ -24,6 +25,7 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
             preferStandardClipSpaceYDirection: true
         );
 
+        this.backend = backend;
         m_graphicsDevice = VeldridStartup.CreateGraphicsDevice(window.inner, deviceOptions, ToVeldridGraphicsBackend(backend));
         swapchainFrameBuffer = new VeldridFrameBuffer(m_graphicsDevice, m_graphicsDevice.SwapchainFramebuffer);
         

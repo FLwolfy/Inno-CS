@@ -11,6 +11,7 @@ public enum GraphicsBackend
 
 public interface IGraphicsDevice : IDisposable
 {
+    GraphicsBackend backend { get; }
     IFrameBuffer swapchainFrameBuffer { get; }
     
     IVertexBuffer CreateVertexBuffer(uint sizeInBytes);
