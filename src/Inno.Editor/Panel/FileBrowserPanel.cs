@@ -127,6 +127,7 @@ public class FileBrowserPanel : EditorPanel
                 {
                     m_selectedFile = file;
                     m_selectedDirectory = path;
+                    RefreshDirectory(path);
                 }
             }
 

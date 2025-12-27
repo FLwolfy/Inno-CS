@@ -2,6 +2,23 @@ using System.Reflection;
 
 namespace Inno.Core.Utility;
 
+/// <summary>
+/// Marks a static method to be invoked automatically
+/// whenever the TypeCache is refreshed.
+/// 
+/// <p>
+/// Constraints: 
+/// - Method MUST be static <br/>
+/// - Method MUST return void <br/>
+/// - Method MUST take no parameters
+/// </p>
+/// 
+/// <code>
+///     [TypeCacheRefresh]
+///     static void OnTypeCacheRefreshed() { ... }
+/// </code>
+/// 
+/// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class TypeCacheRefreshAttribute : Attribute;
 
