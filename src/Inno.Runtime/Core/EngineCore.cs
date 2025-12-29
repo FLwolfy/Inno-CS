@@ -48,7 +48,7 @@ public abstract class EngineCore
         // Initialize Asset
         AssetManager.Initialize(
             assetDir: "Project/Assets",
-            libraryDir: "Project/Library"
+            binDir: "Project/Library"
         );
         
         // Initialize Logging

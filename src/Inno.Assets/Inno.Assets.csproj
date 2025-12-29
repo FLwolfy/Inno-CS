@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Inno.Platform\Inno.Platform.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyMetadata Include="Inno.AssemblyGroup" Value="Engine" />
+  </ItemGroup>
+
 </Project>

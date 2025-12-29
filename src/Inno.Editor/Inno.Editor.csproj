@@ -15,4 +15,7 @@
     <PackageReference Include="ImGui.NET" Version="1.91.6.1" PrivateAssets="compile"/>
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyMetadata Include="Inno.AssemblyGroup" Value="Engine" />
+  </ItemGroup>
 </Project>

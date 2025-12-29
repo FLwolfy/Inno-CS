@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyMetadata Include="Inno.AssemblyGroup" Value="Engine" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="**\Assets\**\*.*">
       <LogicalName>%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>

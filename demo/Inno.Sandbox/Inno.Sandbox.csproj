@@ -9,14 +9,18 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Inno.Editor\Inno.Editor.csproj" />
-      <ProjectReference Include="..\..\src\Inno.Runtime\Inno.Runtime.csproj" />
+          <ProjectReference Include="..\..\src\Inno.Editor\Inno.Editor.csproj" />
+          <ProjectReference Include="..\..\src\Inno.Runtime\Inno.Runtime.csproj" />
     </ItemGroup>
 
     <ItemGroup>
         <Content Include="Project\**\*.*">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <AssemblyMetadata Include="Inno.AssemblyGroup" Value="Game" />
     </ItemGroup>
 
 </Project>

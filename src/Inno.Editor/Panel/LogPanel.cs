@@ -168,6 +168,7 @@ public class LogPanel : EditorPanel, ILogSink
         if (open)
         {
             ImGui.TextWrapped($"Time: {entry.time:HH:mm:ss}");
+            ImGui.TextWrapped($"Source: {entry.source}");
             ImGui.TextWrapped($"File: {entry.file}");
             ImGui.TextWrapped($"Line: {entry.line}");
             ImGui.Dummy(new Vector2(0, 8));

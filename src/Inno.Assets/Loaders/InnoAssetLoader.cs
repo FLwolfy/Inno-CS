@@ -9,7 +9,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
     public InnoAsset? Load(string relativePath)
     {
         var assetMetaPath = Path.Combine(AssetManager.assetDirectory, relativePath + AssetManager.C_ASSET_POSTFIX);
-        var assetBinPath  = Path.Combine(AssetManager.libraryDirectory, relativePath + AssetManager.C_BINARY_ASSET_POSTFIX);
+        var assetBinPath  = Path.Combine(AssetManager.binDirectory, relativePath + AssetManager.C_BINARY_ASSET_POSTFIX);
 
         if (!File.Exists(assetMetaPath))
         {

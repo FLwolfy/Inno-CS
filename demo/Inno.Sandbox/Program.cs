@@ -1,8 +1,9 @@
-﻿namespace Inno.Sandbox;
+﻿using Inno.Core.Logging;
+
+namespace Inno.Sandbox;
 
 internal static class Program
 {
-
     public static void Main()
     {
         // RenderTest rt = new RenderTest();

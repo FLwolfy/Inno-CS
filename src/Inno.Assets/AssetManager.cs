@@ -9,16 +9,16 @@ public static class AssetManager
     private static readonly Dictionary<Guid, InnoAsset> LOADED_ASSETS = new();
     private static FileSystemWatcher? m_watcher;
     
-    public static string libraryDirectory { get; private set; } = null!;
+    public static string binDirectory { get; private set; } = null!;
     public static string assetDirectory { get; private set; } = null!;
     
     public const string C_ASSET_POSTFIX = ".asset";
     public const string C_BINARY_ASSET_POSTFIX = ".bin";
 
-    public static void Initialize(string assetDir, string libraryDir)
+    public static void Initialize(string assetDir, string binDir)
     {
         assetDirectory = assetDir;
-        libraryDirectory = libraryDir;
+        binDirectory = binDir;
 
         m_watcher = new FileSystemWatcher(assetDir)
         {
