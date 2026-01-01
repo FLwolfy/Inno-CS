@@ -74,8 +74,8 @@ internal class VeldridTexture : ITexture
     {
         return dim switch
         {
-            TextureDimension.Texture1D => TextureType.Texture1D,
             TextureDimension.Texture2D => TextureType.Texture2D,
+            TextureDimension.Texture3D => TextureType.Texture3D,
             _ => throw new NotSupportedException($"Unsupported texture type: {dim}")
         };
     }

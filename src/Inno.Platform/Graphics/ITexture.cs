@@ -22,8 +22,8 @@ public enum TextureUsage : byte
 
 public enum TextureDimension
 {
-    Texture1D,
-    Texture2D
+    Texture2D,
+    Texture3D
 }
 
 public struct TextureDescription()
