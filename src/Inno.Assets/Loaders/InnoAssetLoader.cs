@@ -83,6 +83,18 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         }
     }
 
+    /// <summary>
+    /// Called to load the asset from disk / raw file.
+    /// </summary>
+    /// <param name="relativePath">the relative path to the "Assets" directory</param>
+    /// <param name="guid">the guid of the loaded InnoAsset</param>
+    /// <returns>the InnoAsset in the specified type T</returns>
     protected abstract T OnLoad(string relativePath, Guid guid);
+    
+    /// <summary>
+    /// Optionally called to compile the asset into binary form.
+    /// </summary>
+    /// <param name="relativePath">the relative path to the "Assets" directory</param>
+    /// <returns>the compiled binaries in bytes.</returns>
     protected virtual byte[]? OnCompile(string relativePath) { return null; }
 }

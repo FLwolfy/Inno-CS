@@ -1,5 +1,6 @@
 using Inno.Assets.AssetTypes;
 using Inno.Assets.Serializers;
+
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

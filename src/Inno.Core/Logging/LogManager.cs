@@ -39,6 +39,16 @@ public static class LogManager
             SINKS.Add(sink);
         }
     }
+    
+    public static void UnregisterSink(ILogSink sink)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+
+        lock (SINKS_LOCK)
+        {
+            SINKS.Remove(sink);
+        }
+    }
 
     public static void SetMinimumLevel(LogLevel level)
     {
