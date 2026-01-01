@@ -1,13 +1,17 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Inno.Core.Utility;
 
 namespace Inno.Core.Logging;
 
 public static class Log
 {
     private const string C_DEFAULT_CATEGORY = "Unknown";
-    private const string C_LOG_ASSEMBLY_KEY = "Inno.AssemblyGroup";
+
+    private static readonly ConcurrentDictionary<Type, (AssemblyGroup Source, string Category)> TYPE_INFO_CACHE = new();
+    private static readonly ConcurrentDictionary<Assembly, AssemblyGroup> ASSEMBLY_SOURCE_CACHE = new();
 
     [Conditional("DEBUG")]
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -33,31 +37,33 @@ public static class Log
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Write(LogLevel level, string message, params object[]? args)
     {
-        string msg = (args == null || args.Length == 0) ? message : string.Format(message, args);
+        if (!LogManager.IsEnabled(level)) return;
 
-        var frame = new StackTrace(skipFrames: 2, fNeedFileInfo: true).GetFrame(0);
-        var method = frame?.GetMethod();
+        var sf = new StackTrace(skipFrames: 2, fNeedFileInfo: true).GetFrame(0);
+        if (sf == null) return;
+        
+        var method = sf.GetMethod();
         var callerType = method?.DeclaringType;
 
-        var file = frame?.GetFileName() ?? C_DEFAULT_CATEGORY;
-        var line = frame?.GetFileLineNumber() ?? 0;
+        AssemblyGroup source = AssemblyGroup.None;
+        string category = C_DEFAULT_CATEGORY;
 
-        string category = callerType?.Name ?? Path.GetFileNameWithoutExtension(file);
-        LogSource source = callerType == null ? LogSource.None : ParseLogSourceFromAssembly(callerType.Assembly);
-        
-        LogManager.Dispatch(new LogEntry(level, source, category, msg, file, line));
-    }
-    
-    private static LogSource ParseLogSourceFromAssembly(Assembly asm)
-    {
-        foreach (var meta in asm.GetCustomAttributes<AssemblyMetadataAttribute>())
+        if (callerType != null)
         {
-            if (meta.Key == C_LOG_ASSEMBLY_KEY && Enum.TryParse<LogSource>(meta.Value, out var source))
+            var info = TYPE_INFO_CACHE.GetOrAdd(callerType, static t =>
             {
-                return source;
-            }
+                var src = ASSEMBLY_SOURCE_CACHE.GetOrAdd(t.Assembly, static assembly => assembly.GetInnoAssemblyGroup());
+                return (src, t.Name);
+            });
+
+            source = info.Source;
+            category = info.Category;
         }
 
-        return LogSource.None;
+        var msg = (args == null || args.Length == 0) ? message : string.Format(message, args);
+        var file = sf.GetFileName() ?? C_DEFAULT_CATEGORY;
+        var line = sf.GetFileLineNumber();
+        
+        LogManager.Dispatch(new LogEntry(level, source, category, msg, file, line));
     }
 }

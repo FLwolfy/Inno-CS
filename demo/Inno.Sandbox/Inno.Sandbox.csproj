@@ -19,8 +19,4 @@
         </Content>
     </ItemGroup>
 
-    <ItemGroup>
-        <AssemblyMetadata Include="Inno.AssemblyGroup" Value="Game" />
-    </ItemGroup>
-
 </Project>
