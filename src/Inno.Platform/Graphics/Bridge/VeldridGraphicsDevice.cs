@@ -89,6 +89,11 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
     {
         return VeldridTexture.Create(m_graphicsDevice, desc);
     }
+    
+    public ISampler CreateSampler(SamplerDescription desc)
+    {
+        return VeldridSampler.Create(m_graphicsDevice, desc);
+    }
 
     public IPipelineState CreatePipelineState(PipelineStateDescription desc)
     {

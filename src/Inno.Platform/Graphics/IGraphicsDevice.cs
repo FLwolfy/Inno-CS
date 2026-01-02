@@ -24,6 +24,7 @@ public interface IGraphicsDevice : IDisposable
     IShader CreateComputeShader(ShaderDescription desc);
     
     ITexture CreateTexture(TextureDescription desc);
+    ISampler CreateSampler(SamplerDescription desc);
     IPipelineState CreatePipelineState(PipelineStateDescription desc);
     
     ICommandList CreateCommandList();
