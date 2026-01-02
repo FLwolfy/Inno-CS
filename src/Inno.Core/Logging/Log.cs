@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+
 using Inno.Core.Utility;
 
 namespace Inno.Core.Logging;
@@ -15,20 +16,41 @@ public static class Log
 
     [Conditional("DEBUG")]
     [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Debug(object? obj)
+        => Write(LogLevel.Debug, $"{obj}", null);
+    
+    [Conditional("DEBUG")]
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Debug(string message, params object[]? args)
         => Write(LogLevel.Debug, message, args);
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Info(object? obj)
+        => Write(LogLevel.Info, $"{obj}", null);
+    
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Info(string message, params object[]? args)
         => Write(LogLevel.Info, message, args);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Warn(object? obj)
+        => Write(LogLevel.Warn, $"{obj}", null);
+    
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Warn(string message, params object[]? args)
         => Write(LogLevel.Warn, message, args);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Error(object? obj)
+        => Write(LogLevel.Error, $"{obj}", null);
+    
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Error(string message, params object[]? args)
         => Write(LogLevel.Error, message, args);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static void Fatal(object? obj)
+        => Write(LogLevel.Fatal, $"{obj}", null);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static void Fatal(string message, params object[]? args)

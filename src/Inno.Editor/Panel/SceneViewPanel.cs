@@ -136,11 +136,7 @@ public class SceneViewPanel : EditorPanel
         var io = ImGui.GetIO();
         
         float zoomDelta = io.MouseWheel;
-        
-        Vector2 windowPos = ImGui.GetWindowPos();
-        Vector2 screenPos = ImGui.GetCursorStartPos();
-        Vector2 mousePos = io.MousePos;
-        Vector2 localMousePos = mousePos - screenPos - windowPos;
+        Vector2 localMousePos = io.MousePos - ImGui.GetCursorScreenPos();
 
         bool isMouseInContent = localMousePos.y > 0 && ImGui.IsWindowHovered();
         bool isPanning = io.MouseDown[(int)MOUSE_BUTTON_PAN] || zoomDelta != 0.0f;
