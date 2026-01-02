@@ -36,9 +36,8 @@ public class Mesh
 
     public void SetAttribute<T>(string attributeName, T[] data) where T : unmanaged
     {
-        if (m_attributeIndex.ContainsKey(attributeName))
+        if (m_attributeIndex.TryGetValue(attributeName, out var idx))
         {
-            int idx = m_attributeIndex[attributeName];
             m_attributes[idx] = new VertexAttributeEntry(attributeName, typeof(T), data);
         }
         else
