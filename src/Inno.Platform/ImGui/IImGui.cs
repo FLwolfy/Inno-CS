@@ -1,8 +1,5 @@
 using Inno.Platform.Graphics;
-using Inno.Platform.Graphics.Bridge;
 using Inno.Platform.ImGui.Bridge;
-using Inno.Platform.Window;
-using Inno.Platform.Window.Bridge;
 
 namespace Inno.Platform.ImGui;
 

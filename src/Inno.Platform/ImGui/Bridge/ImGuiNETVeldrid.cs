@@ -28,7 +28,6 @@ internal class ImGuiNETVeldrid : IImGui
     private ImFontPtr m_fontBold;
     private ImFontPtr m_fontItalic;
     private ImFontPtr m_fontBoldItalic;
-    private bool m_fontPushed;
     
     public unsafe ImGuiNETVeldrid(VeldridGraphicsDevice graphicsDevice, VeldridSdl2Window window, ImGuiColorSpaceHandling colorSpaceHandling)
     {
