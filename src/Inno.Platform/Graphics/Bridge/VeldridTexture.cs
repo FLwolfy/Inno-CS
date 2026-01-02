@@ -59,7 +59,7 @@ internal class VeldridTexture : ITexture
     {
         return format switch
         {
-            InnoPixelFormat.B8_G8_R8_A8_UNorm => VeldridPixelFormat.B8_G8_R8_A8_UNorm,
+            InnoPixelFormat.R8_G8_B8_A8_UNorm => VeldridPixelFormat.R8_G8_B8_A8_UNorm,
             InnoPixelFormat.D32_Float_S8_UInt => VeldridPixelFormat.D32_Float_S8_UInt,
             _ => throw new NotSupportedException($"Unsupported pixel format: {format}")
         };

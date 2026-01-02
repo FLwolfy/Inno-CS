@@ -68,7 +68,7 @@ public class SceneViewPanel : EditorPanel
         {
             var renderTexDesc = new TextureDescription
             {
-                format = PixelFormat.B8_G8_R8_A8_UNorm,
+                format = PixelFormat.R8_G8_B8_A8_UNorm,
                 usage = TextureUsage.RenderTarget | TextureUsage.Sampled,
                 dimension = TextureDimension.Texture2D
             };

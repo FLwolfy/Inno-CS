@@ -67,6 +67,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         {
             Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
             File.WriteAllBytes(binPath, binaries);
+            asset.OnBinaryLoaded(binaries);
         }
     }
 
