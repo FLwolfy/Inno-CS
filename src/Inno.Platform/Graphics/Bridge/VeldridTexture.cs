@@ -47,7 +47,7 @@ internal class VeldridTexture : ITexture
             width,
             height,
             1,
-            (uint)desc.mipLevels,
+            (uint)desc.mipLevelCount,
             1,
             ToVeldridPixelFormat(desc.format),
             ToVeldridTextureUsage(desc.usage),

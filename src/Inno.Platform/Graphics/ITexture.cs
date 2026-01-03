@@ -30,7 +30,7 @@ public struct TextureDescription()
 {
     public int width;
     public int height;
-    public int mipLevels = 1;
+    public int mipLevelCount = 1;
     
     public PixelFormat format;
     public TextureUsage usage;
