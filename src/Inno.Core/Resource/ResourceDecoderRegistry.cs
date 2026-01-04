@@ -1,6 +1,6 @@
 using Inno.Core.Utility;
 
-namespace Inno.Core.Resources;
+namespace Inno.Core.Resource;
 
 internal static class ResourceDecoderRegistry
 {

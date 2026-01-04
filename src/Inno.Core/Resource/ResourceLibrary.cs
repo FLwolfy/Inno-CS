@@ -1,8 +1,16 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 
-namespace Inno.Core.Resources;
+namespace Inno.Core.Resource;
 
+/// <summary>
+/// Library for loading, decoding, and caching <c>Resource</c>.
+///
+/// <p>
+/// <c>Resource</c> are embedded, built-in files and are distinct from
+/// <c>Assets</c>.
+/// </p>
+/// </summary>
 public static class ResourceLibrary
 {
     private static readonly ConcurrentDictionary<(Assembly, string), byte[]> CACHE = new();

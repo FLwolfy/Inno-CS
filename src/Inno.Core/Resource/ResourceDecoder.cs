@@ -1,4 +1,4 @@
-namespace Inno.Core.Resources;
+namespace Inno.Core.Resource;
 
 public interface IResourceDecoder
 {

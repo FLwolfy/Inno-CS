@@ -1,5 +1,6 @@
 using System.Text;
-using Inno.Core.Resources;
+
+using Inno.Core.Resource;
 using Inno.Graphics.Resources;
 using Inno.Platform.Graphics;
 

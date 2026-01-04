@@ -1,7 +1,5 @@
 using Inno.Core.Math;
-using Inno.Core.Resources;
-using Inno.Core.Utility;
-using Inno.Graphics.ResourceDecoders;
+using Inno.Core.Resource;
 using Inno.Graphics.Resources;
 using Inno.Platform.Graphics;
 

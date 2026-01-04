@@ -14,7 +14,7 @@ internal class ImGuiNETVeldrid : IImGui
     private readonly VeldridGraphicsDevice m_graphicsDevice;
     private readonly VeldridSdl2Window m_veldridWindow;
     
-    // Resources
+    // Resource
     private CommandList m_commandList;
     private ImGuiNETVeldridController m_imGuiVeldridController;
     

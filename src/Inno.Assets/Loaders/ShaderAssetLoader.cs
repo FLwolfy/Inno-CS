@@ -1,6 +1,7 @@
 using Inno.Assets.AssetTypes;
-using Veldrid.SPIRV;
 using Inno.Platform.Graphics;
+
+using Veldrid.SPIRV;
 
 namespace Inno.Assets.Loaders;
 

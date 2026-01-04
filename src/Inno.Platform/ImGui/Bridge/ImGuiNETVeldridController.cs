@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 using ImGuiNET;
 using Inno.Core.Math;
-using Inno.Core.Resources;
+using Inno.Core.Resource;
 using Veldrid;
 using Veldrid.Sdl2;
 

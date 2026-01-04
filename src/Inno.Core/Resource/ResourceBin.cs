@@ -1,4 +1,4 @@
-namespace Inno.Core.Resources;
+namespace Inno.Core.Resource;
 
 public readonly struct ResourceBin(string sourceName, byte[] sourceBytes)
 {
