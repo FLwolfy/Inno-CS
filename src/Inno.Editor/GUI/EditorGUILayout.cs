@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using ImGuiNET;
 using Inno.Core.Math;
 using Inno.Editor.Core;

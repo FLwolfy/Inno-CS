@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Assets.Serializers;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]

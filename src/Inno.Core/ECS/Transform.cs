@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Inno.Core.Math;
 using Inno.Core.Serialization;
 

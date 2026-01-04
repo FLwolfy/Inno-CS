@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using ImGuiNET;
 using Inno.Editor.Core;
 using Inno.Assets;

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Inno.Assets.Loaders;
 using Inno.Core.Utility;
 

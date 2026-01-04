@@ -1,5 +1,3 @@
-using Inno.Platform.ImGui;
-
 namespace Inno.Editor.Gizmo;
 
 public abstract class EditorGizmo

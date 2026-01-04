@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Inno.Assets.AssetTypes;
 using Inno.Platform.Graphics;
 

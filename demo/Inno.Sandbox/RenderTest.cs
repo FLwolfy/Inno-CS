@@ -1,4 +1,7 @@
-﻿using System.Reflection;
+﻿using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Platform;

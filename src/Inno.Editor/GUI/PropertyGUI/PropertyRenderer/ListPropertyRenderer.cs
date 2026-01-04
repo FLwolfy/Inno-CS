@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Inno.Editor.GUI.PropertyGUI.PropertyRenderer;
 
 public class ListPropertyRenderer<T> : PropertyRenderer<List<T>>

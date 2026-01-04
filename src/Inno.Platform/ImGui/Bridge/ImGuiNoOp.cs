@@ -1,3 +1,4 @@
+using System;
 using Inno.Platform.Graphics;
 
 namespace Inno.Platform.ImGui.Bridge;

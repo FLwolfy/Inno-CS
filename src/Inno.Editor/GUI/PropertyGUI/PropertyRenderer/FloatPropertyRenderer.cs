@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Editor.GUI.PropertyGUI.PropertyRenderer;
 
 public class FloatPropertyRenderer : PropertyRenderer<float>

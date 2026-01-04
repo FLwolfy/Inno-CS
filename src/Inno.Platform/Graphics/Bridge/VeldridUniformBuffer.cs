@@ -1,3 +1,4 @@
+using System;
 using Veldrid;
 
 namespace Inno.Platform.Graphics.Bridge;

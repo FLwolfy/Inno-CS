@@ -1,3 +1,4 @@
+using System;
 using Inno.Core.Utility;
 
 namespace Inno.Core.Logging;

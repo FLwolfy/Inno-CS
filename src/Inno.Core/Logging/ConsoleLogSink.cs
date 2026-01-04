@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Core.Logging;
 
 public class ConsoleLogSink : ILogSink

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources;

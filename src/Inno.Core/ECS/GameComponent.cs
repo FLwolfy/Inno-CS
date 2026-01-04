@@ -1,3 +1,4 @@
+using System;
 using Inno.Core.Serialization;
 
 namespace Inno.Core.ECS;

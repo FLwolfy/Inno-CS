@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Core.Events;
 
 [Flags]

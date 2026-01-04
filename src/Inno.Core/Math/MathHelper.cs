@@ -1,4 +1,6 @@
 #nullable disable
+using System;
+
 namespace Inno.Core.Math;
 
 /// <summary>
