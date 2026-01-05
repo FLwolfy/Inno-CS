@@ -1,37 +1,31 @@
 using System;
 using System.IO;
-using Inno.Assets.AssetTypes;
+using Inno.Assets.AssetType;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Inno.Assets.Loaders;
+namespace Inno.Assets.Loader;
 
 internal sealed class TextureAssetLoader : InnoAssetLoader<TextureAsset>
 {
     public override string[] validExtensions => [".png"];
 
-    protected override TextureAsset OnLoad(string relativePath, Guid guid)
+    protected override TextureAsset OnLoad(string relativePath)
     {
-        string absPath = Path.Combine(AssetManager.assetDirectory, relativePath);
-
         // Based on Platform PixelFormat.R8_G8_B8_A8_UNorm
+        string absPath = Path.Combine(AssetManager.assetDirectory, relativePath);
         using var img = Image.Load<Rgba32>(absPath);
 
-        var t = new TextureAsset(
-            guid,
-            relativePath,
+        return new TextureAsset(
             img.Width,
             img.Height
         );
-        
-        return t;
     }
 
-    protected override byte[]? OnCompile(string relativePath)
+    protected override byte[] OnBinarize(string relativePath)
     {
         string absPath = Path.Combine(AssetManager.assetDirectory, relativePath);
-
-        using var img = Image.Load<Bgra32>(absPath);
+        using var img = Image.Load<Rgba32>(absPath);
 
         byte[] bytes = new byte[img.Width * img.Height * 4];
         img.CopyPixelDataTo(bytes);

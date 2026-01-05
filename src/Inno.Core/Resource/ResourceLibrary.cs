@@ -48,15 +48,6 @@ public static class ResourceLibrary
         if (useCache) CACHE[(asm, nameOrSuffix)] = bytes;
         return new ResourceBin(nameOrSuffix, bytes);
     }
-
-    /// <summary>
-    /// Decode loaded binaries/bytes into specific type.
-    /// </summary>
-    /// <typeparam name="T">the given type to be decoded into</typeparam>
-    public static T DecodeBinaries<T>(ResourceBin binaries) where T : notnull
-    {
-        return ResourceDecoderRegistry.Decode<T>(binaries.sourceBytes, binaries.sourceName);
-    }
     
     private static string ResolveManifestName(Assembly asm, string nameOrSuffix, StringComparison comparison, bool endsWithMatch)
     {
@@ -80,6 +71,12 @@ public static class ResourceLibrary
         throw new AmbiguousMatchException(
             $"Embedded resource suffix '{nameOrSuffix}' is ambiguous. Matches: {string.Join(", ", matches)}");
     }
+    
+    /// <summary>
+    /// Decode loaded binaries/bytes into specific type.
+    /// </summary>
+    /// <typeparam name="T">the given type to be decoded into</typeparam>
+    public static T DecodeBinaries<T>(ResourceBin binaries) where T : notnull => ResourceDecoderRegistry.Decode<T>(binaries);
     
     public static void ClearCache() => CACHE.Clear();
 

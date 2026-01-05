@@ -1,22 +1,19 @@
 namespace Inno.Core.Resource;
 
-public interface IResourceDecoder
+internal interface IResourceDecoder
 {
-    object Decode(byte[] bytes, string fullName);
+    object Decode(ResourceBin bin);
 }
 
 /// <summary>
-/// The abstract class for the resource decoder.
+/// The generic class for the resource decoder.
 /// </summary>
 public abstract class ResourceDecoder<T> : IResourceDecoder where T : notnull
 {
-    object IResourceDecoder.Decode(byte[] bytes, string fullName) => this.OnDecode(bytes, fullName);
+    object IResourceDecoder.Decode(ResourceBin bin) => OnDecode(bin);
    
     /// <summary>
-    /// The method to decode bytes into given type.
+    /// The method to decode binaries into given type.
     /// </summary>
-    /// <param name="bytes"></param>
-    /// <param name="fullName"></param>
-    /// <returns></returns>
-    protected abstract T OnDecode(byte[] bytes, string fullName);
+    protected abstract T OnDecode(ResourceBin bin);
 }

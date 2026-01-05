@@ -2,9 +2,10 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Inno.Core.Logging;
 using YamlDotNet.Serialization;
 
-namespace Inno.Assets.Serializers;
+namespace Inno.Assets.Serializer;
 
 public class AssetObjectFactory : IObjectFactory
 {
@@ -31,7 +32,6 @@ public class AssetObjectFactory : IObjectFactory
         return null;
     }
 
-
     public bool GetDictionary(IObjectDescriptor descriptor, out IDictionary? dictionary, out Type[]? genericArguments)
     {
         var type = descriptor.Type;
@@ -50,23 +50,8 @@ public class AssetObjectFactory : IObjectFactory
 
     public Type GetValueType(Type type) => type;
 
-    public void ExecuteOnDeserializing(object value)
-    {
-        // TODO: LOGGING
-    }
-
-    public void ExecuteOnDeserialized(object value)
-    {
-        // TODO: LOGGING
-    }
-
-    public void ExecuteOnSerializing(object value)
-    {
-        // TODO: LOGGING
-    }
-
-    public void ExecuteOnSerialized(object value)
-    {
-        // TODO: LOGGING
-    }
+    public void ExecuteOnDeserializing(object value) => Log.Info($"Deserializing: {value.GetType().FullName}");
+    public void ExecuteOnDeserialized(object value) => Log.Info($"Finish Deserialization: {value.GetType().FullName}");
+    public void ExecuteOnSerializing(object value) => Log.Info($"Serializing: {value.GetType().FullName}");
+    public void ExecuteOnSerialized(object value) => Log.Info($"Finish Serializing: {value.GetType().FullName}");
 }

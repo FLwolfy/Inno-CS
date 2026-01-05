@@ -6,7 +6,7 @@ using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.TypeInspectors;
 
-namespace Inno.Assets.Serializers;
+namespace Inno.Assets.Serializer;
 
 public class AssetPropertyTypeInspector : TypeInspectorSkeleton
 {

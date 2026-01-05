@@ -1,8 +1,8 @@
 using System;
-using Inno.Assets.Serializers;
+using Inno.Assets.Serializer;
 using Inno.Platform.Graphics;
 
-namespace Inno.Assets.AssetTypes;
+namespace Inno.Assets.AssetType;
 
 public sealed class TextureAsset : InnoAsset
 {
@@ -13,13 +13,9 @@ public sealed class TextureAsset : InnoAsset
     [AssetProperty] public TextureUsage usage { get; private set; } = TextureUsage.Sampled;
     [AssetProperty] public TextureDimension dimension { get; private set; } = TextureDimension.Texture2D;
 
-    public byte[] pixelBytes { get; private set; } = [];
-
-    internal TextureAsset(Guid guid, string sourcePath, int width, int height) : base(guid, sourcePath)
+    internal TextureAsset(int width, int height)
     {
         this.width = width;
         this.height = height;
     }
-
-    internal override void OnBinaryLoaded(byte[] data) => pixelBytes = data;
 }

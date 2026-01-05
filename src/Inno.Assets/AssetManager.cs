@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Inno.Assets.AssetTypes;
+using Inno.Assets.AssetType;
+using Inno.Assets.Loader;
 using Inno.Core.Logging;
 
 namespace Inno.Assets;

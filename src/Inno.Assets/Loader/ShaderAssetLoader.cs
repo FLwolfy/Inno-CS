@@ -1,34 +1,29 @@
 using System;
 using System.IO;
-using Inno.Assets.AssetTypes;
+using Inno.Assets.AssetType;
 using Inno.Platform.Graphics;
 
 using Veldrid.SPIRV;
 
-namespace Inno.Assets.Loaders;
+namespace Inno.Assets.Loader;
 
 internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
 {
     public override string[] validExtensions => [".vert", ".frag"];
 
-    protected override ShaderAsset OnLoad(string relativePath, Guid guid)
+    protected override ShaderAsset OnLoad(string relativePath)
     {
-        var asset = new ShaderAsset(
-            guid,
-            relativePath,
+        return new ShaderAsset(
             DetectShaderStage(relativePath)
         );
-        
-        return asset;
     }
     
-    protected override byte[]? OnCompile(string relativePath)
+    protected override byte[] OnBinarize(string relativePath)
     {
-        string absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
-        if (!File.Exists(absoluteSourcePath)) return null;
+        string absPath = Path.Combine(AssetManager.assetDirectory, relativePath);
+        string glsl = File.ReadAllText(absPath);
         
-        string glsl = File.ReadAllText(absoluteSourcePath);
-        Veldrid.ShaderStages stage = (Veldrid.ShaderStages)DetectShaderStage(absoluteSourcePath);
+        Veldrid.ShaderStages stage = (Veldrid.ShaderStages)DetectShaderStage(absPath);
 
         var compileResult = SpirvCompilation.CompileGlslToSpirv(
             glsl,

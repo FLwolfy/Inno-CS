@@ -34,11 +34,11 @@ internal static class ResourceDecoderRegistry
         }
     }
 
-    public static T Decode<T>(byte[] bytes, string fullName)
+    public static T Decode<T>(ResourceBin bin)
     {
         if (DECODERS.TryGetValue(typeof(T), out var decoder))
         {
-            return (T)decoder.Decode(bytes, fullName);
+            return (T)decoder.Decode(bin);
         }
         
         throw new ArgumentException($"Decoding {typeof(T).Name} failed.");

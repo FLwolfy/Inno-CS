@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-
 using Inno.Core.Resource;
 using Inno.Graphics.Resources;
 using Inno.Platform.Graphics;
@@ -9,16 +8,16 @@ namespace Inno.Graphics.ResourceDecoders;
 
 public class ShaderDecoder : ResourceDecoder<Shader>
 {
-    protected override Shader OnDecode(byte[] bytes, string fullName)
+    protected override Shader OnDecode(ResourceBin bin)
     {
-        int dotIndex = fullName.LastIndexOf('.');
-        string extension = fullName.Substring(dotIndex + 1);
+        int dotIndex = bin.sourceName.LastIndexOf('.');
+        string extension = bin.sourceName.Substring(dotIndex + 1);
 
         return new Shader
         (
-            fullName.Substring(0, dotIndex), 
+            bin.sourceName.Substring(0, dotIndex), 
             GetShaderStageFromExt(extension), 
-            Encoding.UTF8.GetString(bytes)
+            Encoding.UTF8.GetString(bin.sourceBytes)
         );
     }
     

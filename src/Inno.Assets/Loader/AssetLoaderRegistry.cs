@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Inno.Assets.Loaders;
 using Inno.Core.Utility;
 
-namespace Inno.Assets;
+namespace Inno.Assets.Loader;
 
 /// <summary>
 /// Maintains a registry of IAssetLoader implementations for different asset types.

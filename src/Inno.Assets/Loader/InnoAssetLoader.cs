@@ -1,8 +1,34 @@
 using System;
 using System.IO;
-using Inno.Assets.AssetTypes;
+using Inno.Assets.AssetType;
+using Inno.Assets.Serializer;
+using Inno.Core.Resource;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
-namespace Inno.Assets.Loaders;
+namespace Inno.Assets.Loader;
+
+internal interface IAssetLoader
+{
+    protected static readonly IDeserializer DESERIALIZER = new DeserializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .IncludeNonPublicProperties()
+        .WithTypeInspector(_ => new AssetPropertyTypeInspector())
+        .WithObjectFactory(new AssetObjectFactory())
+        .IgnoreUnmatchedProperties()
+        .Build();
+
+    protected static readonly ISerializer SERIALIZER = new SerializerBuilder()
+        .IncludeNonPublicProperties()
+        .WithTypeInspector(_ => new AssetPropertyTypeInspector())
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .Build();
+    
+    /// <summary>
+    /// Load the asset from disk / raw file
+    /// </summary>
+    InnoAsset? Load(string path);
+}
 
 internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 {
@@ -18,7 +44,11 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
             if (!File.Exists(absoluteSourcePath)) return null;
             
-            var a = OnLoad(relativePath, Guid.NewGuid());
+            var a = OnLoad(relativePath);
+            a.guid = Guid.NewGuid();
+            a.sourcePath = relativePath;
+            a.RecomputeHash();
+            
             SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
             return a;
         }
@@ -40,7 +70,11 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
             if (File.Exists(absoluteSourcePath))
             {
-                var a = OnLoad(relativePath, asset.guid);
+                var a = OnLoad(relativePath);
+                a.guid = asset.guid;
+                a.sourcePath = relativePath;
+                a.RecomputeHash();
+                
                 SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
                 return a;
             }
@@ -49,11 +83,15 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             return null;
         }
 
-        if (File.Exists(assetBinPath))
+        if (!File.Exists(assetBinPath))
         {
-            byte[] data = File.ReadAllBytes(assetBinPath);
-            asset.OnBinaryLoaded(data);
+            byte[] binaries = OnBinarize(relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(assetBinPath)!);
+            File.WriteAllBytes(assetBinPath, binaries);
         }
+        
+        byte[] data = File.ReadAllBytes(assetBinPath);
+        asset.assetBinaries = new ResourceBin(relativePath, data);
 
         return asset;
     }
@@ -64,13 +102,10 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         Directory.CreateDirectory(Path.GetDirectoryName(metaPath)!);
         File.WriteAllText(metaPath, yaml);
 
-        byte[]? binaries = OnCompile(relativePath);
-        if (binaries != null)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
-            File.WriteAllBytes(binPath, binaries);
-            asset.OnBinaryLoaded(binaries);
-        }
+        byte[] binaries = OnBinarize(relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
+        File.WriteAllBytes(binPath, binaries);
+        asset.assetBinaries = new ResourceBin(relativePath, binaries);
     }
 
     private void DeleteAsset(string metaPath, string binPath)
@@ -90,14 +125,13 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
     /// Called to load the asset from disk / raw file.
     /// </summary>
     /// <param name="relativePath">the relative path to the "Assets" directory</param>
-    /// <param name="guid">the guid of the loaded InnoAsset</param>
     /// <returns>the InnoAsset in the specified type T</returns>
-    protected abstract T OnLoad(string relativePath, Guid guid);
-    
+    protected abstract T OnLoad(string relativePath);
+
     /// <summary>
     /// Optionally called to compile the asset into binary form.
     /// </summary>
     /// <param name="relativePath">the relative path to the "Assets" directory</param>
     /// <returns>the compiled binaries in bytes.</returns>
-    protected virtual byte[]? OnCompile(string relativePath) { return null; }
+    protected abstract byte[] OnBinarize(string relativePath);
 }
