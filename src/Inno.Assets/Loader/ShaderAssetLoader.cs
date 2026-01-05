@@ -19,7 +19,7 @@ internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
 
         var compileResult = SpirvCompilation.CompileGlslToSpirv(
             glsl,
-            null,
+            assetName,
             (Veldrid.ShaderStages) stage,
             new GlslCompileOptions(true)
         );

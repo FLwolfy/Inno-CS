@@ -1,8 +1,7 @@
-using System;
 using Inno.Assets;
 using Inno.Assets.AssetType;
 using Inno.Core.Math;
-using Inno.Core.Resource;
+using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources;
 using Inno.Platform.Graphics;
 
@@ -55,8 +54,8 @@ public static class Renderer2D
             depthStencilState = DepthStencilState.DepthOnlyLessEqual
         };
         opaqueMat.shaders = new ShaderProgram();
-        opaqueMat.shaders.Add(ResourceLibrary.DecodeBinaries<Shader>(ResourceLibrary.LoadEmbedded("SolidQuad.vert")));
-        opaqueMat.shaders.Add(ResourceLibrary.DecodeBinaries<Shader>(ResourceLibrary.LoadEmbedded("SolidQuad.frag")));
+        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.vert")!));
+        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.frag")!));
         
         // Alpha Material
         var alphaMat = new Material("QuadAlpha");
@@ -66,8 +65,8 @@ public static class Renderer2D
             depthStencilState = DepthStencilState.DepthReadOnlyLessEqual
         };
         alphaMat.shaders = new ShaderProgram();
-        alphaMat.shaders.Add(ResourceLibrary.DecodeBinaries<Shader>(ResourceLibrary.LoadEmbedded("SolidQuad.vert")));
-        alphaMat.shaders.Add(ResourceLibrary.DecodeBinaries<Shader>(ResourceLibrary.LoadEmbedded("SolidQuad.frag")));
+        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.vert")!));
+        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.frag")!));
         
         // Opaque Resource
         m_quadOpaqueResources = new GraphicsResource(mesh, [opaqueMat]);

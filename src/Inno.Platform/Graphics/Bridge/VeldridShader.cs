@@ -26,14 +26,12 @@ internal class VeldridShader : IShader
         ShaderDescription vertDesc,
         ShaderDescription fragDesc)
     {
-        var vertResult = SpirvCompilation.CompileGlslToSpirv( vertDesc.sourceCode, null, ToVeldridShaderStage(vertDesc.stage), new GlslCompileOptions(true)); 
-        var fragResult = SpirvCompilation.CompileGlslToSpirv( fragDesc.sourceCode, null, ToVeldridShaderStage(fragDesc.stage), new GlslCompileOptions(true));
-        
+        // TODO: make this second compilation inside ShaderAssetLoader part
         var vertexFragmentCode = CrossCompileSpirv(
             graphicsDevice.BackendType,
             ShaderStages.Vertex,
-            vertResult.SpirvBytes,
-            fragResult.SpirvBytes
+            vertDesc.sourceBytes,
+            fragDesc.sourceBytes
         );
 
         var veldridVertDesc = new VeldridSDescription(
@@ -58,12 +56,10 @@ internal class VeldridShader : IShader
 
     public static VeldridShader CreateCompute(GraphicsDevice graphicsDevice, ShaderDescription desc)
     {
-        var computeResult = SpirvCompilation.CompileGlslToSpirv( desc.sourceCode, null, ToVeldridShaderStage(desc.stage), new GlslCompileOptions(true)); 
-
         var computeCode = CrossCompileSpirv(
             graphicsDevice.BackendType,
             ShaderStages.Compute,
-            computeResult.SpirvBytes
+            desc.sourceBytes
         )[0];
 
         var veldridDesc = new VeldridSDescription(

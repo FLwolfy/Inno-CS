@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 
 using ImGuiNET;
 using Inno.Core.Math;
-using Inno.Core.Resource;
 using Veldrid;
 using Veldrid.Sdl2;
 
@@ -188,9 +187,9 @@ internal class ImGuiNETVeldridController : IDisposable
         var vertexShaderBin = LoadEmbeddedShaderCode(m_graphicsDevice.BackendType, "imgui-vertex", ShaderStages.Vertex, m_colorSpaceHandling);
         var fragmentShaderBin = LoadEmbeddedShaderCode(m_graphicsDevice.BackendType, "imgui-frag", ShaderStages.Fragment, m_colorSpaceHandling);
         
-        m_vertexShader = factory.CreateShader(new ShaderDescription(ShaderStages.Vertex, vertexShaderBin.sourceBytes, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "VS"));
+        m_vertexShader = factory.CreateShader(new ShaderDescription(ShaderStages.Vertex, vertexShaderBin, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "VS"));
         m_vertexShader.Name = "ImGui.NET Vertex Shader";
-        m_fragmentShader = factory.CreateShader(new ShaderDescription(ShaderStages.Fragment, fragmentShaderBin.sourceBytes, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "FS"));
+        m_fragmentShader = factory.CreateShader(new ShaderDescription(ShaderStages.Fragment, fragmentShaderBin, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "FS"));
         m_fragmentShader.Name = "ImGui.NET Fragment Shader";
 
         VertexLayoutDescription[] vertexLayouts =
@@ -235,45 +234,57 @@ internal class ImGuiNETVeldridController : IDisposable
         RecreateFontDeviceTexture();
     }
     
-    private ResourceBin LoadEmbeddedShaderCode(
-        GraphicsBackend backend,
+    private byte[] LoadEmbeddedShaderCode(
+        GraphicsBackend backendType,
         string name,
         ShaderStages stage,
-        ImGuiColorSpaceHandling colorSpaceHandling
-    ) {
-        switch (backend)
+        ImGuiColorSpaceHandling colorSpaceHandling)
+    {
+        switch (backendType)
         {
             case GraphicsBackend.Direct3D11:
             {
                 if (stage == ShaderStages.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy) { name += "-legacy"; }
                 string resourceName = name + ".hlsl.bytes";
-                return ResourceLibrary.LoadEmbedded(resourceName);
+                return GetEmbeddedResourceBytes(resourceName);
             }
             case GraphicsBackend.OpenGL:
             {
                 if (stage == ShaderStages.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy) { name += "-legacy"; }
                 string resourceName = name + ".glsl";
-                return ResourceLibrary.LoadEmbedded(resourceName);
+                return GetEmbeddedResourceBytes(resourceName);
             }
             case GraphicsBackend.OpenGLES:
             {
                 if (stage == ShaderStages.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy) { name += "-legacy"; }
                 string resourceName = name + ".glsles";
-                return ResourceLibrary.LoadEmbedded(resourceName);
+                return GetEmbeddedResourceBytes(resourceName);
             }
             case GraphicsBackend.Vulkan:
             {
                 string resourceName = name + ".spv";
-                return ResourceLibrary.LoadEmbedded(resourceName);
+                return GetEmbeddedResourceBytes(resourceName);
             }
             case GraphicsBackend.Metal:
             {
                 string resourceName = name + ".metallib";
-                return ResourceLibrary.LoadEmbedded(resourceName);
+                return GetEmbeddedResourceBytes(resourceName);
             }
             default:
                 throw new NotImplementedException();
         }
+    }
+
+    private byte[] GetEmbeddedResourceBytes(string shortName)
+    {
+        var resources = m_assembly.GetManifestResourceNames();
+        var match = resources.FirstOrDefault(r => r.EndsWith(shortName, StringComparison.OrdinalIgnoreCase));
+        if (match == null) throw new FileNotFoundException($"Embedded resource '{shortName}' not found.");
+
+        using Stream s = m_assembly.GetManifestResourceStream(match)!;
+        byte[] ret = new byte[s.Length];
+        s.ReadExactly(ret, 0, (int)s.Length);
+        return ret;
     }
     
     #endregion

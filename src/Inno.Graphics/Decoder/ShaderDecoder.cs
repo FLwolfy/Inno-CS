@@ -1,23 +1,23 @@
 using System;
-using System.Text;
-using Inno.Core.Resource;
+
+using Inno.Assets.AssetType;
 using Inno.Graphics.Resources;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics.ResourceDecoders;
+namespace Inno.Graphics.Decoder;
 
-public class ShaderDecoder : ResourceDecoder<Shader>
+public class ShaderDecoder : ResourceDecoder<Shader, ShaderAsset>
 {
-    protected override Shader OnDecode(ResourceBin bin)
+    protected override Shader OnDecode(ShaderAsset asset)
     {
-        int dotIndex = bin.sourceName.LastIndexOf('.');
-        string extension = bin.sourceName.Substring(dotIndex + 1);
+        int dotIndex = asset.name.LastIndexOf('.');
+        string extension = asset.name.Substring(dotIndex + 1);
 
         return new Shader
         (
-            bin.sourceName.Substring(0, dotIndex), 
+            asset.name.Substring(0, dotIndex), 
             GetShaderStageFromExt(extension), 
-            Encoding.UTF8.GetString(bin.sourceBytes)
+            asset.assetBinaries
         );
     }
     

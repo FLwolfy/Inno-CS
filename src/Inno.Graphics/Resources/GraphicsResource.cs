@@ -101,8 +101,8 @@ public class GraphicsResource : IDisposable
             var mvs = m_materials[i].shaders.GetShadersByStage(ShaderStage.Vertex).Values.First();
             var mfs = m_materials[i].shaders.GetShadersByStage(ShaderStage.Fragment).Values.First();
             var (vertexShader, fragmentShader) = gd.CreateVertexFragmentShader(
-                new ShaderDescription { stage = mvs.stage, sourceCode = mvs.sourceCode },
-                new ShaderDescription { stage = mfs.stage, sourceCode = mfs.sourceCode }
+                new ShaderDescription { stage = mvs.stage, sourceBytes = mvs.shaderBinaries },
+                new ShaderDescription { stage = mfs.stage, sourceBytes = mfs.shaderBinaries }
             );
 
             // Material ResourceSet

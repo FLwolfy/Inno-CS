@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using Inno.Assets.AssetType;
 using Inno.Assets.Serializer;
-using Inno.Core.Resource;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -73,7 +72,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             WriteMeta(assetMetaPath, asset);
             WriteBin(assetBinPath, bin);
 
-            asset.assetBinaries = new ResourceBin(relativePath, bin);
+            asset.assetBinaries = bin;
             return asset;
         }
 
@@ -125,7 +124,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             WriteMeta(assetMetaPath, rebuilt);
             WriteBin(assetBinPath, bin);
 
-            rebuilt.assetBinaries = new ResourceBin(relativePath, bin);
+            rebuilt.assetBinaries = bin;
             return rebuilt;
         }
 
@@ -142,7 +141,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 
         // -------------------- Attach binaries --------------------
         byte[] data = File.ReadAllBytes(assetBinPath);
-        assetLoaded.assetBinaries = new ResourceBin(relativePath, data);
+        assetLoaded.assetBinaries = data;
         return assetLoaded;
     }
 
@@ -166,7 +165,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         asset.guid = Guid.Empty;
         asset.sourcePath = C_VIRTUAL_SOURCE_NAME + "/" + assetName;
         asset.RecomputeHash(rawBytes);
-        asset.assetBinaries = new ResourceBin(asset.sourcePath, bin);
+        asset.assetBinaries = bin;
         return asset;
     }
 
