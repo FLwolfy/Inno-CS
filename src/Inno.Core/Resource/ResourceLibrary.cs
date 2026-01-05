@@ -52,7 +52,7 @@ public static class ResourceLibrary
     private static string ResolveManifestName(Assembly asm, string nameOrSuffix, StringComparison comparison, bool endsWithMatch)
     {
         var names = asm.GetManifestResourceNames();
-
+        
         if (!endsWithMatch)
         {
             var exact = names.FirstOrDefault(n => string.Equals(n, nameOrSuffix, comparison));

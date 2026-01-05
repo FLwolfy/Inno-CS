@@ -8,7 +8,6 @@ public class TextureDecoder : ResourceDecoder<Texture>
 {
     protected override Texture OnDecode(ResourceBin bin)
     {
-        // TODO
         throw new NotImplementedException();
     }
 }

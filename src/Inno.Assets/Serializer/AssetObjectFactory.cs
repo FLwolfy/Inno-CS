@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Inno.Core.Logging;
+
 using YamlDotNet.Serialization;
 
 namespace Inno.Assets.Serializer;
@@ -50,8 +50,8 @@ public class AssetObjectFactory : IObjectFactory
 
     public Type GetValueType(Type type) => type;
 
-    public void ExecuteOnDeserializing(object value) => Log.Info($"Deserializing: {value.GetType().FullName}");
-    public void ExecuteOnDeserialized(object value) => Log.Info($"Finish Deserialization: {value.GetType().FullName}");
-    public void ExecuteOnSerializing(object value) => Log.Info($"Serializing: {value.GetType().FullName}");
-    public void ExecuteOnSerialized(object value) => Log.Info($"Finish Serializing: {value.GetType().FullName}");
+    public void ExecuteOnDeserializing(object value) {}
+    public void ExecuteOnDeserialized(object value) {}
+    public void ExecuteOnSerializing(object value) {}
+    public void ExecuteOnSerialized(object value) {}
 }

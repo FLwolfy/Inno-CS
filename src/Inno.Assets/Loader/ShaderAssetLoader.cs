@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using Inno.Assets.AssetType;
 using Inno.Platform.Graphics;
 
@@ -10,34 +11,27 @@ namespace Inno.Assets.Loader;
 internal class ShaderAssetLoader : InnoAssetLoader<ShaderAsset>
 {
     public override string[] validExtensions => [".vert", ".frag"];
-
-    protected override ShaderAsset OnLoad(string relativePath)
-    {
-        return new ShaderAsset(
-            DetectShaderStage(relativePath)
-        );
-    }
     
-    protected override byte[] OnBinarize(string relativePath)
+    protected override byte[] OnLoadBinaries(string assetName, byte[] rawBytes, out ShaderAsset asset)
     {
-        string absPath = Path.Combine(AssetManager.assetDirectory, relativePath);
-        string glsl = File.ReadAllText(absPath);
-        
-        Veldrid.ShaderStages stage = (Veldrid.ShaderStages)DetectShaderStage(absPath);
+        string glsl = Encoding.UTF8.GetString(rawBytes);
+        var stage = DetectShaderStage(assetName);
 
         var compileResult = SpirvCompilation.CompileGlslToSpirv(
             glsl,
             null,
-            stage,
+            (Veldrid.ShaderStages) stage,
             new GlslCompileOptions(true)
         );
+
+        asset = new ShaderAsset(stage);
 
         return compileResult.SpirvBytes;
     }
 
-    private static ShaderStage DetectShaderStage(string path)
+    private static ShaderStage DetectShaderStage(string fileName)
     {
-        string ext = Path.GetExtension(path).ToLowerInvariant();
+        string ext = Path.GetExtension(fileName).ToLowerInvariant();
         return ext switch
         {
             ".vert" => ShaderStage.Vertex,

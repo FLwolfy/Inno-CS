@@ -25,113 +25,213 @@ internal interface IAssetLoader
         .Build();
     
     /// <summary>
-    /// Load the asset from disk / raw file
+    /// Load the asset from disk / raw file.
     /// </summary>
     InnoAsset? Load(string path);
+    
+    /// <summary>
+    /// Load the asset directly from bytes.
+    /// </summary>
+    InnoAsset LoadRaw(string assetName, byte[] rawBytes);
 }
 
 internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 {
-    public abstract string[] validExtensions { get; }
+    private const string C_VIRTUAL_SOURCE_NAME = "InnoVirtualAsset";
     
+    public abstract string[] validExtensions { get; }
+
     public InnoAsset? Load(string relativePath)
     {
-        var assetMetaPath = Path.Combine(AssetManager.assetDirectory, relativePath + AssetManager.C_ASSET_POSTFIX);
-        var assetBinPath  = Path.Combine(AssetManager.binDirectory, relativePath + AssetManager.C_BINARY_ASSET_POSTFIX);
+        relativePath = relativePath.TrimEnd('/', '\\');
 
+        string requestedAbsSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
+
+        string assetMetaPath = Path.Combine(
+            AssetManager.assetDirectory,
+            relativePath + AssetManager.C_ASSET_POSTFIX);
+
+        string assetBinPath = Path.Combine(
+            AssetManager.binDirectory,
+            relativePath + AssetManager.C_BINARY_ASSET_POSTFIX);
+
+        // -------------------- Import (no meta) --------------------
         if (!File.Exists(assetMetaPath))
         {
-            var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
-            if (!File.Exists(absoluteSourcePath)) return null;
-            
-            var a = OnLoad(relativePath);
-            a.guid = Guid.NewGuid();
-            a.sourcePath = relativePath;
-            a.RecomputeHash();
-            
-            SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
-            return a;
+            if (!File.Exists(requestedAbsSourcePath))
+                return null;
+
+            byte[] raw = File.ReadAllBytes(requestedAbsSourcePath);
+
+            string assetName = Path.GetFileName(relativePath);
+            byte[] bin = OnLoadBinaries(assetName, raw, out T asset);
+
+            asset.guid = Guid.NewGuid();
+            asset.sourcePath = relativePath;
+            asset.RecomputeHash(relativePath);
+
+            WriteMeta(assetMetaPath, asset);
+            WriteBin(assetBinPath, bin);
+
+            asset.assetBinaries = new ResourceBin(relativePath, bin);
+            return asset;
         }
 
-        var yaml  = File.ReadAllText(assetMetaPath);
-        var asset = IAssetLoader.DESERIALIZER.Deserialize<T>(yaml);
+        // -------------------- Load meta --------------------
+        var yaml = File.ReadAllText(assetMetaPath);
+        var assetLoaded = IAssetLoader.DESERIALIZER.Deserialize<T>(yaml);
 
-        string actualSource = Path.Combine(AssetManager.assetDirectory, asset.sourcePath);
-        if (!File.Exists(actualSource))
-        {
-            DeleteAsset(assetMetaPath, assetBinPath);
-            return null;
-        }
+        // -------------------- Resolve source path --------------------
+        string recordedRelSourcePath = string.IsNullOrWhiteSpace(assetLoaded.sourcePath)
+            ? relativePath
+            : assetLoaded.sourcePath;
 
-        string old = asset.sourceHash;
-        asset.RecomputeHash();
-        if (old != asset.sourceHash)
+        string recordedAbsSourcePath = Path.Combine(AssetManager.assetDirectory, recordedRelSourcePath);
+
+        if (!File.Exists(recordedAbsSourcePath))
         {
-            var absoluteSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
-            if (File.Exists(absoluteSourcePath))
+            if (File.Exists(requestedAbsSourcePath))
             {
-                var a = OnLoad(relativePath);
-                a.guid = asset.guid;
-                a.sourcePath = relativePath;
-                a.RecomputeHash();
-                
-                SaveAsset(a, relativePath, assetMetaPath, assetBinPath);
-                return a;
+                recordedRelSourcePath = relativePath;
+                recordedAbsSourcePath = requestedAbsSourcePath;
+                assetLoaded.sourcePath = recordedRelSourcePath;
             }
-            
-            DeleteAsset(assetMetaPath, assetBinPath);
-            return null;
+            else
+            {
+                if (File.Exists(assetMetaPath)) File.Delete(assetMetaPath);
+                if (File.Exists(assetBinPath)) File.Delete(assetBinPath);
+
+                return null;
+            }
         }
 
+        // -------------------- Rebuild if source changed --------------------
+        string oldHash = assetLoaded.sourceHash;
+
+        assetLoaded.sourcePath = recordedRelSourcePath;
+        assetLoaded.RecomputeHash(recordedRelSourcePath);
+
+        if (oldHash != assetLoaded.sourceHash)
+        {
+            byte[] raw = File.ReadAllBytes(recordedAbsSourcePath);
+
+            string assetName = Path.GetFileName(recordedRelSourcePath);
+            byte[] bin = OnLoadBinaries(assetName, raw, out T rebuilt);
+
+            rebuilt.guid = assetLoaded.guid;
+            rebuilt.sourcePath = recordedRelSourcePath;
+            rebuilt.RecomputeHash(recordedRelSourcePath);
+
+            WriteMeta(assetMetaPath, rebuilt);
+            WriteBin(assetBinPath, bin);
+
+            rebuilt.assetBinaries = new ResourceBin(relativePath, bin);
+            return rebuilt;
+        }
+
+        // -------------------- Ensure bin exists --------------------
         if (!File.Exists(assetBinPath))
         {
-            byte[] binaries = OnBinarize(relativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(assetBinPath)!);
-            File.WriteAllBytes(assetBinPath, binaries);
-        }
-        
-        byte[] data = File.ReadAllBytes(assetBinPath);
-        asset.assetBinaries = new ResourceBin(relativePath, data);
+            byte[] raw = File.ReadAllBytes(recordedAbsSourcePath);
 
-        return asset;
+            string assetName = Path.GetFileName(recordedRelSourcePath);
+            byte[] bin = OnLoadBinaries(assetName, raw, out _);
+
+            WriteBin(assetBinPath, bin);
+        }
+
+        // -------------------- Attach binaries --------------------
+        byte[] data = File.ReadAllBytes(assetBinPath);
+        assetLoaded.assetBinaries = new ResourceBin(relativePath, data);
+        return assetLoaded;
     }
 
-    private void SaveAsset(T asset, string relativePath, string metaPath, string binPath)
+    private static void WriteMeta(string metaPath, T asset)
     {
         string yaml = IAssetLoader.SERIALIZER.Serialize(asset);
         Directory.CreateDirectory(Path.GetDirectoryName(metaPath)!);
         File.WriteAllText(metaPath, yaml);
-
-        byte[] binaries = OnBinarize(relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
-        File.WriteAllBytes(binPath, binaries);
-        asset.assetBinaries = new ResourceBin(relativePath, binaries);
     }
 
-    private void DeleteAsset(string metaPath, string binPath)
+    private static void WriteBin(string binPath, byte[] bin)
     {
-        if (File.Exists(metaPath))
-        {
-            File.Delete(metaPath);
-        }
+        Directory.CreateDirectory(Path.GetDirectoryName(binPath)!);
+        File.WriteAllBytes(binPath, bin);
+    }
+    
+    public InnoAsset LoadRaw(string assetName, byte[] rawBytes)
+    {
+        byte[] bin = OnLoadBinaries(assetName, rawBytes, out T asset);
 
-        if (File.Exists(binPath))
-        {
-            File.Delete(binPath);
-        }
+        asset.guid = Guid.Empty;
+        asset.sourcePath = C_VIRTUAL_SOURCE_NAME + "/" + assetName;
+        asset.RecomputeHash(rawBytes);
+        asset.assetBinaries = new ResourceBin(asset.sourcePath, bin);
+        return asset;
     }
 
-    /// <summary>
-    /// Called to load the asset from disk / raw file.
-    /// </summary>
-    /// <param name="relativePath">the relative path to the "Assets" directory</param>
-    /// <returns>the InnoAsset in the specified type T</returns>
-    protected abstract T OnLoad(string relativePath);
 
     /// <summary>
-    /// Optionally called to compile the asset into binary form.
+    /// Loads raw source data and produces a binary representation suitable for runtime use,
+    /// while simultaneously creating and populating the corresponding asset instance.
+    ///
+    /// <para>
+    /// This method is the single authoritative entry point for:
+    /// <list type="bullet">
+    ///   <item>Decoding or interpreting raw source bytes (e.g. image, audio, text, etc.)</item>
+    ///   <item>Constructing a fully-initialized asset instance of type <typeparamref name="T"/></item>
+    ///   <item>Producing the binary data that will be persisted as the asset's runtime payload</item>
+    /// </list>
+    /// </para>
+    ///
+    /// <para>
+    /// The returned binary data does not have to be a "compiled" format.
+    /// It only needs to be a deterministic, runtime-consumable representation derived
+    /// from <paramref name="rawBytes"/>. The exact structure and semantics of the binary
+    /// data are asset-type specific.
+    /// </para>
+    ///
+    /// <para>
+    /// The <paramref name="asset"/> output must be a newly created instance and must have
+    /// all asset-specific metadata populated (for example: dimensions, counts, formats, etc.).
+    /// Any data required at runtime that cannot be inferred from the binary payload alone
+    /// should be stored on the asset instance itself and will be serialized into the asset
+    /// metadata file.
+    /// </para>
+    ///
+    /// <para>
+    /// This method may be invoked during:
+    /// <list type="bullet">
+    ///   <item>First-time asset import</item>
+    ///   <item>Asset rebuild due to source content changes</item>
+    ///   <item>Binary regeneration when the runtime payload is missing</item>
+    /// </list>
+    /// Implementations must therefore be deterministic and side-effect free
+    /// with respect to the input parameters.
+    /// </para>
     /// </summary>
-    /// <param name="relativePath">the relative path to the "Assets" directory</param>
-    /// <returns>the compiled binaries in bytes.</returns>
-    protected abstract byte[] OnBinarize(string relativePath);
+    /// <param name="assetName">
+    /// The logical name of the asset, typically derived from the source path.
+    /// This value is intended for identification, diagnostics, or asset-specific processing,
+    /// and must not be used to resolve file system paths.
+    /// </param>
+    /// <param name="rawBytes">
+    /// The raw source bytes loaded directly from the original asset file.
+    /// These bytes represent the authoritative source data and should not be modified.
+    /// </param>
+    /// <param name="asset">
+    /// Outputs a newly created and fully populated asset instance corresponding
+    /// to the provided source data. The caller assumes ownership of this instance.
+    /// </param>
+    /// <returns>
+    /// A byte array containing the runtime binary representation of the asset.
+    /// This data will be written to the asset's binary storage and later reloaded
+    /// for runtime use.
+    /// </returns>
+    protected abstract byte[] OnLoadBinaries(
+        string assetName,
+        byte[] rawBytes,
+        out T asset
+    );
+
 }

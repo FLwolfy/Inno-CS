@@ -1,3 +1,6 @@
+using System;
+using Inno.Assets;
+using Inno.Assets.AssetType;
 using Inno.Core.Math;
 using Inno.Core.Resource;
 using Inno.Graphics.Resources;
