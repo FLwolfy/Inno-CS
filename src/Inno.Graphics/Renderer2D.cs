@@ -99,7 +99,7 @@ public static class Renderer2D
         }
     }
     
-    public static void ClearColor(RenderContext ctx, Color color)
+    public static void FillColor(RenderContext ctx, Color color)
     {
         var mvp = Matrix.identity;
         

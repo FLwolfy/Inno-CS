@@ -16,6 +16,6 @@ public class ClearScreenPass(Color? clearColor = null) : RenderPass
 
     public override void OnRender(RenderContext ctx)
     {
-        Renderer2D.ClearColor(ctx, m_clearColor);
+        Renderer2D.FillColor(ctx, m_clearColor);
     }
 }
