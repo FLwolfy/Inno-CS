@@ -14,6 +14,8 @@ public class GraphicsResource : IDisposable
     private IVertexBuffer? m_vertexBuffer;
     private IIndexBuffer[]? m_indexBuffers;
     private IUniformBuffer[][]? m_uniformBuffers;
+    private ITexture[][]? m_textures;
+    private ISampler[][]? m_samplers;
     private IPipelineState[]? m_pipelines;
     private IResourceSet[]? m_resourceSets;
     private IResourceSet? m_perObjectResourceSet;
@@ -95,7 +97,50 @@ public class GraphicsResource : IDisposable
                 m_uniformBuffers[i][j] = gd.CreateUniformBuffer(uniforms[j].name, uniforms[j].value.GetType());
             }
 
-            // TODO: Textures
+            // Textures
+            var textures = m_materials[i].GetAllTextures();
+
+            // Allocate per-material GPU texture/sampler arrays
+            m_textures ??= new ITexture[materialCount][];
+            m_samplers ??= new ISampler[materialCount][];
+
+            m_textures[i] = new ITexture[textures.Count];
+            m_samplers[i] = new ISampler[textures.Count];
+
+            for (int t = 0; t < textures.Count; t++)
+            {
+                var src = textures[t].texture;
+
+                // Create GPU texture
+                var texDesc = new TextureDescription
+                {
+                    width = src.width,
+                    height = src.height,
+                    mipLevelCount = 1,
+                    format = src.format,
+                    usage = src.usage,
+                    dimension = src.dimension
+                };
+
+                var gpuTex = gd.CreateTexture(texDesc);
+
+                // Upload pixels
+                var bytes = src.data;
+                gpuTex.Set(ref bytes, 0);
+                
+                // Create default sampler
+                // TODO: Move this into Material configurations
+                var sampDesc = new SamplerDescription
+                {
+                    filter = SamplerFilter.Linear,
+                    addressU = SamplerAddressMode.Clamp,
+                    addressV = SamplerAddressMode.Clamp
+                };
+                var gpuSampler = gd.CreateSampler(sampDesc);
+
+                m_textures[i][t] = gpuTex;
+                m_samplers[i][t] = gpuSampler;
+            }
 
             // Shaders
             var mvs = m_materials[i].shaders.GetShadersByStage(ShaderStage.Vertex).Values.First();
@@ -109,7 +154,9 @@ public class GraphicsResource : IDisposable
             var materialBinding = new ResourceSetBinding
             {
                 shaderStages = ShaderStage.Vertex | ShaderStage.Fragment,
-                uniformBuffers = m_uniformBuffers[i]
+                uniformBuffers = m_uniformBuffers[i],
+                textures = m_textures[i],
+                samplers = m_samplers[i]
             };
             m_resourceSets[i] = gd.CreateResourceSet(materialBinding);
 
@@ -238,6 +285,12 @@ public class GraphicsResource : IDisposable
         if (m_uniformBuffers != null)
             foreach (var ubs in m_uniformBuffers)
                 foreach (var ub in ubs) ub.Dispose();
+        if (m_textures != null)
+            foreach (var arr in m_textures)
+                foreach (var tex in arr) tex.Dispose();
+        if (m_samplers != null)
+            foreach (var arr in m_samplers)
+                foreach (var smp in arr) smp.Dispose();
         if (m_pipelines != null)
             foreach (var p in m_pipelines) p.Dispose();
         if (m_resourceSets != null)

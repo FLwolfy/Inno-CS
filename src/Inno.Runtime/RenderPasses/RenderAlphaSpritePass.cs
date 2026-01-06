@@ -22,7 +22,8 @@ public class RenderAlphaSpritePass(bool? requireCameraZCheck = null) : RenderPas
         if (m_requireCameraZCheck && camera == null) return;
 
         foreach (var (sr, depth) in scene.GetAllComponents<SpriteRenderer>()
-                     .Where(sr => sr.isActive && (sr.opacity < 1f || sr.color.a < 1f))
+                     .Where(sr => sr.isActive)
+                     .Where(sr => sr.opacity < 1f || sr.color.a < 1f || sr.sprite.texture != null)
                      .Select(sr => (sr, (sr.layerDepth + (float)((Math.Tanh(sr.transform.worldPosition.z / SpriteRenderer.MAX_LAYER_DEPTH) + 1) / 2)) / (SpriteRenderer.MAX_LAYER_DEPTH + 1)))
                      .OrderByDescending(t => t.Item2))
         {
@@ -32,7 +33,15 @@ public class RenderAlphaSpritePass(bool? requireCameraZCheck = null) : RenderPas
                     Matrix.CreateFromQuaternion(sr.transform.worldRotation) *
                     Matrix.CreateTranslation(new Vector3(sr.transform.worldPosition.x, sr.transform.worldPosition.y, depth));
 
-            Renderer2D.DrawQuad(ctx, t, sr.color * sr.opacity);
+            var s = sr.sprite;
+            if (s.texture != null)
+            {
+                Renderer2D.DrawTexturedQuad(ctx, t, s.texture, s.uv, sr.color * sr.opacity);
+            }
+            else
+            {
+                Renderer2D.DrawQuad(ctx, t, sr.color * sr.opacity);
+            }
         }
     }
 }

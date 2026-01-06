@@ -6,7 +6,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Decoder;
 
-public class ShaderDecoder : ResourceDecoder<Shader, ShaderAsset>
+internal class ShaderDecoder : ResourceDecoder<Shader, ShaderAsset>
 {
     protected override Shader OnDecode(ShaderAsset asset)
     {

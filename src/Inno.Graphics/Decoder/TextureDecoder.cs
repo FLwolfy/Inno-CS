@@ -3,7 +3,7 @@ using Inno.Graphics.Resources;
 
 namespace Inno.Graphics.Decoder;
 
-public class TextureDecoder : ResourceDecoder<Texture, TextureAsset>
+internal class TextureDecoder : ResourceDecoder<Texture, TextureAsset>
 {
     protected override Texture OnDecode(TextureAsset asset)
     {

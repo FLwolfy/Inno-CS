@@ -36,7 +36,6 @@ internal sealed class VeldridSampler : ISampler
             AddressModeV = ToVeldridAddress(desc.addressV),
             AddressModeW = VeldridSamplerAddress.Clamp,
 
-            // 保守預設（你現在階段非常合理）
             MaximumAnisotropy = 1,
             MinimumLod = 0,
             MaximumLod = uint.MaxValue,

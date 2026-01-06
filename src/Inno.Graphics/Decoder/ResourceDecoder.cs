@@ -21,7 +21,7 @@ public static class ResourceDecoder
 /// <summary>
 /// The generic class for the resource decoder.
 /// </summary>
-public abstract class ResourceDecoder<T, TAsset> : IResourceDecoder 
+internal abstract class ResourceDecoder<T, TAsset> : IResourceDecoder 
     where T : notnull
     where TAsset : InnoAsset
 {
