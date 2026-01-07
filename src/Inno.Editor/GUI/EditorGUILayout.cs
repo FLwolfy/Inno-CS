@@ -20,11 +20,11 @@ public static class EditorGUILayout
     private static readonly Stack<int> SCOPE_STACK = new();
     private static readonly Stack<LayoutAlign> ALIGN_STACK = new();
     private static readonly Stack<bool> COLUMN_DIRTY_STACK = new();
-    
+
     private static readonly Dictionary<int, int> COLUMN_COUNT_MAP = new();
     private static readonly Dictionary<int, float> COLUMN_TOTAL_WEIGHT_MAP = new();
     private static readonly Dictionary<int, List<float>> COLUMN_WEIGHT_MAP = new();
-    
+
     private static int m_autoID = 0;
     private static int m_autoMeasureID = 0;
     private static int m_columnDepth = 0;
@@ -38,25 +38,21 @@ public static class EditorGUILayout
     public static void BeginFrame()
     {
         if (m_frameBegin)
-        {
             throw new InvalidOperationException("BeginFrame() can only be called once.");
-        }
 
         m_autoID = 0;
         m_autoMeasureID = 0;
         m_frameBegin = true;
     }
-    
+
     /// <summary>
     /// Check the end condition.
     /// </summary>
     public static void EndFrame()
     {
         if (ALIGN_STACK.Count != 0 || SCOPE_STACK.Count != 0 || !m_frameBegin)
-        {
             throw new InvalidOperationException("EndFrame() is called improperly.");
-        }
-        
+
         m_frameBegin = false;
     }
 
@@ -77,9 +73,9 @@ public static class EditorGUILayout
         ImGui.PopID();
         SCOPE_STACK.Pop();
     }
-    
+
     #endregion
-    
+
     #region Layouts
 
     /// <summary>
@@ -88,25 +84,22 @@ public static class EditorGUILayout
     public static void BeginColumns(float firstColumnWeight = 1.0f, bool bordered = false)
     {
         var flags = ImGuiTableFlags.SizingStretchProp;
-        
-        if (bordered)
-        {
-            flags |= ImGuiTableFlags.BordersInner | ImGuiTableFlags.BordersOuter;
-        }
-        
-        m_columnDepth++;
-        COLUMN_DIRTY_STACK.Push(!COLUMN_COUNT_MAP.ContainsKey(m_columnDepth));
 
-        if (!COLUMN_DIRTY_STACK.Peek())
+        if (bordered)
+            flags |= ImGuiTableFlags.BordersInner | ImGuiTableFlags.BordersOuter;
+
+        m_columnDepth++;
+        bool dirty = !COLUMN_COUNT_MAP.ContainsKey(m_columnDepth);
+        COLUMN_DIRTY_STACK.Push(dirty);
+
+        if (!dirty)
         {
             var columnCount = COLUMN_COUNT_MAP[m_columnDepth];
             ImGui.BeginTable("EditorLayout", columnCount, flags);
 
             for (var i = 0; i < columnCount; i++)
-            {
                 ImGui.TableSetupColumn($"Column {i}", ImGuiTableColumnFlags.None, COLUMN_WEIGHT_MAP[m_columnDepth][i]);
-            }
-            
+
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
         }
@@ -114,9 +107,8 @@ public static class EditorGUILayout
         {
             COLUMN_COUNT_MAP[m_columnDepth] = 1;
             COLUMN_TOTAL_WEIGHT_MAP[m_columnDepth] = firstColumnWeight;
-            COLUMN_WEIGHT_MAP[m_columnDepth] = [firstColumnWeight];
+            COLUMN_WEIGHT_MAP[m_columnDepth] = new List<float> { firstColumnWeight };
         }
-        
     }
 
     /// <summary>
@@ -124,7 +116,9 @@ public static class EditorGUILayout
     /// </summary>
     public static void EndColumns()
     {
-        if (!COLUMN_DIRTY_STACK.Peek())
+        bool dirty = COLUMN_DIRTY_STACK.Pop();
+
+        if (!dirty)
         {
             ImGui.EndTable();
         }
@@ -134,13 +128,10 @@ public static class EditorGUILayout
             if (totalWeight != 0)
             {
                 for (var i = 0; i < COLUMN_COUNT_MAP[m_columnDepth]; i++)
-                {
-                
                     COLUMN_WEIGHT_MAP[m_columnDepth][i] /= totalWeight;
-                }
             }
         }
-        
+
         m_columnDepth--;
     }
 
@@ -149,6 +140,9 @@ public static class EditorGUILayout
     /// </summary>
     public static void SplitColumns(float nextColumnWeight = 1.0f)
     {
+        if (COLUMN_DIRTY_STACK.Count == 0)
+            throw new InvalidOperationException("SplitColumns() called without BeginColumns().");
+
         if (!COLUMN_DIRTY_STACK.Peek())
         {
             ImGui.TableNextColumn();
@@ -160,15 +154,12 @@ public static class EditorGUILayout
             COLUMN_WEIGHT_MAP[m_columnDepth].Add(nextColumnWeight);
         }
     }
-    
+
     /// <summary>
     /// Inserts vertical spacing of given height (default 8px)
     /// </summary>
-    public static void Space(float pixels = 8f)
-    {
-        ImGui.Dummy(new Vector2(1, pixels));
-    }
-    
+    public static void Space(float pixels = 8f) => ImGui.Dummy(new Vector2(1, pixels));
+
     /// <summary>
     /// Inserts horizontal indentation of given width (default 8px)
     /// </summary>
@@ -177,17 +168,17 @@ public static class EditorGUILayout
         ImGui.Dummy(new Vector2(pixels, 1));
         ImGui.SameLine();
     }
-    
+
     /// <summary>
     /// Begin a specific font style.
     /// </summary>
     public static void BeginFont(FontStyle style)
     {
         FONTSTYLE_STACK.Push(style);
-        
+
         FontStyle result = FontStyle.None;
         foreach (var s in FONTSTYLE_STACK) result |= s;
-        
+
         if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
         else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
         else if (result == (FontStyle.Bold | FontStyle.Italic)) IImGui.UseFont(ImGuiFontStyle.BoldItalic);
@@ -200,16 +191,16 @@ public static class EditorGUILayout
     public static void EndFont()
     {
         FONTSTYLE_STACK.Pop();
-        
+
         FontStyle result = FontStyle.None;
         foreach (var s in FONTSTYLE_STACK) result |= s;
-        
+
         if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
         else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
         else if (result == (FontStyle.Bold | FontStyle.Italic)) IImGui.UseFont(ImGuiFontStyle.BoldItalic);
         else IImGui.UseFont(ImGuiFontStyle.Regular);
     }
-    
+
     /// <summary>
     /// Begin a new layout with specified type and alignment.
     /// </summary>
@@ -224,60 +215,47 @@ public static class EditorGUILayout
     /// </summary>
     public static void EndAlignment()
     {
-        if (ALIGN_STACK.Count == 0) {throw new InvalidOperationException("EditorLayout.End called without matching Begin");}
+        if (ALIGN_STACK.Count == 0)
+            throw new InvalidOperationException("EditorLayout.End called without matching Begin");
+
         ALIGN_STACK.Pop();
         ImGui.EndGroup();
     }
-    
+
     private readonly struct DrawScope : IDisposable
     {
-        private readonly bool m_enabled = true;
+        private readonly bool m_enabled;
 
         public DrawScope(bool enabled)
         {
             ImGui.PushID(m_autoID++);
-            if (!enabled)
-            {
-                m_enabled = enabled;
-                ImGui.BeginDisabled();
-            }
+            m_enabled = enabled;
+            if (!enabled) ImGui.BeginDisabled();
         }
 
         public void Dispose()
         {
-            if (!m_enabled)
-            {
-                ImGui.EndDisabled();
-            }
+            if (!m_enabled) ImGui.EndDisabled();
             ImGui.PopID();
         }
     }
 
-
-    private static void AlignNextItem(float itemWidth)
+    private static void SetAlignedCursorPosX(float itemWidth)
     {
         if (ALIGN_STACK.Count == 0) return;
 
         var align = ALIGN_STACK.Peek();
-        Vector2 cursorPos = ImGui.GetCursorPos();
-        Vector2 regionAvail = ImGui.GetContentRegionAvail();
+        var cursorPos = ImGui.GetCursorPos();
+        var avail = ImGui.GetContentRegionAvail();
 
-        float offsetX;
-        switch (align)
+        float offsetX = align switch
         {
-            case LayoutAlign.Center:
-                offsetX = (regionAvail.x - itemWidth) * 0.5f;
-                break;
-            case LayoutAlign.Back:
-                offsetX = regionAvail.x - itemWidth;
-                break;
-            case LayoutAlign.Front:
-            default:
-                offsetX = 0f;
-                break;
-        }
+            LayoutAlign.Center => (avail.X - itemWidth) * 0.5f,
+            LayoutAlign.Back => (avail.X - itemWidth),
+            _ => 0f
+        };
 
-        ImGui.SetCursorPosX(cursorPos.x + offsetX);
+        ImGui.SetCursorPosX(cursorPos.X + offsetX);
     }
 
     private static float MeasureWidth(Action onMeasure)
@@ -290,17 +268,117 @@ public static class EditorGUILayout
 
         return EditorImGuiEx.GetInvisibleItemRectSize().x;
     }
-    
+
+    private static void BeginPropertyRow(string label)
+    {
+        // Column 1: left label.
+        BeginColumns(2f);
+        Label(label);
+        
+        // Column 2: controls area (caller draws controls).
+        SplitColumns(3f);
+
+        // If we are in "recording weights" mode, TableSetColumnIndex won't exist yet; safe to guard.
+        if (!COLUMN_DIRTY_STACK.Peek())
+            ImGui.TableSetColumnIndex(1);
+    }
+
+    private static void EndPropertyRow()
+    {
+        EndColumns();
+    }
+
+    private static bool DrawAxisDrag(string axis, ref float value, float fieldW, Color tagColor)
+    {
+        bool changed = false;
+        float gap = ImGui.GetStyle().ItemSpacing.X;
+        float h = ImGui.GetFrameHeight();
+
+        // --- Tag: draw colored button-looking thing ---
+        // Use an invisible button for drag behavior
+        var tagSize = new Vector2(h, h);
+
+        // Draw background like a button (so it looks identical)
+        var dl = ImGui.GetWindowDrawList();
+        Vector2 p0 = ImGui.GetCursorScreenPos();
+        var p1 = new Vector2(p0.x + tagSize.x, p0.y + tagSize.y);
+
+        // Hover/active shading
+        ImGui.InvisibleButton($"##tag_{axis}", tagSize);
+        var hovered = ImGui.IsItemHovered();
+        var held = ImGui.IsItemActive();
+
+        // Background
+        Vector4 bg = new Vector4(tagColor.r, tagColor.g, tagColor.b, tagColor.a);
+        if (held)
+        {
+            bg = new Vector4(
+                tagColor.r * 0.90f,
+                tagColor.g * 0.90f, 
+                tagColor.b * 0.90f,
+                tagColor.a);
+        }
+        else if (hovered)
+        {
+            bg = new Vector4(
+                MathF.Min(1f, tagColor.r + 0.10f),
+                MathF.Min(1f, tagColor.g + 0.10f),
+                MathF.Min(1f, tagColor.b + 0.10f),
+                tagColor.a);
+        }
+
+        float rounding = ImGui.GetStyle().FrameRounding;
+        dl.AddRectFilled(p0, p1, ImGui.ColorConvertFloat4ToU32(bg), rounding);
+
+        // Centered text
+        Vector2 textSize = ImGui.CalcTextSize(axis);
+        var textPos = new Vector2(
+            p0.x + (tagSize.x - textSize.x) * 0.5f,
+            p0.y + (tagSize.y - textSize.y) * 0.5f);
+        dl.AddText(textPos, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), axis);
+
+        // --- Drag effect on the tag ---
+        // When held, use mouse delta to modify value
+        if (held)
+        {
+            // Sensitivity: tune as you like
+            float speed = 0.02f;
+
+            // Shift = fine, Ctrl = coarse
+            var io = ImGui.GetIO();
+            if (io.KeyShift) speed *= 0.2f;
+            if (io.KeyCtrl)  speed *= 5.0f;
+
+            float delta = io.MouseDelta.X * speed;
+            if (delta != 0f)
+            {
+                value += delta;
+                changed = true;
+            }
+
+            // change cursor while dragging
+            ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+        }
+
+        // --- Value input (still edits the same value) ---
+        ImGui.SameLine(0f, gap);
+        ImGui.SetNextItemWidth(fieldW);
+        changed |= ImGui.InputFloat($"##{axis}", ref value);
+
+        return changed;
+    }
+
     #endregion
 
     #region Widgets
+
     /// <summary>
     /// Render a text label
     /// </summary>
     public static void Label(string text, bool enabled = true)
     {
         float width = MeasureWidth(() => ImGui.Text(text));
-        AlignNextItem(width);
+        SetAlignedCursorPosX(width);
 
         using (new DrawScope(enabled))
         {
@@ -319,160 +397,240 @@ public static class EditorGUILayout
     public static bool Button(string label, bool enabled = true)
     {
         float width = MeasureWidth(() => ImGui.Button(label));
-        AlignNextItem(width);
-
+        SetAlignedCursorPosX(width);
         using (new DrawScope(enabled)) { return ImGui.Button(label); }
     }
 
     /// <summary>
-    /// Render and edit an integer field
+    /// Render and edit an integer field.
     /// </summary>
     public static bool IntField(string label, ref int value, bool enabled = true)
     {
-        var dummyValue = value;
-        float width = MeasureWidth(() => ImGui.InputInt(label, ref dummyValue));
-        AlignNextItem(width);
-        
-        using (new DrawScope(enabled)) { return ImGui.InputInt(label, ref value); }
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            bool result = ImGui.InputInt("##value", ref value);
+            EndPropertyRow();
+            return result;
+        }
     }
 
     /// <summary>
-    /// Render and edit a float field
+    /// Render and edit a float field.
     /// </summary>
     public static bool FloatField(string label, ref float value, bool enabled = true)
     {
-        var dummyValue = value;
-        float width = MeasureWidth(() => ImGui.InputFloat(label, ref dummyValue));
-        AlignNextItem(width);
-        
-        using (new DrawScope(enabled)) { return ImGui.InputFloat(label, ref value); }
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            bool result = ImGui.InputFloat("##value", ref value);
+            EndPropertyRow();
+            return result;
+        }
     }
 
     /// <summary>
-    /// Render and edit a Vector2 field
+    /// Render and edit a Vector2 field.
     /// </summary>
     public static bool Vector2Field(string label, ref Vector2 value, bool enabled = true)
     {
-        System.Numerics.Vector2 dummyValue = value;
-        float width = MeasureWidth(() => ImGui.InputFloat2(label, ref dummyValue));
-        AlignNextItem(width);
+        bool changed = false;
 
-        System.Numerics.Vector2 sysValue = value;
         using (new DrawScope(enabled))
         {
-            var result = ImGui.InputFloat2(label, ref sysValue);
-            value = sysValue;
-            return result;
+            BeginPropertyRow(label);
+
+            float x = value.x;
+            float y = value.y;
+            
+            BeginColumns();
+
+            changed |= DrawAxisDrag(
+                "X", 
+                ref x,
+                ImGui.GetColumnWidth(),
+                new Color(0.75f, 0.20f, 0.20f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "Y", 
+                ref y, 
+                ImGui.GetColumnWidth(),
+                new Color(0.20f, 0.65f, 0.25f));
+            
+            EndColumns();
+
+            if (changed) value = new Vector2(x, y);
+
+            EndPropertyRow();
         }
+
+        return changed;
     }
 
     /// <summary>
-    /// Render and edit a Vector3 field
+    /// Render and edit a Vector3 field.
     /// </summary>
     public static bool Vector3Field(string label, ref Vector3 value, bool enabled = true)
     {
-        System.Numerics.Vector3 dummyValue = value;
-        float width = MeasureWidth(() => ImGui.InputFloat3(label, ref dummyValue));
-        AlignNextItem(width);
-        
-        System.Numerics.Vector3 sysValue = value;
+        bool changed = false;
+
         using (new DrawScope(enabled))
         {
-            var result = ImGui.InputFloat3(label, ref sysValue);
-            value = sysValue;
-            return result;
+            BeginPropertyRow(label);
+
+            float x = value.x;
+            float y = value.y;
+            float z = value.z;
+            
+            BeginColumns();
+
+            changed |= DrawAxisDrag(
+                "X", 
+                ref x,
+                ImGui.GetColumnWidth(),
+                new Color(0.75f, 0.20f, 0.20f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "Y", 
+                ref y, 
+                ImGui.GetColumnWidth(),
+                new Color(0.20f, 0.65f, 0.25f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "Z", 
+                ref z, 
+                ImGui.GetColumnWidth(),
+                new Color(0.25f, 0.35f, 0.80f));
+            
+            EndColumns();
+
+            if (changed) value = new Vector3(x, y, z);
+
+            EndPropertyRow();
         }
+
+        return changed;
     }
 
     /// <summary>
-    /// Render and edit a Quaternion field
+    /// Render and edit a Quaternion field.
     /// </summary>
     public static bool QuaternionField(string label, ref Quaternion value, bool enabled = true)
     {
-        System.Numerics.Vector4 dummyValue = new(value.x, value.y, value.z, value.w);
-        float width = MeasureWidth(() => ImGui.InputFloat4(label, ref dummyValue));
-        AlignNextItem(width);
+        bool changed = false;
         
-        System.Numerics.Vector4 sysValue = new(value.x, value.y, value.z, value.w);
         using (new DrawScope(enabled))
         {
-            var result = ImGui.InputFloat4(label, ref sysValue);
-            value.x = sysValue.X;
-            value.y = sysValue.Y;
-            value.z = sysValue.Z;
-            value.w = sysValue.W;
-            return result;
+            BeginPropertyRow(label);
+
+            float x = value.x;
+            float y = value.y;
+            float z = value.z;
+            float w = value.w;
+            
+            BeginColumns();
+
+            changed |= DrawAxisDrag(
+                "X", 
+                ref x,
+                ImGui.GetColumnWidth(),
+                new Color(0.75f, 0.20f, 0.20f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "Y", 
+                ref y, 
+                ImGui.GetColumnWidth(),
+                new Color(0.20f, 0.65f, 0.25f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "Z", 
+                ref z, 
+                ImGui.GetColumnWidth(),
+                new Color(0.25f, 0.35f, 0.80f));
+            
+            SplitColumns();
+
+            changed |= DrawAxisDrag(
+                "W", 
+                ref w, 
+                ImGui.GetColumnWidth(),
+                new Color(0.55f, 0.55f, 0.55f));
+            
+            EndColumns();
+
+            if (changed)
+            {
+                value.x = x; value.y = y; value.z = z; value.w = w;
+            }
+
+            EndPropertyRow();
         }
+
+        return changed;
     }
 
     /// <summary>
-    /// Render and edit a text (string) field
+    /// Render and edit a text (string) field.
     /// </summary>
     public static bool TextField(string label, ref string value, uint maxLength = 256, bool enabled = true)
     {
-        var dummyValue = value;
-        float width = MeasureWidth(() => ImGui.InputText(label, ref dummyValue, maxLength));
-        AlignNextItem(width);
-        
-        using (new DrawScope(enabled)) { return ImGui.InputText(label, ref value, maxLength); }
-    }
-
-    /// <summary>
-    /// Render and edit a boolean checkbox
-    /// </summary>
-    public static bool Checkbox(string label, ref bool value, bool enabled = true)
-    {
-        var dummyValue = value;
-        float width = MeasureWidth(() => ImGui.Checkbox(label, ref dummyValue));
-        AlignNextItem(width);
-        
-        using (new DrawScope(enabled)) { return ImGui.Checkbox(label, ref value); }
-    }
-    
-    /// <summary>
-    /// Render and edit a Color field
-    /// </summary>
-    public static bool ColorField(string label, in Color input, out Color output, bool enabled = true)
-    {
-        System.Numerics.Vector4 dummyValue = new(input.r, input.g, input.b, input.a);
-        float width = MeasureWidth(() => ImGui.ColorEdit4(label, ref dummyValue));
-        AlignNextItem(width);
-        
-        System.Numerics.Vector4 sysValue = new(input.r, input.g, input.b, input.a);
-        using (new DrawScope(enabled)) 
-        { 
-            var result = ImGui.ColorEdit4(label, ref sysValue); 
-            output = new Color(sysValue.X, sysValue.Y, sysValue.Z, sysValue.W);
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            bool result = ImGui.InputText("##value", ref value, maxLength);
+            EndPropertyRow();
             return result;
         }
     }
-    
-    /// <summary>
-    /// Render a Collapsable Header with a label and an action to call when closed.
-    /// </summary>
-    public static bool CollapsingHeader(string label, Action? onClose = null, bool defaultOpen = true, bool enabled = true)
-    {
-        bool visibility = true;
-        var openFlag = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
 
+    /// <summary>
+    /// Render and edit a boolean checkbox.
+    /// </summary>
+    public static bool Checkbox(string label, ref bool value, bool enabled = true)
+    {
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+            // Checkbox doesn't really use width; keep it at start of control column
+            bool result = ImGui.Checkbox("##value", ref value);
+            EndPropertyRow();
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Render and edit a Color field.
+    /// </summary>
+    public static bool ColorField(string label, in Color input, out Color output, bool enabled = true)
+    {
         bool result;
-        if (onClose == null)
+
+        using (new DrawScope(enabled))
         {
-            BeginFont(FontStyle.Bold);
-            result = ImGui.CollapsingHeader(label, openFlag);
-            EndFont();
+            BeginPropertyRow(label);
+
+            var v = new System.Numerics.Vector4(input.r, input.g, input.b, input.a);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            result = ImGui.ColorEdit4("##value", ref v);
+
+            output = new Color(v.X, v.Y, v.Z, v.W);
+
+            EndPropertyRow();
         }
-        else
-        {
-            using (new DrawScope(enabled))
-            {
-                BeginFont(FontStyle.Bold);
-                result = ImGui.CollapsingHeader(label, ref visibility, openFlag);
-                EndFont();
-            }
-            if (!visibility) { onClose.Invoke(); }
-        }
-        
+
         return result;
     }
 
@@ -481,13 +639,16 @@ public static class EditorGUILayout
     /// </summary>
     public static bool Combo(string label, string[] list, ref int selectedIndex, bool enabled = true)
     {
-        var demmySelected = selectedIndex;
-        float width = MeasureWidth(() => ImGui.Combo(label, ref demmySelected, list, list.Length));
-        AlignNextItem(width);
-        
-        using (new DrawScope(enabled)) { return ImGui.Combo(label, ref selectedIndex, list, list.Length); }
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            bool result = ImGui.Combo("##value", ref selectedIndex, list, list.Length);
+            EndPropertyRow();
+            return result;
+        }
     }
-
+    
     /// <summary>
     /// Render a popup menu for selecting items.
     /// </summary>
@@ -498,8 +659,7 @@ public static class EditorGUILayout
 
         using (new DrawScope(enabled))
         {
-            AlignNextItem(MeasureWidth(() => ImGui.Button(label)));
-            if (ImGui.Button(label))
+            if (Button(label, enabled))
             {
                 ImGui.OpenPopup(label);
             }
@@ -527,7 +687,35 @@ public static class EditorGUILayout
 
         return changed;
     }
-
     
+    /// <summary>
+    /// Render a Collapsable Header with a label and an action to call when closed.
+    /// </summary>
+    public static bool CollapsingHeader(string label, Action? onClose = null, bool defaultOpen = true, bool enabled = true)
+    {
+        bool visibility = true;
+        var openFlag = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
+
+        bool result;
+        if (onClose == null)
+        {
+            BeginFont(FontStyle.Bold);
+            result = ImGui.CollapsingHeader(label, openFlag);
+            EndFont();
+        }
+        else
+        {
+            using (new DrawScope(enabled))
+            {
+                BeginFont(FontStyle.Bold);
+                result = ImGui.CollapsingHeader(label, ref visibility, openFlag);
+                EndFont();
+            }
+            if (!visibility) onClose.Invoke();
+        }
+
+        return result;
+    }
+
     #endregion
 }
