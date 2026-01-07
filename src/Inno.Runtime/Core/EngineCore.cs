@@ -72,7 +72,7 @@ public abstract class EngineCore
     private void OnLoad()
     {
         // InnoAsset Initialization
-        AssetManager.LoadAllAssets();
+        AssetManager.LoadAllFromAssetDirectory();
         
         // Graphics Resources
         Renderer2D.LoadResources();

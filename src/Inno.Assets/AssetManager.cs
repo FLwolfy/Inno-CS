@@ -15,8 +15,8 @@ public static class AssetManager
 {
     private static readonly Lock SYNC = new();
 
-    private static readonly Dictionary<string, Guid> PATH_GUID_PAIRS = new();   // abs file path -> guid
-    private static readonly Dictionary<Guid, InnoAsset> LOADED_ASSETS = new();  // guid -> asset
+    private static readonly Dictionary<string, Guid> PATH_GUID_PAIRS = new();       // abs file path -> guid
+    private static readonly Dictionary<Guid, InnoAsset> LOADED_ASSETS = new();      // guid -> asset
     private static readonly Dictionary<string, InnoAsset> EMBEDDED_ASSETS = new();  // asm|manifest -> asset
 
     private static FileSystemWatcher? m_watcher;
@@ -42,7 +42,7 @@ public static class AssetManager
         m_watcher.EnableRaisingEvents = true;
     }
 
-    public static void LoadAllAssets()
+    public static void LoadAllFromAssetDirectory()
     {
         if (string.IsNullOrEmpty(assetDirectory) || !Directory.Exists(assetDirectory)) return;
 
