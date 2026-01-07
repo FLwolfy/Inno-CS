@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 
 using Inno.Assets;
 using Inno.Assets.AssetType;
+using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources;
@@ -32,7 +34,16 @@ public static class Renderer2D
 
     public static void LoadResources()
     {
+        LoadEmbeddedResources();
         CreateSolidQuadResources();
+    }
+
+    private static void LoadEmbeddedResources()
+    {
+        AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.vert");
+        AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.frag");
+        AssetManager.LoadEmbedded<ShaderAsset>("TexturedQuad.vert");
+        AssetManager.LoadEmbedded<ShaderAsset>("TexturedQuad.frag");
     }
 
     private static void CreateSolidQuadResources()
@@ -63,8 +74,12 @@ public static class Renderer2D
             depthStencilState = DepthStencilState.DepthOnlyLessEqual
         };
         opaqueMat.shaders = new ShaderProgram();
-        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.vert")!));
-        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.frag")!));
+        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
+            AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.vert").Resolve()!
+        ));
+        opaqueMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
+            AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.frag").Resolve()!
+        ));
         
         // Alpha Material
         var alphaMat = new Material("QuadAlpha");
@@ -74,8 +89,12 @@ public static class Renderer2D
             depthStencilState = DepthStencilState.DepthReadOnlyLessEqual
         };
         alphaMat.shaders = new ShaderProgram();
-        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.vert")!));
-        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(AssetManager.LoadEmbedded<ShaderAsset>("SolidQuad.frag")!));
+        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
+            AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.vert").Resolve()!
+        ));
+        alphaMat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
+            AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.frag").Resolve()!
+        ));
         
         // Opaque Resource
         m_quadOpaqueResources = new GraphicsResource(mesh, [opaqueMat]);
@@ -135,10 +154,10 @@ public static class Renderer2D
 
         mat.shaders = new ShaderProgram();
         mat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
-            AssetManager.LoadEmbedded<ShaderAsset>("TexturedQuad.vert")!
+            AssetManager.GetEmbedded<ShaderAsset>("TexturedQuad.vert").Resolve()!
         ));
         mat.shaders.Add(ResourceDecoder.DecodeBinaries<Shader, ShaderAsset>(
-            AssetManager.LoadEmbedded<ShaderAsset>("TexturedQuad.frag")!
+            AssetManager.GetEmbedded<ShaderAsset>("TexturedQuad.frag").Resolve()!
         ));
 
         // Bind Texture into material

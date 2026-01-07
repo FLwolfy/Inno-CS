@@ -81,7 +81,9 @@ public class EditorTest
             testObject6.transform.worldScale = new Vector3(1f, 1f, 1f);
             testObject6.transform.localRotationZ = 0;
             SpriteRenderer sr6 = testObject6.AddComponent<SpriteRenderer>();
-            Texture testTexture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(AssetManager.Load<TextureAsset>("TestTextures/coin.png")!);
+
+            AssetRef<TextureAsset> testTextureAsset = AssetManager.Get<TextureAsset>("TestTextures/coin.png");
+            Texture testTexture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(testTextureAsset.Resolve()!);
             sr6.sprite = Sprite.FromTexture(testTexture);
         }
     }

@@ -55,7 +55,6 @@ public abstract class EngineCore
         m_fileSink = new FileLogSink("Project/Logs", 5 * 1024 * 1024, 20);
         LogManager.SetMinimumLevel(LogLevel.Debug);
         LogManager.RegisterSink(m_fileSink);
-        LogManager.RegisterSink(new ConsoleLogSink());
         
         // Initialize Render
         RenderTargetPool.Initialize(m_graphicsDevice);
