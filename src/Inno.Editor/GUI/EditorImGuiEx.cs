@@ -3,7 +3,7 @@ using ImGuiNET;
 using Inno.Core.Math;
 using Inno.Platform.ImGui;
 
-namespace Inno.Editor.Core;
+namespace Inno.Editor.GUI;
 
 public static class EditorImGuiEx
 {

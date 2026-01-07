@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+
 using ImGuiNET;
 
 using Inno.Core.ECS;
 using Inno.Core.Events;
 using Inno.Editor.Core;
+using Inno.Editor.GUI;
 
 namespace Inno.Editor.Panel;
 
