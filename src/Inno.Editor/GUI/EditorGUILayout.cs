@@ -95,10 +95,12 @@ public static class EditorGUILayout
         if (!dirty)
         {
             var columnCount = COLUMN_COUNT_MAP[m_columnDepth];
-            ImGui.BeginTable("EditorLayout", columnCount, flags);
+            ImGui.BeginTable($"EditorLayout##{m_columnDepth}", columnCount, flags);
 
             for (var i = 0; i < columnCount; i++)
+            {
                 ImGui.TableSetupColumn($"Column {i}", ImGuiTableColumnFlags.None, COLUMN_WEIGHT_MAP[m_columnDepth][i]);
+            }
 
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
@@ -228,7 +230,6 @@ public static class EditorGUILayout
 
         public DrawScope(bool enabled)
         {
-            ImGui.PushID(m_autoID++);
             m_enabled = enabled;
             if (!enabled) ImGui.BeginDisabled();
         }
@@ -236,7 +237,6 @@ public static class EditorGUILayout
         public void Dispose()
         {
             if (!m_enabled) ImGui.EndDisabled();
-            ImGui.PopID();
         }
     }
 
@@ -261,7 +261,7 @@ public static class EditorGUILayout
     private static float MeasureWidth(Action onMeasure)
     {
         EditorImGuiEx.BeginInvisible();
-        ImGui.PushID(m_autoMeasureID++);
+        ImGui.PushID("__measure__");
         onMeasure.Invoke();
         ImGui.PopID();
         EditorImGuiEx.EndInvisible();
@@ -271,14 +271,13 @@ public static class EditorGUILayout
 
     private static void BeginPropertyRow(string label)
     {
-        // Column 1: left label.
+        ImGui.PushID(label);
+
         BeginColumns(2f);
         Label(label);
-        
-        // Column 2: controls area (caller draws controls).
+
         SplitColumns(3f);
 
-        // If we are in "recording weights" mode, TableSetColumnIndex won't exist yet; safe to guard.
         if (!COLUMN_DIRTY_STACK.Peek())
             ImGui.TableSetColumnIndex(1);
     }
@@ -286,6 +285,7 @@ public static class EditorGUILayout
     private static void EndPropertyRow()
     {
         EndColumns();
+        ImGui.PopID();
     }
 
     private static bool DrawAxisDrag(string axis, ref float value, float fieldW, Color tagColor)
@@ -293,9 +293,6 @@ public static class EditorGUILayout
         bool changed = false;
         float gap = ImGui.GetStyle().ItemSpacing.X;
         float h = ImGui.GetFrameHeight();
-
-        // --- Tag: draw colored button-looking thing ---
-        // Use an invisible button for drag behavior
         var tagSize = new Vector2(h, h);
 
         // Draw background like a button (so it looks identical)
@@ -693,14 +690,15 @@ public static class EditorGUILayout
     /// </summary>
     public static bool CollapsingHeader(string label, Action? onClose = null, bool defaultOpen = true, bool enabled = true)
     {
-        bool visibility = true;
-        var openFlag = defaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None;
+        ImGui.SetNextItemOpen(defaultOpen, ImGuiCond.Once);
 
+        bool visibility = true;
         bool result;
+
         if (onClose == null)
         {
             BeginFont(FontStyle.Bold);
-            result = ImGui.CollapsingHeader(label, openFlag);
+            result = ImGui.CollapsingHeader(label);
             EndFont();
         }
         else
@@ -708,9 +706,10 @@ public static class EditorGUILayout
             using (new DrawScope(enabled))
             {
                 BeginFont(FontStyle.Bold);
-                result = ImGui.CollapsingHeader(label, ref visibility, openFlag);
+                result = ImGui.CollapsingHeader(label, ref visibility);
                 EndFont();
             }
+
             if (!visibility) onClose.Invoke();
         }
 
