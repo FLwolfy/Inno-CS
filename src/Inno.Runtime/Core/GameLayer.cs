@@ -1,5 +1,6 @@
 using Inno.Core.ECS;
 using Inno.Core.Layers;
+using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
@@ -32,8 +33,8 @@ public class GameLayer : Layer
             depthAttachmentDescription = depthTexDesc,
             colorAttachmentDescriptions = [renderTexDesc]
         };
-        m_renderTarget = RenderTargetPool.Create("scene", renderTargetDesc);
-        m_renderTarget = RenderTargetPool.GetMain(); // TODO: Remove this until texture blit is supported
+        m_renderTarget = RenderGraphics.targetPool.Create("scene", renderTargetDesc);
+        m_renderTarget = RenderGraphics.targetPool.GetMain(); // TODO: Remove this until texture blit is supported
         
         // Render Passes
         m_renderPasses = new RenderPassStack();

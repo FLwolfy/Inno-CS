@@ -6,7 +6,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
-public static class RenderableGpuCompiler
+internal static class RenderableGpuCompiler
 {
     public static RenderableGpuBinding Compile(
         IGraphicsDevice gd,

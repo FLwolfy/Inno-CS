@@ -3,7 +3,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Bindings;
 
-public sealed class RenderableGpuBinding : IDisposable
+internal sealed class RenderableGpuBinding : IDisposable
 {
     private const int C_PER_OBJECT_SET_INDEX = 0;
     private const int C_MATERIAL_SET_INDEX = 1;

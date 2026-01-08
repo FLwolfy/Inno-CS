@@ -11,26 +11,28 @@ public sealed class GpuCache
     private readonly Lock m_sync = new();
     private readonly Dictionary<GpuCacheKey, Entry> m_cache = new();
 
+    internal GpuCache() { }
+
     private sealed class Entry
     {
-        public required object resource;
+        public required IDisposable resource;
         public int refCount;
     }
 
     public readonly struct Handle<T> : IDisposable where T : class, IDisposable
     {
-        private readonly GpuCache? m_cache;
+        private readonly GpuCache? m_resourceCache;
         private readonly GpuCacheKey m_key;
         public T value { get; }
 
-        internal Handle(GpuCache cache, GpuCacheKey key, T value)
+        internal Handle(GpuCache resourceCache, GpuCacheKey key, T value)
         {
-            m_cache = cache;
+            m_resourceCache = resourceCache;
             m_key = key;
             this.value = value;
         }
 
-        public void Dispose() => m_cache?.Release(m_key);
+        public void Dispose() => m_resourceCache?.Release(m_key);
     }
 
     public Handle<T> Acquire<T>(Func<T> factory, Guid guid, int variantKey = 0)
@@ -63,7 +65,16 @@ public sealed class GpuCache
             if (e.refCount > 0) return;
 
             m_cache.Remove(key);
-            ((IDisposable)e.resource).Dispose();
+            e.resource.Dispose();
+        }
+    }
+    
+    public void Clear()
+    {
+        lock (m_sync)
+        {
+            foreach (var entry in m_cache.Values) entry.resource.Dispose();
+            m_cache.Clear();
         }
     }
 }

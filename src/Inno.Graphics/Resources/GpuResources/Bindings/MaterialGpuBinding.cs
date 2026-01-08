@@ -12,7 +12,7 @@ namespace Inno.Graphics.Resources.GpuResources.Bindings;
 ///
 /// IMPORTANT: Does NOT include pipeline. Pipeline depends on mesh layout + material layout.
 /// </summary>
-public sealed class MaterialGpuBinding : IDisposable
+internal sealed class MaterialGpuBinding : IDisposable
 {
     private readonly GpuCache.Handle<IUniformBuffer>[] m_ubHandles;
     private readonly GpuCache.Handle<ITexture>[] m_texHandles;

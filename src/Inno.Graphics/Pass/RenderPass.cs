@@ -1,3 +1,5 @@
+using Inno.Graphics.Targets;
+
 namespace Inno.Graphics.Pass;
 
 /// <summary>

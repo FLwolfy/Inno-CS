@@ -9,7 +9,7 @@ namespace Inno.Graphics.Resources.GpuResources.Bindings;
 /// Pure GPU container for mesh resources.
 /// Does not reference CPU <see cref="CpuResources.Mesh"/> and does not allocate GPU resources.
 /// </summary>
-public sealed class MeshGpuBinding : IDisposable
+internal sealed class MeshGpuBinding : IDisposable
 {
     private readonly GpuCache.Handle<IVertexBuffer> m_vbHandle;
     private readonly GpuCache.Handle<IIndexBuffer>[] m_ibHandles;

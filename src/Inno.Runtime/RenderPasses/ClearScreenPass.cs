@@ -1,6 +1,8 @@
 using Inno.Core.Math;
 using Inno.Graphics;
 using Inno.Graphics.Pass;
+using Inno.Graphics.Renderer;
+using Inno.Graphics.Targets;
 
 namespace Inno.Runtime.RenderPasses;
 

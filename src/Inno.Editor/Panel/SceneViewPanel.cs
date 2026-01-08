@@ -5,6 +5,7 @@ using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.Gizmo;
 using Inno.Editor.Utility;
+using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
@@ -65,7 +66,7 @@ public class SceneViewPanel : EditorPanel
     
     private void EnsureSceneRenderTarget()
     {
-        if (RenderTargetPool.Get("scene") == null)
+        if (RenderGraphics.targetPool.Get("scene") == null)
         {
             var renderTexDesc = new TextureDescription
             {
@@ -87,7 +88,7 @@ public class SceneViewPanel : EditorPanel
                 colorAttachmentDescriptions = [renderTexDesc]
             };
             
-            m_renderTarget = RenderTargetPool.Create("scene", renderTargetDesc);
+            m_renderTarget = RenderGraphics.targetPool.Create("scene", renderTargetDesc);
             m_currentTexture = m_renderTarget.GetColorAttachment(0)!;
         }
     }
@@ -120,7 +121,7 @@ public class SceneViewPanel : EditorPanel
 
     private void RenderSceneToBuffer()
     {
-        if (RenderTargetPool.Get("scene") != null)
+        if (RenderGraphics.targetPool.Get("scene") != null)
         {
             var flipYViewMatrix = m_editorCamera2D.viewMatrix;
             flipYViewMatrix.m42 *= -1;
@@ -155,7 +156,7 @@ public class SceneViewPanel : EditorPanel
 
     private void DrawScene()
     {
-        var targetTexture = RenderTargetPool.Get("scene")?.GetColorAttachment(0);
+        var targetTexture = RenderGraphics.targetPool.Get("scene")?.GetColorAttachment(0);
         if (targetTexture != null)
         {
             var newTextureHandle = IImGui.GetOrBindTexture(targetTexture);

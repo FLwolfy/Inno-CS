@@ -6,7 +6,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
-public static class PerObjectGpuCompiler
+internal static class PerObjectGpuCompiler
 {
     public static PerObjectGpuBinding Compile(
         IGraphicsDevice gd,
@@ -31,7 +31,7 @@ public static class PerObjectGpuCompiler
                 v.AddType(type);
             });
 
-            ubHandles[i] = GraphicsGpu.cache.Acquire(
+            ubHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () => gd.CreateUniformBuffer(name, type),
                 ownerGuid,
                 variantKey: ubVariant
@@ -50,7 +50,7 @@ public static class PerObjectGpuCompiler
             }
         });
 
-        var rsHandle = GraphicsGpu.cache.Acquire(
+        var rsHandle = RenderGraphics.gpuCache.Acquire(
             factory: () =>
             {
                 var rawUBs = new IUniformBuffer[ubHandles.Length];

@@ -7,7 +7,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
-public static class MaterialGpuCompiler
+internal static class MaterialGpuCompiler
 {
     public static MaterialGpuBinding Compile(
         IGraphicsDevice gd,
@@ -29,7 +29,7 @@ public static class MaterialGpuCompiler
                 v.AddType(type);
             });
 
-            matUbHandles[i] = GraphicsGpu.cache.Acquire(
+            matUbHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () => gd.CreateUniformBuffer(name, type),
                 ownerGuid,
                 variantKey: ubVariant
@@ -58,7 +58,7 @@ public static class MaterialGpuCompiler
                 v.Add((int)src.dimension);
             });
 
-            texHandles[i] = GraphicsGpu.cache.Acquire(
+            texHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () =>
                 {
                     var gpuTex = gd.CreateTexture(new TextureDescription
@@ -88,7 +88,7 @@ public static class MaterialGpuCompiler
 
             // TODO
             // Change the guid for sampler instead of texture
-            smpHandles[i] = GraphicsGpu.cache.Acquire(
+            smpHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () => gd.CreateSampler(new SamplerDescription
                 {
                     filter = SamplerFilter.Linear,
@@ -104,7 +104,7 @@ public static class MaterialGpuCompiler
         var vsCpu = material.shaders.GetShadersByStage(ShaderStage.Vertex).Values.First();
         var fsCpu = material.shaders.GetShadersByStage(ShaderStage.Fragment).Values.First();
 
-        var vsHandle = GraphicsGpu.cache.Acquire(
+        var vsHandle = RenderGraphics.gpuCache.Acquire(
             factory: () => gd.CreateVertexFragmentShader(
                 new ShaderDescription { stage = vsCpu.stage, sourceBytes = vsCpu.shaderBinaries },
                 new ShaderDescription { stage = fsCpu.stage, sourceBytes = fsCpu.shaderBinaries }
@@ -112,7 +112,7 @@ public static class MaterialGpuCompiler
             vsCpu.guid
         );
 
-        var fsHandle = GraphicsGpu.cache.Acquire(
+        var fsHandle = RenderGraphics.gpuCache.Acquire(
             factory: () => gd.CreateVertexFragmentShader(
                 new ShaderDescription { stage = vsCpu.stage, sourceBytes = vsCpu.shaderBinaries },
                 new ShaderDescription { stage = fsCpu.stage, sourceBytes = fsCpu.shaderBinaries }
@@ -142,10 +142,10 @@ public static class MaterialGpuCompiler
             // Make resource set rebuild when bindings change (editor-friendly).
             // Layout should be separated later; for now we key on the bound GPU resource identities.
             for (int i = 0; i < matUBs.Length; i++) v.AddType(matUBs[i].GetType());
-            for (int i = 0; i < texEntries.Count; i++) v.AddGuid(texEntries[i].texture.guid);
+            for (int i = 0; i < texEntries.Count; i++) v.AddId(texEntries[i].texture.guid);
         });
 
-        var resourceSetHandle = GraphicsGpu.cache.Acquire(
+        var resourceSetHandle = RenderGraphics.gpuCache.Acquire(
             factory: () => gd.CreateResourceSet(materialSetBinding),
             ownerGuid,
             variantKey: rsVariant

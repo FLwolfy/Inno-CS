@@ -5,6 +5,8 @@ using Inno.Core.Layers;
 using Inno.Core.Logging;
 using Inno.Core.Utility;
 using Inno.Graphics;
+using Inno.Graphics.Renderer;
+using Inno.Graphics.Resources.GpuResources.Cache;
 using Inno.Graphics.Targets;
 using Inno.Platform;
 using Inno.Platform.Graphics;
@@ -57,8 +59,7 @@ public abstract class EngineCore
         LogManager.RegisterSink(m_fileSink);
         
         // Initialize Render
-        RenderTargetPool.Initialize(m_graphicsDevice);
-        Renderer2D.Initialize(m_graphicsDevice);
+        RenderGraphics.Initialize(m_graphicsDevice);
         
         // Initialization Callbacks
         m_gameShell.SetOnLoad(OnLoad);
@@ -122,8 +123,7 @@ public abstract class EngineCore
     private void OnClose()
     {
         // Clean Graphics Cache
-        RenderTargetPool.Clear();
-        Renderer2D.CleanResources();
+        RenderGraphics.Clear();
         
         // Dispose Resources
         IImGui.DisposeImpl();

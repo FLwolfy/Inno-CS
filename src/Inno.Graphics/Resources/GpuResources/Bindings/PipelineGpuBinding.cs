@@ -7,9 +7,9 @@ namespace Inno.Graphics.Resources.GpuResources.Bindings;
 /// <summary>
 /// Pure GPU container for a pipeline state object.
 /// Constructors MUST NOT allocate GPU resources.
-/// Allocation is the responsibility of a compiler that uses <see cref="GraphicsGpu.cache"/>.
+/// Allocation is the responsibility of a compiler that uses <see cref="RenRenderGraphics.CACHE.
 /// </summary>
-public sealed class PipelineGpuBinding : IDisposable
+internal sealed class PipelineGpuBinding : IDisposable
 {
     private readonly GpuCache.Handle<IPipelineState> m_psoHandle;
 

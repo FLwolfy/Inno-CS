@@ -8,7 +8,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
-public static class MeshGpuCompiler
+internal static class MeshGpuCompiler
 {
     public static MeshGpuBinding Compile(IGraphicsDevice gd, Mesh mesh)
     {
@@ -30,7 +30,7 @@ public static class MeshGpuCompiler
             }
         });
 
-        var vbHandle = GraphicsGpu.cache.Acquire(
+        var vbHandle = RenderGraphics.gpuCache.Acquire(
             factory: () =>
             {
                 var vb = gd.CreateVertexBuffer((uint)(mesh.vertexCount * stride));
@@ -58,7 +58,7 @@ public static class MeshGpuCompiler
                 v.Add(s.indexCount);
             });
 
-            ibHandles[i] = GraphicsGpu.cache.Acquire(
+            ibHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () =>
                 {
                     var ib = gd.CreateIndexBuffer((uint)(s.indexCount * sizeof(uint)));

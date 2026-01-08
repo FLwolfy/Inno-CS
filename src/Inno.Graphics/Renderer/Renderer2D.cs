@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-
 using Inno.Assets;
 using Inno.Assets.AssetType;
 using Inno.Core.Math;
@@ -8,9 +7,10 @@ using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources.CpuResources;
 using Inno.Graphics.Resources.GpuResources.Bindings;
 using Inno.Graphics.Resources.GpuResources.Compilers;
+using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics;
+namespace Inno.Graphics.Renderer;
 
 public static class Renderer2D
 {
@@ -22,13 +22,15 @@ public static class Renderer2D
     private static RenderableGpuBinding m_quadAlpha = null!;
 
     // Textured Resources
-    private static readonly Dictionary<Guid, RenderableGpuBinding> m_texturedOpaqueCache = new();
-    private static readonly Dictionary<Guid, RenderableGpuBinding> m_texturedAlphaCache = new();
-
+    private static Dictionary<Guid, RenderableGpuBinding> m_texturedOpaqueCache = null!;
+    private static Dictionary<Guid, RenderableGpuBinding> m_texturedAlphaCache = null!;
 
     public static void Initialize(IGraphicsDevice graphicsDevice)
     {
         m_graphicsDevice = graphicsDevice;
+        
+        m_texturedOpaqueCache = new Dictionary<Guid, RenderableGpuBinding>();
+        m_texturedAlphaCache = new Dictionary<Guid, RenderableGpuBinding>();
     }
 
     public static void LoadResources()
@@ -48,6 +50,7 @@ public static class Renderer2D
     private static void CreateSolidQuadResources()
     {
         // Mesh
+        // TODO: Use storage to cache meshes
         var mesh = new Mesh("Quad");
         mesh.renderState = new MeshRenderState
         {
@@ -95,28 +98,27 @@ public static class Renderer2D
             AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.frag").Resolve()!
         ));
         
+        // Per-Object Uniforms
+        var perObjectUniforms = new List<(string name, Type type)>
+        {
+            ("MVP", typeof(Matrix)),
+            ("Color", typeof(Color))
+        };
+        
         // Opaque Renderable
         m_quadOpaque = RenderableGpuCompiler.Compile(
             m_graphicsDevice,
             mesh,
-            new[] { opaqueMat },
-            new List<(string name, Type type)>
-            {
-                ("MVP", typeof(Matrix)),
-                ("Color", typeof(Color))
-            }
+            [opaqueMat],
+            perObjectUniforms
         );
 
         // Alpha Renderable
         m_quadAlpha = RenderableGpuCompiler.Compile(
             m_graphicsDevice,
             mesh,
-            new[] { alphaMat },
-            new List<(string name, Type type)>
-            {
-                ("MVP", typeof(Matrix)),
-                ("Color", typeof(Color))
-            }
+            [alphaMat],
+            perObjectUniforms
         );
     }
     
@@ -126,10 +128,10 @@ public static class Renderer2D
         if (cache.TryGetValue(texture.guid, out var res))
             return res;
 
-        // Mesh (Position + UV) - 這個 mesh 每次 new 也能跑，但你之後應該抽成 shared CPU mesh
+        // Mesh
+        // TODO: Use storage to cache meshes
         var mesh = new Mesh("TexturedQuad");
         mesh.renderState = new MeshRenderState { topology = PrimitiveTopology.TriangleList };
-
         mesh.SetAttribute("Position", new Vector3[]
         {
             new(-1.0f,  1.0f, 0f),
@@ -137,7 +139,6 @@ public static class Renderer2D
             new(-1.0f, -1.0f, 0f),
             new( 1.0f, -1.0f, 0f)
         });
-
         mesh.SetAttribute("TexCoord0", new Vector2[]
         {
             new(0f, 0f),
@@ -145,9 +146,9 @@ public static class Renderer2D
             new(0f, 1f),
             new(1f, 1f)
         });
-
         mesh.SetIndices([0, 1, 2, 2, 1, 3]);
 
+        // Materials
         var mat = new Material(opaque ? "TexturedQuadOpaque" : "TexturedQuadAlpha");
         mat.renderState = new MaterialRenderState
         {
@@ -165,16 +166,19 @@ public static class Renderer2D
 
         mat.SetTexture("MainTex", texture);
 
+        // Per-Object Uniforms
+        var perObjectUniforms = new List<(string name, Type type)>
+        {
+            ("MVP", typeof(Matrix)),
+            ("Color", typeof(Color)),
+            ("UVRect", typeof(Vector4))
+        };
+        
         res = RenderableGpuCompiler.Compile(
             m_graphicsDevice,
             mesh,
-            new[] { mat },
-            new List<(string name, Type type)>
-            {
-                ("MVP", typeof(Matrix)),
-                ("Color", typeof(Color)),
-                ("UVRect", typeof(Vector4))
-            }
+            [mat],
+            perObjectUniforms
         );
 
         cache[texture.guid] = res;
@@ -206,10 +210,11 @@ public static class Renderer2D
             DrawQuad(ctx, transform, color);
             return;
         }
-
-        bool opaque = false; // 你之後可以根據資產 alpha 信息判斷
+        
+        // TODO: Use Texture Asset to detect
+        bool opaque = false; 
+        
         var res = GetOrCreateTexturedQuadResource(texture, opaque);
-
         var mvp = transform * ctx.viewProjection;
 
         res.UpdatePerObject(ctx.commandList, "MVP", mvp);

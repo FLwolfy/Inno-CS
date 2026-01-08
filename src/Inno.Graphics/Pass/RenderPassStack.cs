@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Inno.Graphics.Targets;
 
 namespace Inno.Graphics.Pass;
 

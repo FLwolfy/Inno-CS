@@ -4,40 +4,40 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Targets;
 
-public static class RenderTargetPool
+public sealed class RenderTargetPool
 {
-    private static readonly Dictionary<string, RenderTarget> TARGETS = new();
-    private static IGraphicsDevice m_device = null!;
+    private readonly Dictionary<string, RenderTarget> m_targets = new();
+    private readonly IGraphicsDevice m_device;
 
-    public static void Initialize(IGraphicsDevice device)
+    internal RenderTargetPool(IGraphicsDevice device)
     {
         m_device = device;
-        TARGETS["main"] = new RenderTarget(new RenderContext(device, device.swapchainFrameBuffer));
+        m_targets["main"] = new RenderTarget(new RenderContext(device, device.swapchainFrameBuffer));
     }
 
-    public static RenderTarget? Get(string name) => TARGETS.GetValueOrDefault(name);
-    public static RenderTarget GetMain() => TARGETS["main"];
+    public RenderTarget? Get(string name) => m_targets.GetValueOrDefault(name);
+    public RenderTarget GetMain() => m_targets["main"];
 
-    public static RenderTarget Create(string name, FrameBufferDescription desc)
+    public RenderTarget Create(string name, FrameBufferDescription desc)
     {
-        if (TARGETS.ContainsKey(name)) throw new InvalidOperationException($"Already exists a framebuffer named {name}!");
+        if (m_targets.ContainsKey(name)) throw new InvalidOperationException($"Already exists a framebuffer named {name}!");
         var result = new RenderTarget(m_device, desc);
-        TARGETS[name] = result;
+        m_targets[name] = result;
         return result;
     }
 
-    public static void Release(string name)
+    public void Release(string name)
     {
-        if (TARGETS.TryGetValue(name, out var rt))
+        if (m_targets.TryGetValue(name, out var rt))
         {
             rt.Dispose();
-            TARGETS.Remove(name);
+            m_targets.Remove(name);
         }
     }
 
-    public static void Clear()
+    public void Clear()
     {
-        foreach (var rt in TARGETS.Values) rt.Dispose();
-        TARGETS.Clear();
+        foreach (var rt in m_targets.Values) rt.Dispose();
+        m_targets.Clear();
     }
 }

@@ -7,7 +7,7 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
-public static class PipelineGpuCompiler
+internal static class PipelineGpuCompiler
 {
     public static PipelineGpuBinding Compile(
         IGraphicsDevice gd,
@@ -24,8 +24,8 @@ public static class PipelineGpuCompiler
         int psoVariant = GpuVariant.Build(v =>
         {
             // Shaders
-            v.AddGuid(material.shaders.GetShadersByStage(ShaderStage.Vertex).Values.First().guid);
-            v.AddGuid(material.shaders.GetShadersByStage(ShaderStage.Fragment).Values.First().guid);
+            v.AddId(material.shaders.GetShadersByStage(ShaderStage.Vertex).Values.First().guid);
+            v.AddId(material.shaders.GetShadersByStage(ShaderStage.Fragment).Values.First().guid);
 
             // Mesh vertex layout
             foreach (var t in vertexLayoutTypes)
@@ -46,7 +46,7 @@ public static class PipelineGpuCompiler
             v.Add(materialGpu.samplers.Length);
         });
 
-        var psoHandle = GraphicsGpu.cache.Acquire(
+        var psoHandle = RenderGraphics.gpuCache.Acquire(
             factory: () =>
             {
                 var materialSet = new ResourceSetBinding

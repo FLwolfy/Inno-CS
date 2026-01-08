@@ -4,6 +4,8 @@ using Inno.Core.ECS;
 using Inno.Core.Math;
 using Inno.Graphics;
 using Inno.Graphics.Pass;
+using Inno.Graphics.Renderer;
+using Inno.Graphics.Targets;
 using Inno.Runtime.Component;
 
 namespace Inno.Runtime.RenderPasses;

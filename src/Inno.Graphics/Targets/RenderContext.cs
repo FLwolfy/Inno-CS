@@ -2,7 +2,7 @@ using System;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics;
+namespace Inno.Graphics.Targets;
 
 public class RenderContext : IDisposable
 {

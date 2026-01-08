@@ -9,7 +9,7 @@ namespace Inno.Graphics.Resources.GpuResources.Bindings;
 /// Pure GPU container for per-object resources (typically per instance / renderable).
 /// All GPU allocations must be performed by a compiler.
 /// </summary>
-public sealed class PerObjectGpuBinding : IDisposable
+internal sealed class PerObjectGpuBinding : IDisposable
 {
     private readonly Dictionary<string, int> m_index;
     private readonly GpuCache.Handle<IUniformBuffer>[] m_uniformHandles;
