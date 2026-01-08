@@ -1,5 +1,6 @@
 using Inno.Core.Math;
 using Inno.Graphics.Resources;
+using Inno.Graphics.Resources.CpuResources;
 
 namespace Inno.Runtime.RenderObject;
 

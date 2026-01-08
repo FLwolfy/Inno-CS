@@ -6,6 +6,7 @@ using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources;
+using Inno.Graphics.Resources.CpuResources;
 using Inno.Runtime.Component;
 using Inno.Runtime.Core;
 using Inno.Runtime.RenderObject;

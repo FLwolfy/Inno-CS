@@ -1,8 +1,10 @@
+using System;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics.Resources;
+namespace Inno.Graphics.Resources.CpuResources;
 
 public class Texture(
+    Guid guid,
     string name,
     int width,
     int height,
@@ -11,6 +13,8 @@ public class Texture(
     TextureUsage usage,
     TextureDimension dimension
 ) {
+    public Guid guid { get; } = guid;
+
     public string name { get; } = name;
     public int width { get; } = width;
     public int height { get; } = height;

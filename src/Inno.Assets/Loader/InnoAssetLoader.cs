@@ -31,7 +31,7 @@ internal interface IAssetLoader
     /// <summary>
     /// Load the asset directly from bytes.
     /// </summary>
-    InnoAsset LoadRaw(string assetName, byte[] rawBytes);
+    InnoAsset LoadRaw(string assetName, Guid assetGuid, byte[] rawBytes);
 }
 
 internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
@@ -158,11 +158,11 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         File.WriteAllBytes(binPath, bin);
     }
     
-    public InnoAsset LoadRaw(string assetName, byte[] rawBytes)
+    public InnoAsset LoadRaw(string assetName, Guid assetGuid, byte[] rawBytes)
     {
         byte[] bin = OnLoadBinaries(assetName, rawBytes, out T asset);
 
-        asset.guid = Guid.Empty;
+        asset.guid = assetGuid;
         asset.sourcePath = C_VIRTUAL_SOURCE_NAME + "/" + assetName;
         asset.RecomputeHash(rawBytes);
         asset.assetBinaries = bin;

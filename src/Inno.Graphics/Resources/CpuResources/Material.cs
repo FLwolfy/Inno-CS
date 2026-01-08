@@ -1,7 +1,8 @@
+using System;
 using System.Collections.Generic;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics.Resources;
+namespace Inno.Graphics.Resources.CpuResources;
 
 public struct MaterialRenderState
 {
@@ -11,6 +12,9 @@ public struct MaterialRenderState
 
 public class Material
 {
+    // TODO: Change this to asset-inserted when complete material assets
+    public Guid guid { get; } = Guid.NewGuid(); 
+
     private readonly List<UniformEntry> m_uniforms = new();
     private readonly Dictionary<string, int> m_uniformIndex = new();
 
@@ -21,32 +25,18 @@ public class Material
     public MaterialRenderState renderState { get; set; }
     public ShaderProgram shaders { get; set; } = null!;
 
-    public Material(string name)
-    {
-        this.name = name;
-    }
+    public Material(string name) => this.name = name;
 
-    // ---------------- Uniforms ----------------
+    // Uniforms
     public void SetUniform<T>(string uniformName, T value) where T : unmanaged
     {
         if (m_uniformIndex.TryGetValue(uniformName, out int idx))
-        {
             m_uniforms[idx] = new UniformEntry(uniformName, value);
-        }
         else
         {
             m_uniformIndex[uniformName] = m_uniforms.Count;
             m_uniforms.Add(new UniformEntry(uniformName, value));
         }
-    }
-
-    public T GetUniform<T>(string uniformName) where T : unmanaged
-    {
-        if (m_uniformIndex.TryGetValue(uniformName, out int idx))
-        {
-            return (T)m_uniforms[idx].value;
-        }
-        throw new KeyNotFoundException($"Uniform {uniformName} not found.");
     }
 
     public IReadOnlyList<UniformEntry> GetAllUniforms() => m_uniforms;
@@ -57,27 +47,16 @@ public class Material
         public readonly object value = value;
     }
 
-    // ---------------- Textures ----------------
+    // Textures
     public void SetTexture(string textureName, Texture texture)
     {
         if (m_textureIndex.TryGetValue(textureName, out int idx))
-        {
             m_textures[idx] = new TextureEntry(textureName, texture);
-        }
         else
         {
             m_textureIndex[textureName] = m_textures.Count;
             m_textures.Add(new TextureEntry(textureName, texture));
         }
-    }
-
-    public Texture GetTexture(string textureName)
-    {
-        if (m_textureIndex.TryGetValue(textureName, out int idx))
-        {
-            return m_textures[idx].texture;
-        }
-        throw new KeyNotFoundException($"Texture {textureName} not found.");
     }
 
     public IReadOnlyList<TextureEntry> GetAllTextures() => m_textures;

@@ -1,4 +1,6 @@
 using System;
+using System.Security.Cryptography;
+using System.Text;
 using Inno.Assets.AssetType;
 
 namespace Inno.Assets;
@@ -6,16 +8,15 @@ namespace Inno.Assets;
 public readonly struct AssetRef<T> where T : InnoAsset
 {
     public Guid guid { get; }
-    internal string? embeddedKey { get; }
+    public bool isEmbedded { get; }
 
-    internal AssetRef(Guid guid, string? embeddedKey)
+    internal AssetRef(Guid guid, bool isEmbedded)
     {
         this.guid = guid; 
-        this.embeddedKey = embeddedKey;
+        this.isEmbedded = isEmbedded;
     }
 
-    public bool isEmbedded => embeddedKey != null;
-    public bool isValid => guid != Guid.Empty || isEmbedded;
+    public bool isValid => guid != Guid.Empty;
 
     public T? Resolve() => AssetManager.ResolveAssetRef(this);
 
@@ -25,7 +26,7 @@ public readonly struct AssetRef<T> where T : InnoAsset
             return $"{typeof(T).Name}: Invalid";
         
         if (isEmbedded) 
-            return $"{typeof(T).Name}: (Embedded Key) {embeddedKey}";
+            return $"{typeof(T).Name}: (Embedded) {guid}";
         
         return $"{typeof(T).Name}: {guid}";
     }

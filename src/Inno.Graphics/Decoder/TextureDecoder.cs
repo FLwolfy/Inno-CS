@@ -1,5 +1,5 @@
 using Inno.Assets.AssetType;
-using Inno.Graphics.Resources;
+using Inno.Graphics.Resources.CpuResources;
 
 namespace Inno.Graphics.Decoder;
 
@@ -7,8 +7,8 @@ internal class TextureDecoder : ResourceDecoder<Texture, TextureAsset>
 {
     protected override Texture OnDecode(TextureAsset asset)
     {
-        return new Texture
-        (
+        return new Texture(
+            asset.guid,
             asset.name,
             asset.width,
             asset.height,

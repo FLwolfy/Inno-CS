@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Inno.Platform.Graphics;
 
-namespace Inno.Graphics.Resources;
+namespace Inno.Graphics.Resources.CpuResources;
 
 public struct MeshRenderState
 {
@@ -11,6 +11,9 @@ public struct MeshRenderState
 
 public class Mesh
 {
+    // TODO: Change this to asset-inserted when complete mesh assets
+    public Guid guid { get; } = Guid.NewGuid();
+
     private readonly List<VertexAttributeEntry> m_attributes = new();
     private readonly Dictionary<string, int> m_attributeIndex = new();
 
@@ -28,7 +31,7 @@ public class Mesh
     {
         this.name = name;
     }
-    
+
     public readonly struct VertexAttributeEntry(string name, Type type, Array data)
     {
         public readonly string name = name;
@@ -39,9 +42,7 @@ public class Mesh
     public void SetAttribute<T>(string attributeName, T[] data) where T : unmanaged
     {
         if (m_attributeIndex.TryGetValue(attributeName, out var idx))
-        {
             m_attributes[idx] = new VertexAttributeEntry(attributeName, typeof(T), data);
-        }
         else
         {
             m_attributes.Add(new VertexAttributeEntry(attributeName, typeof(T), data));
@@ -50,10 +51,7 @@ public class Mesh
     }
 
     public T[] GetAttribute<T>(string attributeName) where T : unmanaged
-    {
-        int idx = m_attributeIndex[attributeName];
-        return (T[])m_attributes[idx].data;
-    }
+        => (T[])m_attributes[m_attributeIndex[attributeName]].data;
 
     public IReadOnlyList<VertexAttributeEntry> GetAllAttributes() => m_attributes;
 
@@ -67,7 +65,7 @@ public class Mesh
 public class MeshSegment
 {
     public string name { get; }
-    public int indexStart { get; } 
+    public int indexStart { get; }
     public int indexCount { get; }
     public int materialIndex { get; }
 

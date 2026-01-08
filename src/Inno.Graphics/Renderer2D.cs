@@ -3,10 +3,11 @@ using System.Collections.Generic;
 
 using Inno.Assets;
 using Inno.Assets.AssetType;
-using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Graphics.Decoder;
-using Inno.Graphics.Resources;
+using Inno.Graphics.Resources.CpuResources;
+using Inno.Graphics.Resources.GpuResources.Bindings;
+using Inno.Graphics.Resources.GpuResources.Compilers;
 using Inno.Platform.Graphics;
 
 namespace Inno.Graphics;
@@ -17,19 +18,17 @@ public static class Renderer2D
     private static IGraphicsDevice m_graphicsDevice = null!;
 
     // Quad Resources
-    private static GraphicsResource m_quadOpaqueResources = null!;
-    private static GraphicsResource m_quadAlphaResources = null!;
-    
-    // Textured Quad Resource Cache (per Texture)
-    private static Dictionary<Texture, GraphicsResource> m_texturedOpaqueCache = null!;
-    private static Dictionary<Texture, GraphicsResource> m_texturedAlphaCache = null!;
+    private static RenderableGpuBinding m_quadOpaque = null!;
+    private static RenderableGpuBinding m_quadAlpha = null!;
+
+    // Textured Resources
+    private static readonly Dictionary<Guid, RenderableGpuBinding> m_texturedOpaqueCache = new();
+    private static readonly Dictionary<Guid, RenderableGpuBinding> m_texturedAlphaCache = new();
+
 
     public static void Initialize(IGraphicsDevice graphicsDevice)
     {
         m_graphicsDevice = graphicsDevice;
-
-        m_texturedOpaqueCache = new();
-        m_texturedAlphaCache = new();
     }
 
     public static void LoadResources()
@@ -96,31 +95,40 @@ public static class Renderer2D
             AssetManager.GetEmbedded<ShaderAsset>("SolidQuad.frag").Resolve()!
         ));
         
-        // Opaque Resource
-        m_quadOpaqueResources = new GraphicsResource(mesh, [opaqueMat]);
-        m_quadOpaqueResources.RegisterPerObjectUniform("MVP", typeof(Matrix));
-        m_quadOpaqueResources.RegisterPerObjectUniform("Color", typeof(Color));
-        m_quadOpaqueResources.Create(m_graphicsDevice);
-        
-        // Alpha Resource 
-        m_quadAlphaResources = new GraphicsResource(mesh, [alphaMat]);
-        m_quadAlphaResources.RegisterPerObjectUniform("MVP", typeof(Matrix));
-        m_quadAlphaResources.RegisterPerObjectUniform("Color", typeof(Color));
-        m_quadAlphaResources.Create(m_graphicsDevice);
+        // Opaque Renderable
+        m_quadOpaque = RenderableGpuCompiler.Compile(
+            m_graphicsDevice,
+            mesh,
+            new[] { opaqueMat },
+            new List<(string name, Type type)>
+            {
+                ("MVP", typeof(Matrix)),
+                ("Color", typeof(Color))
+            }
+        );
+
+        // Alpha Renderable
+        m_quadAlpha = RenderableGpuCompiler.Compile(
+            m_graphicsDevice,
+            mesh,
+            new[] { alphaMat },
+            new List<(string name, Type type)>
+            {
+                ("MVP", typeof(Matrix)),
+                ("Color", typeof(Color))
+            }
+        );
     }
     
-    private static GraphicsResource GetOrCreateTexturedQuadResource(Texture texture, bool opaque)
+    private static RenderableGpuBinding GetOrCreateTexturedQuadResource(Texture texture, bool opaque)
     {
         var cache = opaque ? m_texturedOpaqueCache : m_texturedAlphaCache;
-        if (cache.TryGetValue(texture, out var res))
+        if (cache.TryGetValue(texture.guid, out var res))
             return res;
 
-        // Mesh (Position + UV)
+        // Mesh (Position + UV) - 這個 mesh 每次 new 也能跑，但你之後應該抽成 shared CPU mesh
         var mesh = new Mesh("TexturedQuad");
-        mesh.renderState = new MeshRenderState
-        {
-            topology = PrimitiveTopology.TriangleList
-        };
+        mesh.renderState = new MeshRenderState { topology = PrimitiveTopology.TriangleList };
 
         mesh.SetAttribute("Position", new Vector3[]
         {
@@ -130,7 +138,6 @@ public static class Renderer2D
             new( 1.0f, -1.0f, 0f)
         });
 
-        // UV (location = 1)
         mesh.SetAttribute("TexCoord0", new Vector2[]
         {
             new(0f, 0f),
@@ -139,12 +146,8 @@ public static class Renderer2D
             new(1f, 1f)
         });
 
-        mesh.SetIndices([
-            0, 1, 2,
-            2, 1, 3
-        ]);
+        mesh.SetIndices([0, 1, 2, 2, 1, 3]);
 
-        // Material
         var mat = new Material(opaque ? "TexturedQuadOpaque" : "TexturedQuadAlpha");
         mat.renderState = new MaterialRenderState
         {
@@ -160,16 +163,21 @@ public static class Renderer2D
             AssetManager.GetEmbedded<ShaderAsset>("TexturedQuad.frag").Resolve()!
         ));
 
-        // Bind Texture into material
         mat.SetTexture("MainTex", texture);
 
-        res = new GraphicsResource(mesh, [mat]);
-        res.RegisterPerObjectUniform("MVP", typeof(Matrix));
-        res.RegisterPerObjectUniform("Color", typeof(Color));
-        res.RegisterPerObjectUniform("UVRect", typeof(Vector4));
-        res.Create(m_graphicsDevice);
+        res = RenderableGpuCompiler.Compile(
+            m_graphicsDevice,
+            mesh,
+            new[] { mat },
+            new List<(string name, Type type)>
+            {
+                ("MVP", typeof(Matrix)),
+                ("Color", typeof(Color)),
+                ("UVRect", typeof(Vector4))
+            }
+        );
 
-        cache[texture] = res;
+        cache[texture.guid] = res;
         return res;
     }
     
@@ -179,60 +187,56 @@ public static class Renderer2D
 
         if (MathHelper.AlmostEquals(color.a, 1.0f))
         {
-            m_quadOpaqueResources.UpdatePerObjectUniform(ctx.commandList, "MVP", mvp);
-            m_quadOpaqueResources.UpdatePerObjectUniform(ctx.commandList, "Color", color);
-            m_quadOpaqueResources.ApplyAll(ctx.commandList);
+            m_quadOpaque.UpdatePerObject(ctx.commandList, "MVP", mvp);
+            m_quadOpaque.UpdatePerObject(ctx.commandList, "Color", color);
+            m_quadOpaque.DrawAll(ctx.commandList);
         }
         else
         {
-            m_quadAlphaResources.UpdatePerObjectUniform(ctx.commandList, "MVP", mvp);
-            m_quadAlphaResources.UpdatePerObjectUniform(ctx.commandList, "Color", color);
-            m_quadAlphaResources.ApplyAll(ctx.commandList);
+            m_quadAlpha.UpdatePerObject(ctx.commandList, "MVP", mvp);
+            m_quadAlpha.UpdatePerObject(ctx.commandList, "Color", color);
+            m_quadAlpha.DrawAll(ctx.commandList);
         }
     }
     
     public static void DrawTexturedQuad(RenderContext ctx, Matrix transform, Texture? texture, Vector4 uv, Color color)
     {
-        // Solid-color fallback
         if (texture == null)
         {
             DrawQuad(ctx, transform, color);
             return;
         }
 
-        // TODO: make texture has "alpha" check
-        bool opaque = false;
+        bool opaque = false; // 你之後可以根據資產 alpha 信息判斷
         var res = GetOrCreateTexturedQuadResource(texture, opaque);
 
         var mvp = transform * ctx.viewProjection;
 
-        res.UpdatePerObjectUniform(ctx.commandList, "MVP", mvp);
-        res.UpdatePerObjectUniform(ctx.commandList, "Color", color);
-        res.UpdatePerObjectUniform(ctx.commandList, "UVRect", uv);
+        res.UpdatePerObject(ctx.commandList, "MVP", mvp);
+        res.UpdatePerObject(ctx.commandList, "Color", color);
+        res.UpdatePerObject(ctx.commandList, "UVRect", uv);
 
-        res.ApplyAll(ctx.commandList);
+        res.DrawAll(ctx.commandList);
     }
-
     
     public static void FillColor(RenderContext ctx, Color color)
     {
         var mvp = Matrix.identity;
         
-        m_quadAlphaResources.UpdatePerObjectUniform(ctx.commandList, "MVP", mvp);
-        m_quadAlphaResources.UpdatePerObjectUniform(ctx.commandList, "Color", color);
-        m_quadAlphaResources.ApplyAll(ctx.commandList);
+        m_quadAlpha.UpdatePerObject(ctx.commandList, "MVP", mvp);
+        m_quadAlpha.UpdatePerObject(ctx.commandList, "Color", color);
+        m_quadAlpha.DrawAll(ctx.commandList);
     }
 
 
     public static void CleanResources()
     {
-        // Solid Quad
-        m_quadOpaqueResources.Dispose();
-        m_quadAlphaResources.Dispose();
-        
-        // Textured Quad
+        m_quadOpaque.Dispose();
+        m_quadAlpha.Dispose();
+
         foreach (var kv in m_texturedOpaqueCache) kv.Value.Dispose();
         foreach (var kv in m_texturedAlphaCache) kv.Value.Dispose();
+
         m_texturedOpaqueCache.Clear();
         m_texturedAlphaCache.Clear();
     }

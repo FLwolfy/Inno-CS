@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 
 using Inno.Assets.AssetType;
@@ -17,7 +19,7 @@ public static class AssetManager
 
     private static readonly Dictionary<string, Guid> PATH_GUID_PAIRS = new();       // abs file path -> guid
     private static readonly Dictionary<Guid, InnoAsset> LOADED_ASSETS = new();      // guid -> asset
-    private static readonly Dictionary<string, InnoAsset> EMBEDDED_ASSETS = new();  // asm|manifest -> asset
+    private static readonly Dictionary<Guid, InnoAsset> EMBEDDED_ASSETS = new();    // embedded guid -> asset
 
     private static FileSystemWatcher? m_watcher;
 
@@ -121,8 +123,9 @@ public static class AssetManager
         using var ms = new MemoryStream();
         s.CopyTo(ms);
 
+        var embeddedGuid = GenerateGuidFromEmbeddedKey(embeddedKey);
         var bytes = ms.ToArray();
-        var asset = loader.LoadRaw(Path.GetFileName(nameOrSuffix), bytes);
+        var asset = loader.LoadRaw(Path.GetFileName(nameOrSuffix), embeddedGuid, bytes);
 
         RegisterEmbedded(embeddedKey, asset);
         return true;
@@ -136,18 +139,18 @@ public static class AssetManager
         }
 
         Log.Warn($"Could not find asset from path: {Path.GetFullPath(Path.Combine(assetDirectory, relativePath))}");
-        return new AssetRef<T>(Guid.Empty, null);
+        return new AssetRef<T>(Guid.Empty, false);
     }
 
     public static AssetRef<T> Get<T>(Guid guid) where T : InnoAsset
     {
         if (LOADED_ASSETS.TryGetValue(guid, out var asset))
         {
-            return new AssetRef<T>(asset.guid, null);
+            return new AssetRef<T>(asset.guid, false);
         }
         
         Log.Warn($"Could not find asset with guid: '{guid}'.");
-        return new AssetRef<T>(Guid.Empty, null);
+        return new AssetRef<T>(Guid.Empty, false);
     }
 
     public static AssetRef<T> GetEmbedded<T>(
@@ -158,14 +161,15 @@ public static class AssetManager
         var asm = Assembly.GetCallingAssembly();
         var manifestName = ResolveManifestName(asm, nameOrSuffix, comparison, endsWithMatch);
         var embeddedKey = $"{asm.FullName}|{manifestName}";
+        var embeddedGuid = GenerateGuidFromEmbeddedKey(embeddedKey);
         
-        if (EMBEDDED_ASSETS.TryGetValue(embeddedKey, out _))
+        if (EMBEDDED_ASSETS.TryGetValue(embeddedGuid, out _))
         {
-            return new AssetRef<T>(Guid.Empty, embeddedKey);
+            return new AssetRef<T>(embeddedGuid, true);
         }
         
         Log.Warn($"Could not get embedded asset for {typeof(T).Name}");
-        return new AssetRef<T>(Guid.Empty, null);
+        return new AssetRef<T>(Guid.Empty, true);
     }
 
     internal static T? ResolveAssetRef<T>(AssetRef<T> assetRef) where T : InnoAsset
@@ -174,10 +178,18 @@ public static class AssetManager
 
         if (assetRef.isEmbedded)
         {
-            return (T)EMBEDDED_ASSETS[assetRef.embeddedKey!];
+            return (T)EMBEDDED_ASSETS[assetRef.guid];
         }
         
         return (T) LOADED_ASSETS[assetRef.guid];
+    }
+
+    private static Guid GenerateGuidFromEmbeddedKey(string embeddedKey)
+    {
+        using var md5 = MD5.Create();
+        var bytes = Encoding.UTF8.GetBytes(embeddedKey);
+        var hash = md5.ComputeHash(bytes);
+        return new Guid(hash.AsSpan(0, 16));
     }
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
@@ -226,7 +238,8 @@ public static class AssetManager
     {
         lock (SYNC)
         {
-            EMBEDDED_ASSETS[embeddedKey] = asset;
+            var guid = GenerateGuidFromEmbeddedKey(embeddedKey);
+            EMBEDDED_ASSETS[guid] = asset;
         }
     }
 
