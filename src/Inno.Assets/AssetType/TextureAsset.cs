@@ -1,4 +1,3 @@
-using System;
 using Inno.Assets.Serializer;
 using Inno.Platform.Graphics;
 

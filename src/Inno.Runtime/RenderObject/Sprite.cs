@@ -8,7 +8,6 @@ public sealed class Sprite
     public Texture? texture { get; }
     public Vector4 uv;
     public Vector2 pivot;
-    
     public Vector2 size;
 
     private Sprite(Texture? texture, Vector4 uv, Vector2 pivot, Vector2 size)
