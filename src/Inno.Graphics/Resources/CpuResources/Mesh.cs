@@ -9,6 +9,14 @@ public struct MeshRenderState
     public PrimitiveTopology topology;
 }
 
+public readonly struct MeshSegment(string name, int indexStart, int indexCount, int materialIndex)
+{
+    public string name { get; } = name;
+    public int indexStart { get; } = indexStart;
+    public int indexCount { get; } = indexCount;
+    public int materialIndex { get; } = materialIndex;
+}
+
 public class Mesh
 {
     // TODO: Change this to asset-inserted when complete mesh assets
@@ -60,20 +68,4 @@ public class Mesh
 
     public void AddSegment(MeshSegment meshSegment) => m_segments.Add(meshSegment);
     public IReadOnlyList<MeshSegment> GetSegments() => m_segments;
-}
-
-public class MeshSegment
-{
-    public string name { get; }
-    public int indexStart { get; }
-    public int indexCount { get; }
-    public int materialIndex { get; }
-
-    public MeshSegment(string name, int indexStart, int indexCount, int materialIndex)
-    {
-        this.name = name;
-        this.indexStart = indexStart;
-        this.indexCount = indexCount;
-        this.materialIndex = materialIndex;
-    }
 }

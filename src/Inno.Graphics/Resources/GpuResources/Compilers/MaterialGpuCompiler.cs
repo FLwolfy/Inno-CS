@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Collections.Generic;
 using Inno.Graphics.Resources.CpuResources;
 using Inno.Graphics.Resources.GpuResources.Bindings;
 using Inno.Graphics.Resources.GpuResources.Cache;
@@ -12,16 +11,33 @@ public static class MaterialGpuCompiler
 {
     public static MaterialGpuBinding Compile(
         IGraphicsDevice gd,
-        Mesh mesh,
-        Material material,
-        IUniformBuffer[] perObjectUniforms // per-object layout is part of pipeline layout
+        Guid ownerGuid,
+        Material material
     )
     {
-        // ---- Material UniformBuffers (owned by MaterialGpuBinding)
+        // ---- Material UniformBuffers (cached; typically per material instance)
         var uniforms = material.GetAllUniforms();
-        var matUBs = new IUniformBuffer[uniforms.Count];
+        var matUbHandles = new GpuCache.Handle<IUniformBuffer>[uniforms.Count];
         for (int i = 0; i < uniforms.Count; i++)
-            matUBs[i] = gd.CreateUniformBuffer(uniforms[i].name, uniforms[i].value.GetType());
+        {
+            var name = uniforms[i].name;
+            var type = uniforms[i].value.GetType();
+
+            int ubVariant = GpuVariant.Build(v =>
+            {
+                v.Add(name);
+                v.AddType(type);
+            });
+
+            matUbHandles[i] = GraphicsGpu.cache.Acquire(
+                factory: () => gd.CreateUniformBuffer(name, type),
+                ownerGuid,
+                variantKey: ubVariant
+            );
+        }
+
+        var matUBs = new IUniformBuffer[matUbHandles.Length];
+        for (int i = 0; i < matUbHandles.Length; i++) matUBs[i] = matUbHandles[i].value;
 
         // ---- Textures/Samplers (shared via cache)
         var texEntries = material.GetAllTextures();
@@ -42,8 +58,7 @@ public static class MaterialGpuCompiler
                 v.Add((int)src.dimension);
             });
 
-            texHandles[i] = GraphicsGpu.cache.Acquire<ITexture>(
-                src.guid,
+            texHandles[i] = GraphicsGpu.cache.Acquire(
                 factory: () =>
                 {
                     var gpuTex = gd.CreateTexture(new TextureDescription
@@ -57,9 +72,10 @@ public static class MaterialGpuCompiler
                     });
 
                     var bytes = src.data;
-                    gpuTex.Set(ref bytes, 0);
+                    gpuTex.Set(ref bytes);
                     return gpuTex;
                 },
+                src.guid,
                 variantKey: texVariant
             );
 
@@ -70,15 +86,16 @@ public static class MaterialGpuCompiler
                 v.Add((int)SamplerAddressMode.Clamp);
             });
 
-            // 如果你未來 sampler 可配置，這裡 guid 應該來自 SamplerConfig 的 guid，而不是 texture guid。
-            smpHandles[i] = GraphicsGpu.cache.Acquire<ISampler>(
-                src.guid,
+            // TODO
+            // Change the guid for sampler instead of texture
+            smpHandles[i] = GraphicsGpu.cache.Acquire(
                 factory: () => gd.CreateSampler(new SamplerDescription
                 {
                     filter = SamplerFilter.Linear,
                     addressU = SamplerAddressMode.Clamp,
                     addressV = SamplerAddressMode.Clamp
                 }),
+                src.guid, // Here should sampler Guid
                 variantKey: smpVariant
             );
         }
@@ -87,23 +104,23 @@ public static class MaterialGpuCompiler
         var vsCpu = material.shaders.GetShadersByStage(ShaderStage.Vertex).Values.First();
         var fsCpu = material.shaders.GetShadersByStage(ShaderStage.Fragment).Values.First();
 
-        var vsHandle = GraphicsGpu.cache.Acquire<IShader>(
-            vsCpu.guid,
+        var vsHandle = GraphicsGpu.cache.Acquire(
             factory: () => gd.CreateVertexFragmentShader(
                 new ShaderDescription { stage = vsCpu.stage, sourceBytes = vsCpu.shaderBinaries },
                 new ShaderDescription { stage = fsCpu.stage, sourceBytes = fsCpu.shaderBinaries }
-            ).Item1
+            ).Item1,
+            vsCpu.guid
         );
 
-        var fsHandle = GraphicsGpu.cache.Acquire<IShader>(
-            fsCpu.guid,
+        var fsHandle = GraphicsGpu.cache.Acquire(
             factory: () => gd.CreateVertexFragmentShader(
                 new ShaderDescription { stage = vsCpu.stage, sourceBytes = vsCpu.shaderBinaries },
                 new ShaderDescription { stage = fsCpu.stage, sourceBytes = fsCpu.shaderBinaries }
-            ).Item2
+            ).Item2,
+            fsCpu.guid
         );
 
-        // ---- ResourceSet (usually per material instance; not shared here)
+        // ---- ResourceSet (usually per material instance; keep cached per ownerGuid)
         // Build raw arrays
         var rawTextures = texHandles.Select(h => h.value).ToArray();
         var rawSamplers = smpHandles.Select(h => h.value).ToArray();
@@ -115,67 +132,32 @@ public static class MaterialGpuCompiler
             textures = rawTextures,
             samplers = rawSamplers
         };
-        var resourceSet = gd.CreateResourceSet(materialSetBinding);
-
-        // ---- Pipeline (shared via cache) - derive variant from layout/state
-        var vertexLayoutTypes = mesh.GetAllAttributes().Select(a => a.elementType).ToList();
-
-        int psoVariant = GpuVariant.Build(v =>
+        int rsVariant = GpuVariant.Build(v =>
         {
-            v.AddGuid(vsCpu.guid);
-            v.AddGuid(fsCpu.guid);
-
-            foreach (var t in vertexLayoutTypes)
-                v.AddType(t);
-
-            v.Add((int)material.renderState.blendMode);
-            v.Add((int)material.renderState.depthStencilState);
-            v.Add((int)mesh.renderState.topology);
-
-            v.Add(perObjectUniforms.Length);
-            foreach (var ub in perObjectUniforms)
-                v.Add(ub.GetType()); // Change this to descriptor
-
+            v.Add((int)materialSetBinding.shaderStages);
             v.Add(matUBs.Length);
             v.Add(rawTextures.Length);
             v.Add(rawSamplers.Length);
+
+            // Make resource set rebuild when bindings change (editor-friendly).
+            // Layout should be separated later; for now we key on the bound GPU resource identities.
+            for (int i = 0; i < matUBs.Length; i++) v.AddType(matUBs[i].GetType());
+            for (int i = 0; i < texEntries.Count; i++) v.AddGuid(texEntries[i].texture.guid);
         });
 
-        var psoHandle = GraphicsGpu.cache.Acquire<IPipelineState>(
-            material.guid, // Here use material guid
-            factory: () =>
-            {
-                var desc = new PipelineStateDescription
-                {
-                    vertexShader = vsHandle.value,
-                    fragmentShader = fsHandle.value,
-                    vertexLayoutTypes = vertexLayoutTypes,
-                    blendMode = material.renderState.blendMode,
-                    depthStencilState = material.renderState.depthStencilState,
-                    primitiveTopology = mesh.renderState.topology,
-                    resourceLayoutSpecifiers =
-                    [
-                        new ResourceSetBinding
-                        {
-                            shaderStages = ShaderStage.Vertex | ShaderStage.Fragment,
-                            uniformBuffers = perObjectUniforms
-                        },
-                        materialSetBinding
-                    ]
-                };
-                return gd.CreatePipelineState(desc);
-            },
-            variantKey: psoVariant
+        var resourceSetHandle = GraphicsGpu.cache.Acquire(
+            factory: () => gd.CreateResourceSet(materialSetBinding),
+            ownerGuid,
+            variantKey: rsVariant
         );
 
         return new MaterialGpuBinding(
-            uniformBuffers: matUBs,
+            ubHandles: matUbHandles,
             texHandles: texHandles,
             smpHandles: smpHandles,
             vsHandle: vsHandle,
             fsHandle: fsHandle,
-            psoHandle: psoHandle,
-            resourceSet: resourceSet
+            resourceSetHandle: resourceSetHandle
         );
     }
 }

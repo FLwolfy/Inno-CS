@@ -33,7 +33,7 @@ public sealed class GpuCache
         public void Dispose() => m_cache?.Release(m_key);
     }
 
-    public Handle<T> Acquire<T>(Guid guid, Func<T> factory, int variantKey = 0)
+    public Handle<T> Acquire<T>(Func<T> factory, Guid guid, int variantKey = 0)
         where T : class, IDisposable
     {
         var key = new GpuCacheKey(guid, typeof(T), variantKey);
