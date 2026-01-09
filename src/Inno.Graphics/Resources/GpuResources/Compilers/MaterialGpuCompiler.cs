@@ -86,8 +86,6 @@ internal static class MaterialGpuCompiler
                 v.Add((int)SamplerAddressMode.Clamp);
             });
 
-            // TODO
-            // Change the guid for sampler instead of texture
             smpHandles[i] = RenderGraphics.gpuCache.Acquire(
                 factory: () => gd.CreateSampler(new SamplerDescription
                 {
@@ -95,7 +93,7 @@ internal static class MaterialGpuCompiler
                     addressU = SamplerAddressMode.Clamp,
                     addressV = SamplerAddressMode.Clamp
                 }),
-                src.guid, // Here should sampler Guid
+                GpuCache.GLOBAL_DOMAIN,
                 variantKey: smpVariant
             );
         }
@@ -132,6 +130,7 @@ internal static class MaterialGpuCompiler
             textures = rawTextures,
             samplers = rawSamplers
         };
+        
         int rsVariant = GpuVariant.Build(v =>
         {
             v.Add((int)materialSetBinding.shaderStages);
@@ -139,6 +138,7 @@ internal static class MaterialGpuCompiler
             v.Add(rawTextures.Length);
             v.Add(rawSamplers.Length);
 
+            // TODO: 
             // Make resource set rebuild when bindings change (editor-friendly).
             // Layout should be separated later; for now we key on the bound GPU resource identities.
             for (int i = 0; i < matUBs.Length; i++) v.AddType(matUBs[i].GetType());

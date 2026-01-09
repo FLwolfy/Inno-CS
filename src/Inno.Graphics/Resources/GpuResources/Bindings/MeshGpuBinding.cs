@@ -13,19 +13,15 @@ internal sealed class MeshGpuBinding : IDisposable
 {
     private readonly GpuCache.Handle<IVertexBuffer> m_vbHandle;
     private readonly GpuCache.Handle<IIndexBuffer>[] m_ibHandles;
-
-    public PrimitiveTopology topology { get; }
     public MeshSegment[] segments { get; }
 
     public MeshGpuBinding(
+        MeshSegment[] segments,
         GpuCache.Handle<IVertexBuffer> vbHandle,
-        GpuCache.Handle<IIndexBuffer>[] ibHandles,
-        PrimitiveTopology topology,
-        MeshSegment[] segments)
+        GpuCache.Handle<IIndexBuffer>[] ibHandles)
     {
         m_vbHandle = vbHandle;
         m_ibHandles = ibHandles;
-        this.topology = topology;
         this.segments = segments;
     }
 

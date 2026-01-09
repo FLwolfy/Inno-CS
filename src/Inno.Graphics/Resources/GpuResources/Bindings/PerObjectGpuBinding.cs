@@ -15,8 +15,7 @@ internal sealed class PerObjectGpuBinding : IDisposable
     private readonly GpuCache.Handle<IUniformBuffer>[] m_uniformHandles;
     private readonly GpuCache.Handle<IResourceSet> m_resourceSetHandle;
 
-    public IUniformBuffer[] uniformBuffers { get; }
-    public IResourceSet resourceSet => m_resourceSetHandle.value;
+    public IUniformBuffer[] uniformBuffers => Array.ConvertAll(m_uniformHandles, h => h.value);
 
     public PerObjectGpuBinding(
         Dictionary<string, int> indexMap,
@@ -26,10 +25,6 @@ internal sealed class PerObjectGpuBinding : IDisposable
         m_index = indexMap;
         m_uniformHandles = uniformHandles;
         m_resourceSetHandle = resourceSetHandle;
-
-        uniformBuffers = new IUniformBuffer[m_uniformHandles.Length];
-        for (int i = 0; i < m_uniformHandles.Length; i++)
-            uniformBuffers[i] = m_uniformHandles[i].value;
     }
 
     public void Update<T>(ICommandList cmd, string name, T value) where T : unmanaged
@@ -37,7 +32,12 @@ internal sealed class PerObjectGpuBinding : IDisposable
         if (!m_index.TryGetValue(name, out var idx))
             throw new InvalidOperationException($"PerObjectUniform '{name}' not registered.");
 
-        cmd.UpdateUniform(uniformBuffers[idx], ref value);
+        cmd.UpdateUniform(m_uniformHandles[idx].value, ref value);
+    }
+
+    public void Bind(ICommandList cmd, int perObjectSetId)
+    {
+        cmd.SetResourceSet(perObjectSetId, m_resourceSetHandle.value);
     }
 
     public void Dispose()

@@ -51,7 +51,7 @@ public static class Renderer2D
     {
         // Mesh
         // TODO: Use storage to cache meshes
-        var mesh = new Mesh("Quad");
+        Mesh mesh = new("Quad");
         mesh.renderState = new MeshRenderState
         {
             topology = PrimitiveTopology.TriangleList
@@ -69,7 +69,7 @@ public static class Renderer2D
         ]);
         
         // Opaque Material
-        var opaqueMat = new Material("QuadOpaque");
+        Material opaqueMat = new("QuadOpaque");
         opaqueMat.renderState = new MaterialRenderState
         {
             blendMode = BlendMode.Opaque,
@@ -84,7 +84,7 @@ public static class Renderer2D
         ));
         
         // Alpha Material
-        var alphaMat = new Material("QuadAlpha");
+        Material alphaMat = new("QuadAlpha");
         alphaMat.renderState = new MaterialRenderState
         {
             blendMode = BlendMode.AlphaBlend,
@@ -99,11 +99,10 @@ public static class Renderer2D
         ));
         
         // Per-Object Uniforms
-        var perObjectUniforms = new List<(string name, Type type)>
-        {
+        (string name, Type type)[] perObjectUniforms = [
             ("MVP", typeof(Matrix)),
             ("Color", typeof(Color))
-        };
+        ];
         
         // Opaque Renderable
         m_quadOpaque = RenderableGpuCompiler.Compile(
@@ -167,12 +166,11 @@ public static class Renderer2D
         mat.SetTexture("MainTex", texture);
 
         // Per-Object Uniforms
-        var perObjectUniforms = new List<(string name, Type type)>
-        {
+        (string name, Type type)[] perObjectUniforms = [
             ("MVP", typeof(Matrix)),
             ("Color", typeof(Color)),
             ("UVRect", typeof(Vector4))
-        };
+        ];
         
         res = RenderableGpuCompiler.Compile(
             m_graphicsDevice,

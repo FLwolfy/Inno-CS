@@ -1,4 +1,5 @@
 using System;
+using Inno.Graphics.Resources.GpuResources.Cache;
 using Inno.Platform.Graphics;
 
 namespace Inno.Graphics.Resources.GpuResources.Bindings;
@@ -7,34 +8,41 @@ internal sealed class RenderableGpuBinding : IDisposable
 {
     private const int C_PER_OBJECT_SET_INDEX = 0;
     private const int C_MATERIAL_SET_INDEX = 1;
+    
+    private readonly GpuCache.Handle<IPipelineState>[] m_psoHandles;
 
     private readonly MeshGpuBinding m_meshGpu;
     private readonly MaterialGpuBinding[] m_materialsGpu;
-    private readonly PipelineGpuBinding[] m_pipelinesGpu;
     private readonly PerObjectGpuBinding m_perObject;
 
     public RenderableGpuBinding(
+        GpuCache.Handle<IPipelineState>[] psoHandles,
         MeshGpuBinding meshGpu,
         MaterialGpuBinding[] materialsGpu,
-        PipelineGpuBinding[] pipelinesGpu,
         PerObjectGpuBinding perObject)
     {
-        if (materialsGpu.Length != pipelinesGpu.Length)
-            throw new ArgumentException("materialsGpu and pipelinesGpu must have same length.");
+        if (materialsGpu.Length != psoHandles.Length)
+        {
+            throw new ArgumentException("materialsGpu and psoHandles must have same length.");
+        }
 
         m_meshGpu = meshGpu;
         m_materialsGpu = materialsGpu;
-        m_pipelinesGpu = pipelinesGpu;
+        m_psoHandles = psoHandles;
         m_perObject = perObject;
     }
 
     public void UpdatePerObject<T>(ICommandList cmd, string name, T value) where T : unmanaged
-        => m_perObject.Update(cmd, name, value);
+    {
+        m_perObject.Update(cmd, name, value);
+    }
 
     public void DrawAll(ICommandList cmd)
     {
         for (int i = 0; i < m_meshGpu.segments.Length; i++)
+        {
             DrawSegment(cmd, i);
+        }
     }
 
     public void DrawSegment(ICommandList cmd, int segmentIndex)
@@ -43,13 +51,13 @@ internal sealed class RenderableGpuBinding : IDisposable
         int matIndex = seg.materialIndex;
 
         var matGpu = m_materialsGpu[matIndex];
-        var psoGpu = m_pipelinesGpu[matIndex];
+        var pso = m_psoHandles[matIndex].value;
 
+        cmd.SetPipelineState(pso);
+        
         m_meshGpu.Bind(cmd, segmentIndex);
-
-        cmd.SetPipelineState(psoGpu.pipeline);
-        cmd.SetResourceSet(C_PER_OBJECT_SET_INDEX, m_perObject.resourceSet);
-        cmd.SetResourceSet(C_MATERIAL_SET_INDEX, matGpu.resourceSet);
+        m_perObject.Bind(cmd, C_PER_OBJECT_SET_INDEX);
+        matGpu.Bind(cmd, C_MATERIAL_SET_INDEX);
 
         cmd.DrawIndexed((uint)seg.indexCount);
     }
@@ -57,7 +65,7 @@ internal sealed class RenderableGpuBinding : IDisposable
     public void Dispose()
     {
         m_perObject.Dispose();
-        foreach (var p in m_pipelinesGpu) p.Dispose();
+        foreach (var h in m_psoHandles) h.Dispose();
         foreach (var m in m_materialsGpu) m.Dispose();
         m_meshGpu.Dispose();
     }

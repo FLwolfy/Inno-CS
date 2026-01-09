@@ -10,7 +10,9 @@ namespace Inno.Graphics.Resources.GpuResources.Compilers;
 
 internal static class MeshGpuCompiler
 {
-    public static MeshGpuBinding Compile(IGraphicsDevice gd, Mesh mesh)
+    public static MeshGpuBinding Compile(
+        IGraphicsDevice gd, 
+        Mesh mesh)
     {
         // Ensure CPU mesh has segments for draw traversal, but DO NOT mutate it.
         var cpuSegs = mesh.segmentCount == 0
@@ -73,10 +75,9 @@ internal static class MeshGpuCompiler
         }
 
         return new MeshGpuBinding(
+            gpuSegs,
             vbHandle,
-            ibHandles,
-            mesh.renderState.topology,
-            gpuSegs
+            ibHandles
         );
     }
 

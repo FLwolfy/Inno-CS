@@ -20,10 +20,10 @@ internal static class PerObjectGpuCompiler
         for (int i = 0; i < uniforms.Count; i++)
         {
             var (name, type) = uniforms[i];
-            if (index.ContainsKey(name))
+            if (!index.TryAdd(name, i))
+            {
                 throw new InvalidOperationException($"Duplicate per-object uniform '{name}'.");
-
-            index[name] = i;
+            }
 
             int ubVariant = GpuVariant.Build(v =>
             {

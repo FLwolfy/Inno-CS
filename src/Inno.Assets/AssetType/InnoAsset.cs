@@ -20,9 +20,9 @@ public abstract class InnoAsset
         type = GetType().Name;
     }
     
-    internal void RecomputeHash(string path)
+    internal void RecomputeHash(string relativePath)
     {
-        using var stream = File.OpenRead(Path.Combine(AssetManager.assetDirectory, sourcePath));
+        using var stream = File.OpenRead(Path.Combine(AssetManager.assetDirectory, relativePath));
         using var sha = SHA256.Create();
         var hashBytes = sha.ComputeHash(stream);
         sourceHash = Convert.ToHexString(hashBytes);
