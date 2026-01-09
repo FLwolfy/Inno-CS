@@ -13,13 +13,13 @@ internal sealed class RenderableGpuBinding : IDisposable
 
     private readonly MeshGpuBinding m_meshGpu;
     private readonly MaterialGpuBinding[] m_materialsGpu;
-    private readonly PerObjectGpuBinding m_perObject;
+    private readonly PerObjectGpuBinding m_perObjectGpu;
 
     public RenderableGpuBinding(
         GpuCache.Handle<IPipelineState>[] psoHandles,
         MeshGpuBinding meshGpu,
         MaterialGpuBinding[] materialsGpu,
-        PerObjectGpuBinding perObject)
+        PerObjectGpuBinding perObjectGpu)
     {
         if (materialsGpu.Length != psoHandles.Length)
         {
@@ -29,12 +29,12 @@ internal sealed class RenderableGpuBinding : IDisposable
         m_meshGpu = meshGpu;
         m_materialsGpu = materialsGpu;
         m_psoHandles = psoHandles;
-        m_perObject = perObject;
+        m_perObjectGpu = perObjectGpu;
     }
 
     public void UpdatePerObject<T>(ICommandList cmd, string name, T value) where T : unmanaged
     {
-        m_perObject.Update(cmd, name, value);
+        m_perObjectGpu.Update(cmd, name, value);
     }
 
     public void DrawAll(ICommandList cmd)
@@ -50,21 +50,18 @@ internal sealed class RenderableGpuBinding : IDisposable
         var seg = m_meshGpu.segments[segmentIndex];
         int matIndex = seg.materialIndex;
 
-        var matGpu = m_materialsGpu[matIndex];
-        var pso = m_psoHandles[matIndex].value;
-
-        cmd.SetPipelineState(pso);
+        cmd.SetPipelineState(m_psoHandles[matIndex].value);
         
         m_meshGpu.Bind(cmd, segmentIndex);
-        m_perObject.Bind(cmd, C_PER_OBJECT_SET_INDEX);
-        matGpu.Bind(cmd, C_MATERIAL_SET_INDEX);
+        m_perObjectGpu.Bind(cmd, C_PER_OBJECT_SET_INDEX);
+        m_materialsGpu[matIndex].Bind(cmd, C_MATERIAL_SET_INDEX);
 
         cmd.DrawIndexed((uint)seg.indexCount);
     }
 
     public void Dispose()
     {
-        m_perObject.Dispose();
+        m_perObjectGpu.Dispose();
         foreach (var h in m_psoHandles) h.Dispose();
         foreach (var m in m_materialsGpu) m.Dispose();
         m_meshGpu.Dispose();

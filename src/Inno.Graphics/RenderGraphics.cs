@@ -1,4 +1,3 @@
-using System;
 using Inno.Graphics.Renderer;
 using Inno.Graphics.Resources.GpuResources.Cache;
 using Inno.Graphics.Targets;
