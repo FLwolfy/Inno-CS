@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Veldrid;
 using ImGuiNET;
 
@@ -33,12 +34,13 @@ internal class ImGuiNETVeldrid : IImGui
     
     // IO
     private readonly string m_iniPath;
+    private DateTime m_lastIniWriteUtc;
     
     public unsafe ImGuiNETVeldrid(VeldridGraphicsDevice graphicsDevice, VeldridSdl2Window window, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         m_graphicsDevice = graphicsDevice;
         m_veldridWindow = window;
-        
+
         m_commandList = m_graphicsDevice.inner.ResourceFactory.CreateCommandList();
         m_imGuiVeldridController = new ImGuiNETVeldridController(
             m_graphicsDevice.inner,
@@ -46,66 +48,88 @@ internal class ImGuiNETVeldrid : IImGui
             m_graphicsDevice.inner.MainSwapchain.Framebuffer.OutputDescription,
             colorSpaceHandling
         );
-        
+
         var (sx, sy) = VeldridSdl2HiDpi.GetFramebufferScale(m_veldridWindow.inner);
         m_dpiScale = MathF.Max(sx, sy);
-        
+
         // Main Context
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
         SetupFonts(DEFAULT_FONT_SIZE * m_dpiScale);
-        
-        // IO
+
+        // Main IO
         m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
         ImGuiNET.ImGui.LoadIniSettingsFromDisk(m_iniPath);
-        ImGuiIniDataFile.Load(m_iniPath);
-        
-        // Virtual Context
+        ImGuiIniDataFile.LoadAndEnsure(m_iniPath);
+        m_lastIniWriteUtc = File.Exists(m_iniPath) ? File.GetLastWriteTimeUtc(m_iniPath) : DateTime.MinValue;
+
+        // Virtual Context (shares fonts)
         virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
         ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
         SetupFonts(DEFAULT_FONT_SIZE * m_dpiScale);
-        
+
+        // Virtual IO: Ensure virtual context never saves ini (avoid main/virtual competing)
+        var io = ImGuiNET.ImGui.GetIO();
+        io.WantSaveIniSettings = false;
+        io.NativePtr->IniFilename = null;
+
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
     }
-
+    
     public void BeginLayoutImpl(float deltaTime)
     {
-        // Begin Render
+	    // Begin Render
 	    m_commandList.Begin();
 	    m_commandList.SetFramebuffer(m_graphicsDevice.inner.SwapchainFramebuffer);
-        
-        // Virtual Context
-        ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-        ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_veldridWindow.width, m_veldridWindow.height);
-        ImGuiNET.ImGui.NewFrame();
-        ImGuiNET.ImGui.PushFont(m_fontRegular);
-        
-        // Main Context
-		ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-		m_imGuiVeldridController.Update(deltaTime, m_veldridWindow.inputSnapshot, m_imGuiVeldridController.PumpExtraWindowInputs());
-		ImGuiNET.ImGui.PushFont(m_fontRegular);
+
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_veldridWindow.width, m_veldridWindow.height);
+	    ImGuiNET.ImGui.NewFrame();
+	    ImGuiNET.ImGui.PushFont(m_fontRegular);
+
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    m_imGuiVeldridController.Update(deltaTime, m_veldridWindow.inputSnapshot, m_imGuiVeldridController.PumpExtraWindowInputs());
+	    ImGuiNET.ImGui.PushFont(m_fontRegular);
     }
 
     public void EndLayoutImpl()
     {
-        // Virtual Context
-        ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
-        ImGuiNET.ImGui.EndFrame();
-        
-        // Main Context
-        ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-        ImGuiNET.ImGui.PopFont();
-        
-        // Render
-        m_imGuiVeldridController.Render(m_graphicsDevice.inner, m_commandList);
-        m_commandList.End();
-        m_graphicsDevice.inner.SubmitCommands(m_commandList);
-        m_imGuiVeldridController.SwapExtraWindowBuffers(m_graphicsDevice.inner);
+	    ImGuiNET.ImGui.EndFrame();
+
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+
+	    // Render
+	    m_imGuiVeldridController.Render(m_graphicsDevice.inner, m_commandList);
+
+	    // IMPORTANT:
+	    // - We do NOT call ImGui.SaveIniSettingsToDisk ourselves.
+	    // - ImGui internally saves (when needed) during Render()/EndFrame().
+	    // - After that, we "self-heal" the ini file by re-injecting [InnoData]
+	    //   to prevent ImGui's next save from washing it out.
+	    if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
+	    {
+		    var writeUtc = File.GetLastWriteTimeUtc(m_iniPath);
+		    if (writeUtc != m_lastIniWriteUtc)
+		    {
+			    ImGuiIniDataFile.EnsureSectionPresent(m_iniPath);
+			    m_lastIniWriteUtc = File.GetLastWriteTimeUtc(m_iniPath);
+		    }
+	    }
+
+	    m_commandList.End();
+	    m_graphicsDevice.inner.SubmitCommands(m_commandList);
+	    m_imGuiVeldridController.SwapExtraWindowBuffers(m_graphicsDevice.inner);
     }
 
     public IntPtr GetOrBindTextureImpl(ITexture texture)
@@ -151,12 +175,15 @@ internal class ImGuiNETVeldrid : IImGui
     
     public void SetStorageDataImpl(string key, object? value)
     {
+	    // Store payload in memory
 	    ImGuiDataStore.DATA[key] = ImGuiDataCodec.Encode(value);
 
-	    // Make sure save it to the mainContext
+	    // Do NOT save the ini file here.
+	    // Instead, we mark the main context as dirty so ImGui will save it internally,
+	    // and EndLayoutImpl() will re-inject [InnoData] right after that save.
 	    var currentContext = ImGuiNET.ImGui.GetCurrentContext();
 	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    ImGuiIniDataFile.Save(m_iniPath);
+	    ImGuiNET.ImGui.GetIO().WantSaveIniSettings = true;
 	    ImGuiNET.ImGui.SetCurrentContext(currentContext);
     }
 
@@ -296,11 +323,11 @@ internal class ImGuiNETVeldrid : IImGui
 	    style.Colors[(int)ImGuiCol.ModalWindowDimBg] = new Vector4(0.8f, 0.8f, 0.8f, 0.35f);
 	    style.Colors[(int)ImGuiCol.DockingPreview] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.54901963f);
 	}
-    
-    public void Dispose()
-    {
-        m_commandList.Dispose();
-        m_imGuiVeldridController.Dispose();
-    }
+
+	public void Dispose()
+	{
+		m_commandList.Dispose();
+		m_imGuiVeldridController.Dispose();
+	}
 }
 

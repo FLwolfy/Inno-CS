@@ -15,21 +15,39 @@ internal static class ImGuiDataStore
 internal static class ImGuiDataCodec
 {
 	// payload format: "<type>:<value>"
-	// type: f,i,b,s
+	// type:
+	// - f: float
+	// - i: int
+	// - b: bool
+	// - s: string (inline, single-line)
+	// - S: string (base64-utf8, supports newlines and any characters)
 	public static string Encode(object? value)
 	{
 		if (value is null) return "s:";
 
 		return value switch
 		{
-			float f   => "f:" + f.ToString(CultureInfo.InvariantCulture),
-			double d  => "f:" + ((float)d).ToString(CultureInfo.InvariantCulture), // optional
-			int i     => "i:" + i.ToString(CultureInfo.InvariantCulture),
-			bool b    => "b:" + (b ? "1" : "0"),
-			string s  => "s:" + s,
+			float f  => "f:" + f.ToString(CultureInfo.InvariantCulture),
+			double d => "f:" + ((float)d).ToString(CultureInfo.InvariantCulture), // optional convenience
+			int i    => "i:" + i.ToString(CultureInfo.InvariantCulture),
+			bool b   => "b:" + (b ? "1" : "0"),
+			string s => EncodeString(s),
 			_ => throw new NotSupportedException(
 				$"IImGui.RegisterData only supports float/int/bool/string. Got: {value.GetType().FullName}")
 		};
+	}
+
+	private static string EncodeString(string s)
+	{
+		// INI is line-based; newlines would corrupt the file.
+		// If a string contains CR/LF, store it as base64 to keep the ini single-line and lossless.
+		if (s.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+		{
+			var bytes = Encoding.UTF8.GetBytes(s);
+			return "S:" + Convert.ToBase64String(bytes);
+		}
+
+		return "s:" + s;
 	}
 
 	private static object? Decode(string? payload)
@@ -46,8 +64,23 @@ internal static class ImGuiDataCodec
 			'i' => int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : 0,
 			'b' => v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase),
 			's' => v,
+			'S' => DecodeBase64Utf8(v),
 			_ => v
 		};
+	}
+
+	private static string DecodeBase64Utf8(string base64)
+	{
+		try
+		{
+			var bytes = Convert.FromBase64String(base64);
+			return Encoding.UTF8.GetString(bytes);
+		}
+		catch
+		{
+			// Fallback: treat it as plain string to avoid throwing during ini load.
+			return base64;
+		}
 	}
 
 	public static T Decode<T>(string? payload, T defaultValue)
@@ -65,103 +98,145 @@ internal static class ImGuiDataCodec
 
 internal static class ImGuiIniDataFile
 {
-    private const string C_SECTION = "InnoData";
+	private const string C_SECTION = "InnoData";
 
-    public static void Load(string iniPath)
-    {
-        if (string.IsNullOrWhiteSpace(iniPath)) return;
-        if (!File.Exists(iniPath)) return;
+	// NOTE: Keys live on the left side of '=' in ini files. That side cannot safely contain arbitrary characters.
+	// We percent-encode keys to keep ini parsing stable and to avoid collisions after trimming.
+	// Values are stored in ImGuiDataCodec payloads and can contain '=' safely; newlines are base64-encoded.
+	private static string EscapeKey(string key)
+		=> Uri.EscapeDataString(key);
 
-        string text = File.ReadAllText(iniPath);
-        ParseSection(text);
-    }
+	private static string UnescapeKey(string key)
+	{
+		try { return Uri.UnescapeDataString(key); }
+		catch { return key; }
+	}
 
-    public static void Save(string iniPath)
-    {
-        if (string.IsNullOrWhiteSpace(iniPath)) return;
-        ImGuiNET.ImGui.SaveIniSettingsToDisk(iniPath);
+	public static void Load(string iniPath)
+	{
+		if (string.IsNullOrWhiteSpace(iniPath)) return;
+		if (!File.Exists(iniPath)) return;
 
-        string baseText = File.Exists(iniPath) ? File.ReadAllText(iniPath) : string.Empty;
-        string merged = UpsertSection(baseText);
-        File.WriteAllText(iniPath, merged);
-    }
+		string text = File.ReadAllText(iniPath);
+		ParseSection(text);
+	}
 
-    private static void ParseSection(string text)
-    {
-        ImGuiDataStore.DATA.Clear();
+	/// <summary>
+	/// Ensures the ini file contains an up-to-date [InnoData] section.
+	///
+	/// IMPORTANT: This method deliberately does NOT call ImGui.SaveIniSettingsToDisk.
+	/// It is intended to be invoked AFTER ImGui has written its own ini content,
+	/// to avoid competing saves and to prevent ImGui from "washing out" custom sections.
+	/// </summary>
+	public static void EnsureSectionPresent(string iniPath)
+	{
+		if (string.IsNullOrWhiteSpace(iniPath)) return;
+		if (!File.Exists(iniPath)) return;
 
-        using var sr = new StringReader(text);
-        string? line;
-        bool inSection = false;
+		string baseText = File.ReadAllText(iniPath);
+		string merged = UpsertSection(baseText);
+		if (!string.Equals(baseText, merged, StringComparison.Ordinal))
+			File.WriteAllText(iniPath, merged);
+	}
 
-        while ((line = sr.ReadLine()) != null)
-        {
-            line = line.Trim();
-            if (line.Length == 0) continue;
+	/// <summary>
+	/// Load [InnoData] and immediately inject it back into the ini file if the section is missing.
+	/// This is a "self-heal" step that prevents the next ImGui save from wiping our custom data.
+	/// </summary>
+	public static void LoadAndEnsure(string iniPath)
+	{
+		if (string.IsNullOrWhiteSpace(iniPath)) return;
+		if (!File.Exists(iniPath)) return;
 
-            if (line.StartsWith("[") && line.EndsWith("]"))
-            {
-                inSection = string.Equals(line, $"[{C_SECTION}]", StringComparison.Ordinal);
-                continue;
-            }
+		string text = File.ReadAllText(iniPath);
+		ParseSection(text);
 
-            if (!inSection) continue;
+		// If the section does not exist yet, append it once so future ImGui saves keep a stable file shape.
+		if (!text.Contains($"[{C_SECTION}]", StringComparison.Ordinal))
+			File.WriteAllText(iniPath, UpsertSection(text));
+	}
 
-            int idx = line.IndexOf('=');
-            if (idx <= 0) continue;
+	private static void ParseSection(string text)
+	{
+		ImGuiDataStore.DATA.Clear();
 
-            string key = line.Substring(0, idx).Trim();
-            string val = line.Substring(idx + 1).Trim();
-            if (key.Length == 0) continue;
+		using var sr = new StringReader(text);
+		string? line;
+		bool inSection = false;
 
-            ImGuiDataStore.DATA[key] = val;
-        }
-    }
+		while ((line = sr.ReadLine()) != null)
+		{
+			line = line.Trim();
+			if (line.Length == 0) continue;
 
-    private static string UpsertSection(string baseText)
-    {
-        // Remove existing [InnoData] section, then append a fresh one at the end.
-        var sb = new StringBuilder(baseText.Length + 256);
+			if (line.StartsWith("[") && line.EndsWith("]"))
+			{
+				inSection = string.Equals(line, $"[{C_SECTION}]", StringComparison.Ordinal);
+				continue;
+			}
 
-        using (var sr = new StringReader(baseText))
-        {
-            string? line;
-            bool skipping = false;
+			if (!inSection) continue;
 
-            while ((line = sr.ReadLine()) != null)
-            {
-                string trimmed = line.Trim();
+			int idx = line.IndexOf('=');
+			if (idx <= 0) continue;
 
-                if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-                {
-                    // entering a section
-                    if (string.Equals(trimmed, $"[{C_SECTION}]", StringComparison.Ordinal))
-                    {
-                        skipping = true;
-                        continue; // drop the header
-                    }
+			// IMPORTANT:
+			// - We Trim() because ini writers commonly add whitespace.
+			// - Then we unescape to recover original keys.
+			string key = UnescapeKey(line.Substring(0, idx).Trim());
+			string val = line.Substring(idx + 1).Trim();
+			if (key.Length == 0) continue;
 
-                    // leaving our section
-                    if (skipping)
-                    {
-                        skipping = false;
-                    }
-                }
+			ImGuiDataStore.DATA[key] = val;
+		}
+	}
 
-                if (!skipping) sb.AppendLine(line);
-            }
-        }
+	private static string UpsertSection(string baseText)
+	{
+		// Remove existing [InnoData] section, then append a fresh one at the end.
+		var sb = new StringBuilder(baseText.Length + 256);
 
-        // Ensure there is a blank line before appending
-        if (sb.Length > 0 && sb[^1] != '\n')
-            sb.AppendLine();
+		using (var sr = new StringReader(baseText))
+		{
+			string? line;
+			bool skipping = false;
 
-        sb.AppendLine($"[{C_SECTION}]");
-        foreach (var kv in ImGuiDataStore.DATA)
-            sb.AppendLine($"{kv.Key}={kv.Value}");
-        sb.AppendLine();
+			while ((line = sr.ReadLine()) != null)
+			{
+				string trimmed = line.Trim();
 
-        return sb.ToString();
-    }
+				if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+				{
+					// entering a section
+					if (string.Equals(trimmed, $"[{C_SECTION}]", StringComparison.Ordinal))
+					{
+						skipping = true;
+						continue; // drop the header
+					}
+
+					// leaving our section
+					if (skipping)
+					{
+						skipping = false;
+					}
+				}
+
+				if (!skipping) sb.AppendLine(line);
+			}
+		}
+
+		// Ensure there is a blank line before appending
+		if (sb.Length > 0 && sb[^1] != '\n')
+			sb.AppendLine();
+
+		sb.AppendLine($"[{C_SECTION}]");
+		foreach (var kv in ImGuiDataStore.DATA)
+		{
+			var safeKey = EscapeKey(kv.Key);
+			sb.AppendLine($"{safeKey}={kv.Value}");
+		}
+		sb.AppendLine();
+
+		return sb.ToString();
+	}
 }
-
