@@ -75,19 +75,19 @@ internal class ImGuiNETVeldrid : IImGui
     public void BeginLayoutImpl(float deltaTime)
     {
         // Begin Render
-        m_commandList.Begin();
-        m_commandList.SetFramebuffer(m_graphicsDevice.inner.SwapchainFramebuffer);
+	    m_commandList.Begin();
+	    m_commandList.SetFramebuffer(m_graphicsDevice.inner.SwapchainFramebuffer);
         
         // Virtual Context
         ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-        ImGuiNET.ImGui.GetIO().DisplaySize = new System.Numerics.Vector2(m_veldridWindow.width, m_veldridWindow.height);
+        ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_veldridWindow.width, m_veldridWindow.height);
         ImGuiNET.ImGui.NewFrame();
         ImGuiNET.ImGui.PushFont(m_fontRegular);
         
         // Main Context
-        ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-        m_imGuiVeldridController.Update(deltaTime, m_veldridWindow.inputSnapshot, m_imGuiVeldridController.PumpExtraWindowInputs());
-        ImGuiNET.ImGui.PushFont(m_fontRegular);
+		ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+		m_imGuiVeldridController.Update(deltaTime, m_veldridWindow.inputSnapshot, m_imGuiVeldridController.PumpExtraWindowInputs());
+		ImGuiNET.ImGui.PushFont(m_fontRegular);
     }
 
     public void EndLayoutImpl()

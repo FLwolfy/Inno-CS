@@ -73,6 +73,7 @@ internal class ImGuiNETVeldridWindow : IDisposable
         );
 
         m_swapchain = m_graphicsDevice.ResourceFactory.CreateSwapchain(scDesc);
+        m_swapchain.Resize((uint)fbW, (uint)fbH);
         m_window.Resized += () =>
         {
             var (nw, nh) = VeldridSdl2HiDpi.GetFramebufferSize(m_window);
