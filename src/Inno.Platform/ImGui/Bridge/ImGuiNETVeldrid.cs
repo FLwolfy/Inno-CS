@@ -31,6 +31,9 @@ internal class ImGuiNETVeldrid : IImGui
     private ImFontPtr m_fontItalic;
     private ImFontPtr m_fontBoldItalic;
     
+    // IO
+    private readonly string m_iniPath;
+    
     public unsafe ImGuiNETVeldrid(VeldridGraphicsDevice graphicsDevice, VeldridSdl2Window window, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         m_graphicsDevice = graphicsDevice;
@@ -53,6 +56,11 @@ internal class ImGuiNETVeldrid : IImGui
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
         SetupFonts(DEFAULT_FONT_SIZE * m_dpiScale);
+        
+        // IO
+        m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
+        ImGuiNET.ImGui.LoadIniSettingsFromDisk(m_iniPath);
+        ImGuiIniDataFile.Load(m_iniPath);
         
         // Virtual Context
         virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
@@ -139,6 +147,24 @@ internal class ImGuiNETVeldrid : IImGui
     {
 	    var sizePixels = zoomRate * DEFAULT_FONT_SIZE * m_dpiScale;
 	    SetupFonts(sizePixels);
+    }
+    
+    public void SetStorageDataImpl(string key, object? value)
+    {
+	    ImGuiDataStore.DATA[key] = ImGuiDataCodec.Encode(value);
+
+	    // Make sure save it to the mainContext
+	    var currentContext = ImGuiNET.ImGui.GetCurrentContext();
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiIniDataFile.Save(m_iniPath);
+	    ImGuiNET.ImGui.SetCurrentContext(currentContext);
+    }
+
+    public T? GetStorageDataImpl<T>(string key, T? defaultValue = default)
+    {
+	    return ImGuiDataStore.DATA.TryGetValue(key, out var payload)
+		    ? ImGuiDataCodec.Decode(payload, defaultValue)
+		    : defaultValue;
     }
     
     private void SetupFonts(float sizePixels)

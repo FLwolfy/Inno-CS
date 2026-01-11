@@ -38,6 +38,16 @@ internal class ImGuiNoOp : IImGui
     {
         // Do nothing
     }
+    
+    public void SetStorageDataImpl(string key, object? value)
+    {
+        // Do nothing
+    }
+
+    public T? GetStorageDataImpl<T>(string key, T? defaultValue = default)
+    {
+        return default;
+    }
 
     public IntPtr mainMainContextPtrImpl => IntPtr.Zero;
 

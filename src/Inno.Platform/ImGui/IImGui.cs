@@ -91,6 +91,18 @@ public interface IImGui : IDisposable
     /// </summary>
     static IntPtr virtualContextPtr => impl.virtualContextPtrImpl;
     internal IntPtr virtualContextPtrImpl { get; }
+    
+    /// <summary>
+    /// Sets the UI storage data into ImGui.ini.
+    /// </summary>
+    static void SetStorageData(string key, object? value) => impl.SetStorageDataImpl(key, value);
+    internal void SetStorageDataImpl(string key, object? value);
+    
+    /// <summary>
+    /// Gets the UI storage data from ImGui.ini.
+    /// </summary>
+    static T? GetStorageData<T>(string key, T? defaultValue = default) => impl.GetStorageDataImpl(key, defaultValue);
+    internal T? GetStorageDataImpl<T>(string key, T? defaultValue);
 
     /// <summary>
     /// Dispose the implementation of ImGui.
