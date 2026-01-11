@@ -16,8 +16,8 @@ internal class ImGuiNETVeldrid : IImGui
     private readonly VeldridSdl2Window m_veldridWindow;
     
     // Resource
-    private CommandList m_commandList;
-    private ImGuiNETVeldridController m_imGuiVeldridController;
+    private readonly CommandList m_commandList;
+    private readonly ImGuiNETVeldridController m_imGuiVeldridController;
     
     // Properties
     public IntPtr mainMainContextPtrImpl { get; }
@@ -25,6 +25,7 @@ internal class ImGuiNETVeldrid : IImGui
     
     // Fonts
     private static readonly float DEFAULT_FONT_SIZE = 16.0f;
+    private readonly float m_dpiScale;
     private ImFontPtr m_fontRegular;
     private ImFontPtr m_fontBold;
     private ImFontPtr m_fontItalic;
@@ -43,17 +44,22 @@ internal class ImGuiNETVeldrid : IImGui
             colorSpaceHandling
         );
         
+        var (sx, sy) = VeldridSdl2HiDpi.GetFramebufferScale(m_veldridWindow.inner);
+        m_dpiScale = MathF.Max(sx, sy);
+        
         // Main Context
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+        ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
-        SetupFonts(DEFAULT_FONT_SIZE);
+        SetupFonts(DEFAULT_FONT_SIZE * m_dpiScale);
         
         // Virtual Context
         virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
         ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+        ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
-        SetupFonts(DEFAULT_FONT_SIZE);
+        SetupFonts(DEFAULT_FONT_SIZE * m_dpiScale);
         
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
     }
@@ -131,7 +137,7 @@ internal class ImGuiNETVeldrid : IImGui
 
     public void ZoomImpl(float zoomRate)
     {
-	    var sizePixels = zoomRate * DEFAULT_FONT_SIZE;
+	    var sizePixels = zoomRate * DEFAULT_FONT_SIZE * m_dpiScale;
 	    SetupFonts(sizePixels);
     }
     

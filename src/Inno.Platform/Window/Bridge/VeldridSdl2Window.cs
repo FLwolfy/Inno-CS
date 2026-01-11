@@ -41,16 +41,23 @@ internal class VeldridSdl2Window : IWindow
 
     public VeldridSdl2Window(WindowInfo info)
     {
-        inner = VeldridStartup.CreateWindow(new()
-        {
-            WindowTitle = info.name,
-            WindowWidth = info.width,
-            WindowHeight = info.height,
-            WindowInitialState = WindowState.Normal
-        });
+        // IMPORTANT (macOS / HiDPI):
+        // Use SDL_WINDOW_ALLOW_HIGHDPI, otherwise the OS will upscale a 1x backbuffer -> blurry ImGui text.
+        SDL_WindowFlags flags = SDL_WindowFlags.AllowHighDpi;
+        flags |= SDL_WindowFlags.Resizable;
+
+        inner = new Sdl2Window(
+            info.name,
+            100, 100,
+            info.width,
+            info.height,
+            flags,
+            false);
+
         inner.Resized += () => m_isWindowSizeDirty = true;
         inputSnapshot = inner.PumpEvents();
     }
+
 
     public void Show() => inner.Visible = true;
     public void Hide() => inner.Visible = false;

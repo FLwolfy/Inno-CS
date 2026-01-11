@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 
 using ImGuiNET;
 using Inno.Core.Math;
+using Inno.Platform.Window.Bridge;
 using Veldrid;
 using Veldrid.Sdl2;
 
@@ -46,7 +47,7 @@ internal class ImGuiNETVeldridController : IDisposable
 
     // Window info
     private readonly ImGuiNETVeldridWindow m_mainImGuiWindow;
-    private readonly Dictionary<uint, ImGuiNETVeldridWindow> m_windowHolders = new();
+    private readonly Dictionary<uint, ImGuiNETVeldridWindow> m_windowHolders = new(); // keep this to avoid GC
     private bool m_controlDown;
     private bool m_shiftDown;
     private bool m_altDown;
@@ -669,8 +670,6 @@ internal class ImGuiNETVeldridController : IDisposable
         cl.SetPipeline(m_pipeline);
         cl.SetGraphicsResourceSet(0, m_mainResourceSet);
 
-        drawData.ScaleClipRects(io.DisplayFramebufferScale);
-
         // Render command lists
         int vtxOffset = 0;
         int idxOffset = 0;
@@ -693,13 +692,14 @@ internal class ImGuiNETVeldridController : IDisposable
                             : GetImageResourceSet(pcmd.TextureId));
                 }
 
-                cl.SetScissorRect(
-                    0,
-                    (uint)(pcmd.ClipRect.X - pos.X),
-                    (uint)(pcmd.ClipRect.Y - pos.Y),
-                    (uint)(pcmd.ClipRect.Z - pcmd.ClipRect.X),
-                    (uint)(pcmd.ClipRect.W - pcmd.ClipRect.Y));
+                // ClipRect is in ImGui coordinates (points). Convert to framebuffer pixels for scissor.
+                var scale = io.DisplayFramebufferScale;
+                uint clipX = (uint)((pcmd.ClipRect.X - pos.X) * scale.X);
+                uint clipY = (uint)((pcmd.ClipRect.Y - pos.Y) * scale.Y);
+                uint clipW = (uint)((pcmd.ClipRect.Z - pcmd.ClipRect.X) * scale.X);
+                uint clipH = (uint)((pcmd.ClipRect.W - pcmd.ClipRect.Y) * scale.Y);
 
+                cl.SetScissorRect(0, clipX, clipY, clipW, clipH);
                 cl.DrawIndexed(pcmd.ElemCount, 1, pcmd.IdxOffset + (uint)idxOffset, (int)pcmd.VtxOffset + vtxOffset, 0);
             }
             vtxOffset += cmdList.VtxBuffer.Size;
@@ -812,12 +812,19 @@ internal class ImGuiNETVeldridController : IDisposable
     private void SetPerFrameImGuiData(float deltaSeconds)
     {
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
+
+        // DisplaySize is in logical units (points).
         io.DisplaySize = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
-        io.DeltaTime = deltaSeconds; // DeltaTime is in seconds.
+        io.DeltaTime = deltaSeconds;
+
+        // FramebufferScale is (drawablePixels / logicalPoints). On macOS Retina this is typically 2x2.
+        var (sx, sy) = VeldridSdl2HiDpi.GetFramebufferScale(m_mainWindow);
+        io.DisplayFramebufferScale = new SYSVector2(sx, sy);
 
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new SYSVector2(m_mainWindow.X, m_mainWindow.Y);
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
     }
+
     
     #endregion
     

@@ -29,8 +29,19 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
         this.backend = backend;
         m_graphicsDevice = VeldridStartup.CreateGraphicsDevice(window.inner, deviceOptions, ToVeldridGraphicsBackend(backend));
         swapchainFrameBuffer = new VeldridFrameBuffer(m_graphicsDevice, m_graphicsDevice.SwapchainFramebuffer);
+
+        // Ensure swapchain/backbuffer matches drawable pixel size on HiDPI displays.
+        {
+            var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+            if (fbW != window.width || fbH != window.height)
+                swapchainFrameBuffer.Resize(fbW, fbH);
+        }
         
-        window.inner.Resized += () => swapchainFrameBuffer.Resize(window.width, window.height);
+        window.inner.Resized += () =>
+        {
+            var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+            swapchainFrameBuffer.Resize(fbW, fbH);
+        };
     }
 
     private VeldridGraphicsBackend ToVeldridGraphicsBackend(GraphicsBackend backend)
