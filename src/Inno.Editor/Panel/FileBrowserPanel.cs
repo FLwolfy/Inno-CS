@@ -200,12 +200,9 @@ public sealed class FileBrowserPanel : EditorPanel
 
     // ============================
     // Toolbar
-    // Layout: Back/Forward | CurrentFolderName | View Toggle | Search (fills remaining)
-    // (No fixed-height child; it behaves like normal widgets in the current window.)
     // ============================
     private void DrawToolbar()
     {
-        // Keep vertical alignment consistent with buttons / input
         ImGui.AlignTextToFramePadding();
 
         bool canBack = m_historyIndex > 0;
@@ -222,19 +219,6 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.SameLine();
 
         ImGui.TextUnformatted(GetCurrentFolderDisplayName());
-        ImGui.SameLine();
-
-        string viewLabel = m_viewMode == ViewMode.Grid ? "Grid" : "List";
-        if (ImGui.Button(viewLabel))
-        {
-            m_viewMode = m_viewMode == ViewMode.Grid ? ViewMode.List : ViewMode.Grid;
-        }
-
-        ImGui.SameLine();
-
-        // Search fills remaining width; keep a sensible minimum
-        ImGui.SetNextItemWidth(Math.Max(80f, ImGui.GetContentRegionAvail().X));
-        ImGui.InputTextWithHint("##Search", "Search", ref m_search, 256);
     }
 
     // ============================
@@ -333,6 +317,10 @@ public sealed class FileBrowserPanel : EditorPanel
     // ============================
     private void DrawContent()
     {
+        // TopBar: View toggle + Search (always on top of the view)
+        DrawViewTopBar();
+        ImGui.Separator();
+
         bool searching = !string.IsNullOrWhiteSpace(m_search);
 
         if (searching) RefreshSearchSnapshot(force: false);
@@ -344,12 +332,6 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGui.EndPopup();
         }
 
-        if (m_viewMode == ViewMode.List)
-        {
-            DrawListHeaderControls();
-            ImGui.Separator();
-        }
-
         var src = searching ? m_searchSnapshot.entries : m_snapshot.entries;
         var entries = ApplyFilterAndSort(src);
 
@@ -359,8 +341,25 @@ public sealed class FileBrowserPanel : EditorPanel
         }
         else
         {
-            DrawList(entries);
+            DrawListWithSortBar(entries);
         }
+    }
+    
+    private void DrawViewTopBar()
+    {
+        ImGui.AlignTextToFramePadding();
+
+        // View toggle
+        string viewLabel = m_viewMode == ViewMode.Grid ? "Grid" : "List";
+        if (ImGui.Button(viewLabel))
+            m_viewMode = m_viewMode == ViewMode.Grid ? ViewMode.List : ViewMode.Grid;
+
+        ImGui.SameLine();
+
+        // Search fills remaining width; never overflow
+        float avail = ImGui.GetContentRegionAvail().X;
+        ImGui.SetNextItemWidth(Math.Max(120f, avail));
+        ImGui.InputTextWithHint("##Search", "Search", ref m_search, 256);
     }
 
     // ============================
@@ -550,23 +549,44 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.EndTable();
     }
     
-    
-    private void DrawListHeaderControls()
+    private void DrawListWithSortBar(List<Entry> entries)
+    {
+        float barH = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y * 2f;
+
+        var avail = ImGui.GetContentRegionAvail();
+        float listH = Math.Max(0f, avail.Y - barH);
+
+        ImGui.BeginChild("##ListArea", new Vector2(0, listH));
+        DrawList(entries);
+        ImGui.EndChild();
+
+        ImGui.Separator();
+
+        ImGui.BeginChild("##ListSortBar", new Vector2(0, 0), ImGuiChildFlags.None);
+        DrawListSortBar();
+        ImGui.EndChild();
+    }
+
+    private void DrawListSortBar()
     {
         ImGui.AlignTextToFramePadding();
-        ImGui.TextDisabled("Sort:");
-        ImGui.SameLine();
 
-        SortCombo("##sortField", ref m_sortField);
+        ImGui.TextDisabled("Sort");
         ImGui.SameLine();
 
         if (ImGui.Button(m_sortAscending ? "Asc##sort" : "Desc##sort"))
             m_sortAscending = !m_sortAscending;
+
+        ImGui.SameLine();
+
+        float w = ImGui.GetContentRegionAvail().X;
+        ImGui.SetNextItemWidth(Math.Max(80f, w));
+
+        SortCombo("##sortField", ref m_sortField);
     }
 
     private static void SortCombo(string id, ref SortField field)
     {
-        ImGui.SetNextItemWidth(140f);
         if (ImGui.BeginCombo(id, field.ToString()))
         {
             foreach (SortField v in Enum.GetValues(typeof(SortField)))
