@@ -82,9 +82,11 @@ internal class ImGuiNETVeldridController : IDisposable
     private readonly Dictionary<IntPtr, ResourceSetInfo> m_viewsById = new();
     private readonly List<IDisposable> m_ownedResources = new();
     
-    // Font trackers
+    // Font
+    private readonly ImFontConfigPtr m_baseCfg;
+    private readonly ImFontConfigPtr m_mergeCfg;
     private readonly Dictionary<string, (IntPtr, int)> m_fontCache;
-    
+    private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache;
     
     // ============================================================
     // Initialization and Loads
@@ -137,7 +139,17 @@ internal class ImGuiNETVeldridController : IDisposable
         io.BackendFlags |= ImGuiBackendFlags.RendererHasViewports;
 
         // Fonts
+        unsafe
+        {
+            m_baseCfg = ImGuiNative.ImFontConfig_ImFontConfig();
+            m_baseCfg.FontDataOwnedByAtlas = false;
+            m_mergeCfg = ImGuiNative.ImFontConfig_ImFontConfig();
+            m_mergeCfg.MergeMode = true;
+            m_mergeCfg.PixelSnapH = true;
+            m_mergeCfg.FontDataOwnedByAtlas = false;
+        }
         m_fontCache = new Dictionary<string, (IntPtr, int)>();
+        m_iconSizeCache = new Dictionary<string, (float, (ushort, ushort))>();
         ImGuiNET.ImGui.GetIO().Fonts.AddFontDefault();
         ImGuiNET.ImGui.GetIO().Fonts.Flags |= ImFontAtlasFlags.NoBakedLines;
 
@@ -502,9 +514,55 @@ internal class ImGuiNETVeldridController : IDisposable
     // ============================================================
     
     #region Fonts
-    
-    public IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+
+    public ImFontPtr AddFontIcon(string baseFontFile, float sizePixels, (ushort, ushort) range)
     {
+        var iconPtr = LoadEmbeddedFontTTF(baseFontFile, out _);
+        m_iconSizeCache[baseFontFile] = (sizePixels, range);
+        
+        return iconPtr;
+    }
+
+    public ImFontPtr AddFontBase(string baseFontFile, float sizePixels)
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        var basePtr = LoadEmbeddedFontTTF(baseFontFile, out var baseLen);
+        var baseFont = io.Fonts.AddFontFromMemoryTTF(basePtr, baseLen, sizePixels, m_baseCfg);
+
+        // Merge icon glyphs into "baseFont" (it merges into the last added font)
+        foreach (var iconName in m_iconSizeCache.Keys)
+        {
+            var fontCache = m_fontCache[iconName];
+            var sizeCache = m_iconSizeCache[iconName];
+            
+            nint iconRanges;
+            unsafe
+            {
+#pragma warning disable CA2014
+                ushort* ranges = stackalloc ushort[]
+                {
+                    sizeCache.Item2.Item1, sizeCache.Item2.Item2,
+                    0
+                };
+#pragma warning restore CA2014
+
+                iconRanges = (nint)ranges;
+            }
+            
+            io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_mergeCfg, iconRanges);
+        }
+        
+        return baseFont;
+    }
+    
+    private IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+    {
+        if (m_fontCache.TryGetValue(shortName, out var cached))
+        {
+            length = cached.Item2;
+            return cached.Item1;
+        }
+
         var resources = m_assembly.GetManifestResourceNames();
         var match = resources.FirstOrDefault(r => r.EndsWith(shortName, StringComparison.OrdinalIgnoreCase));
         if (match == null)
@@ -520,11 +578,13 @@ internal class ImGuiNETVeldridController : IDisposable
 
         var ptr = Marshal.AllocHGlobal(fontData.Length);
         Marshal.Copy(fontData, 0, ptr, fontData.Length);
+
         m_fontCache[shortName] = (ptr, fontData.Length);
-	    
+
         length = fontData.Length;
         return ptr;
     }
+
     
     /// <summary>
     /// Recreates the device texture used to render text.

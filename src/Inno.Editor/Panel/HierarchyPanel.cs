@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using System.Linq;
 using ImGuiNET;
 
 using Inno.Core.ECS;
@@ -8,6 +8,7 @@ using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.GUI;
+using Inno.Runtime.Component;
 
 namespace Inno.Editor.Panel;
 
@@ -103,7 +104,9 @@ public class HierarchyPanel : EditorPanel
         if (isSelected) { flags |= ImGuiTreeNodeFlags.Selected; }
 
         ////////////// Begin Tree Node //////////////
-        bool isOpenTree = ImGui.TreeNodeEx($"{obj.name}###{obj.id}", flags);
+        var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
+        var icon = isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube;
+        bool isOpenTree = ImGui.TreeNodeEx($"{icon} {obj.name}###{obj.id}", flags);
         
         // Handle Right Click menu
         if (ImGui.BeginPopupContextItem($"Popup_{obj.id}"))

@@ -195,28 +195,20 @@ internal class ImGuiNETVeldrid : IImGui
     }
     
     private void SetupFonts(float sizePixels)
-    {
+	{
 	    var io = ImGuiNET.ImGui.GetIO();
 	    io.Fonts.Clear();
+	    
+	    m_imGuiVeldridController.AddFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * 0.8f, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+	    m_imGuiVeldridController.AddFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * 0.8f, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
 
-	    // Load Regular
-	    var regularPtr = m_imGuiVeldridController.LoadEmbeddedFontTTF("JetBrainsMono-Regular.ttf", out var regularLen);
-	    m_fontRegular = io.Fonts.AddFontFromMemoryTTF(regularPtr, regularLen, sizePixels);
-
-	    // Load Bold
-	    var boldPtr = m_imGuiVeldridController.LoadEmbeddedFontTTF("JetBrainsMono-Bold.ttf", out var boldLen);
-	    m_fontBold = io.Fonts.AddFontFromMemoryTTF(boldPtr, boldLen, sizePixels);
-
-	    // Load Italic
-	    var italicPtr = m_imGuiVeldridController.LoadEmbeddedFontTTF("JetBrainsMono-Italic.ttf", out var italicLen);
-	    m_fontItalic = io.Fonts.AddFontFromMemoryTTF(italicPtr, italicLen, sizePixels);
-
-	    // Load Bold Italic
-	    var boldItalicPtr = m_imGuiVeldridController.LoadEmbeddedFontTTF("JetBrainsMono-BoldItalic.ttf", out var boldItalicLen);
-	    m_fontBoldItalic = io.Fonts.AddFontFromMemoryTTF(boldItalicPtr, boldItalicLen, sizePixels);
+	    m_fontRegular = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Regular.ttf", sizePixels);
+	    m_fontBold = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Bold.ttf", sizePixels);
+	    m_fontItalic = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Italic.ttf", sizePixels);
+	    m_fontBoldItalic = m_imGuiVeldridController.AddFontBase("JetBrainsMono-BoldItalic.ttf", sizePixels);
 
 	    m_imGuiVeldridController.RecreateFontDeviceTexture();
-    }
+	}
     
     private void SetupImGuiStyle()
 	{

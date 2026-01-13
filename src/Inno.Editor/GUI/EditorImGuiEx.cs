@@ -13,18 +13,30 @@ public static class EditorImGuiEx
     // UnderLine
     public static void UnderlineLastItem(float thickness = 1f, float yOffset = -1f)
     {
-        var min = ImGuiNET.ImGui.GetItemRectMin();
-        var max = ImGuiNET.ImGui.GetItemRectMax();
+        var min = ImGui.GetItemRectMin();
+        var max = ImGui.GetItemRectMax();
 
         float y = max.Y + yOffset;
-        var col = ImGuiNET.ImGui.GetColorU32(ImGuiCol.Text);
+        var col = ImGui.GetColorU32(ImGuiCol.Text);
 
-        ImGuiNET.ImGui.GetWindowDrawList().AddLine(
+        ImGui.GetWindowDrawList().AddLine(
             new Vector2(min.X, y),
             new Vector2(max.X, y),
             col,
             thickness
         );
+    }
+    
+    // Icon
+    public static void DrawIconAndText(string iconText, string text, float iconGap = 1.2f)
+    {
+        float w = ImGui.GetFontSize() * iconGap;
+        float x0 = ImGui.GetCursorPosX();
+        
+        ImGui.TextUnformatted(iconText);
+        ImGui.SameLine();
+        ImGui.SetCursorPosX(x0 + w);
+        ImGui.TextUnformatted(text);
     }
     
     // Gizmos Overlay

@@ -257,14 +257,14 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             IImGui.UseFont(ImGuiFontStyle.BoldItalic);
             ImGui.SameLine();
-            ImGui.TextUnformatted($"{FolderIcon()} {displayName}");
+            EditorImGuiEx.DrawIconAndText(ImGuiIcon.Folder, displayName);
             EditorImGuiEx.UnderlineLastItem();
             IImGui.UseFont(ImGuiFontStyle.Regular);
         }
         else
         {
             ImGui.SameLine();
-            ImGui.TextUnformatted($"{FolderIcon()} {displayName}");
+            EditorImGuiEx.DrawIconAndText(ImGuiIcon.Folder, displayName);
         }
 
         if (ImGui.BeginPopupContextItem($"##tree_ctx_{pathNormalized}"))
@@ -322,7 +322,7 @@ public sealed class FileBrowserPanel : EditorPanel
             SelectFile(full);
 
         ImGui.SameLine();
-        ImGui.TextUnformatted($"{FileIcon(type)}  {name}");
+        EditorImGuiEx.DrawIconAndText(FileIcon(type), name);
 
         if (ImGui.BeginPopupContextItem($"##tree_file_ctx_{full}"))
         {
@@ -426,7 +426,7 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.BeginGroup();
         ImGui.PushID(e.fullPath);
 
-        var icon = e.isDir ? FolderIcon() : FileIcon(e.type);
+        var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
         bool selected = IsSelected(e.fullPath);
 
         if (selected)
@@ -441,8 +441,7 @@ public sealed class FileBrowserPanel : EditorPanel
             else SelectFile(e.fullPath);
         }
 
-        if (selected)
-            ImGui.PopStyleColor(2);
+        if (selected) ImGui.PopStyleColor(2);
 
         if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
@@ -562,9 +561,8 @@ public sealed class FileBrowserPanel : EditorPanel
             // Col 0: Name
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted(e.isDir ? FolderIcon() : FileIcon(e.type));
-            ImGui.SameLine();
-            ImGui.TextUnformatted(e.name);
+            var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
+            EditorImGuiEx.DrawIconAndText(icon, e.name);
 
             // Col 1: Type
             ImGui.TableSetColumnIndex(1);
@@ -1307,19 +1305,12 @@ public sealed class FileBrowserPanel : EditorPanel
         return e.ToUpperInvariant();
     }
 
-    private static string FolderIcon()
-    {
-        // TODO: Use Icon Font
-        return "F";
-    }
-
     private static string FileIcon(string type)
     {
-        // TODO: Use Icon Font
         return type switch
         {
-            "PNG" => "P",
-            _ => "A"
+            "PNG" => ImGuiIcon.Image,
+            _ => ImGuiIcon.File
         };
     }
 
