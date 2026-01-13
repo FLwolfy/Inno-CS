@@ -220,46 +220,45 @@ internal class ImGuiNETVeldrid : IImGui
     
     private void SetupImGuiStyle()
 	{
-	    // Keep ALL colors unchanged. Only adjust geometry + spacing to be sharper and more compact.
 	    var style = ImGuiNET.ImGui.GetStyle();
 
 	    style.Alpha = 1.0f;
 	    style.DisabledAlpha = 0.1f;
 
-	    // --- Window / Child / Popup (sharper + smaller padding) ---
-	    style.WindowPadding = new Vector2(6.0f, 6.0f);      // was (8, 8)
-	    style.WindowRounding = 2.0f;                        // was 10
-	    style.WindowBorderSize = 1.0f;                      // was 2
+	    // --- Window / Child / Popup ---
+	    style.WindowPadding = new Vector2(6.0f, 6.0f);
+	    style.WindowRounding = 2.0f;
+	    style.WindowBorderSize = 1.0f;
 	    style.WindowMinSize = new Vector2(30.0f, 30.0f);
 	    style.WindowTitleAlign = new Vector2(0.5f, 0.5f);
 	    style.WindowMenuButtonPosition = ImGuiDir.Right;
 
-	    style.ChildRounding = 2.0f;                         // was 5
+	    style.ChildRounding = 2.0f;
 	    style.ChildBorderSize = 1.0f;
 
-	    style.PopupRounding = 2.0f;                         // was 10
+	    style.PopupRounding = 2.0f;
 	    style.PopupBorderSize = 0.0f;
 
-	    // --- Frame / Items (compact) ---
-	    style.FramePadding = new Vector2(6.0f, 2.0f);        // was (10, 3.5)
-	    style.FrameRounding = 2.0f;                          // was 5
+	    // --- Frame / Items ---
+	    style.FramePadding = new Vector2(6.0f, 2.0f);
+	    style.FrameRounding = 2.0f;
 	    style.FrameBorderSize = 0.0f;
 
-	    style.ItemSpacing = new Vector2(4.0f, 3.0f);         // was (5, 4)
-	    style.ItemInnerSpacing = new Vector2(4.0f, 4.0f);    // was (5, 5)
-	    style.CellPadding = new Vector2(3.0f, 2.0f);         // was (4, 2)
+	    style.ItemSpacing = new Vector2(4.0f, 3.0f);
+	    style.ItemInnerSpacing = new Vector2(4.0f, 4.0f);
+	    style.CellPadding = new Vector2(3.0f, 2.0f);
 
-	    style.IndentSpacing = 16.0f;                         // was 20
-	    style.ColumnsMinSpacing = 4.0f;                      // was 5
+	    style.IndentSpacing = 16.0f;
+	    style.ColumnsMinSpacing = 4.0f;
 
-	    // --- Scrollbar / Grab (sharper) ---
-	    style.ScrollbarSize = 12.0f;                         // was 15
-	    style.ScrollbarRounding = 2.0f;                      // was 9
-	    style.GrabMinSize = 12.0f;                           // was 15
-	    style.GrabRounding = 2.0f;                           // was 5
+	    // --- Scrollbar / Grab ---
+	    style.ScrollbarSize = 12.0f;
+	    style.ScrollbarRounding = 2.0f;
+	    style.GrabMinSize = 12.0f;
+	    style.GrabRounding = 2.0f;
 
-	    // --- Tabs (sharper) ---
-	    style.TabRounding = 2.0f;                            // was 5
+	    // --- Tabs ---
+	    style.TabRounding = 2.0f;
 	    style.TabBorderSize = 0.0f;
 	    style.TabMinWidthForCloseButton = 0.0f;
 
@@ -267,7 +266,7 @@ internal class ImGuiNETVeldrid : IImGui
 	    style.ButtonTextAlign = new Vector2(0.5f, 0.5f);
 	    style.SelectableTextAlign = new Vector2(0.0f, 0.0f);
 
-	    // --- Colors (UNCHANGED) ---
+	    // --- Colors ---
 	    style.Colors[(int)ImGuiCol.Text] = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	    style.Colors[(int)ImGuiCol.TextDisabled] = new Vector4(1.0f, 1.0f, 1.0f, 0.360515f);
 	    style.Colors[(int)ImGuiCol.WindowBg] = new Vector4(0.18f, 0.18f, 0.18f, 1.0f);

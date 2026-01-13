@@ -8,10 +8,9 @@ namespace Inno.Editor.Core;
 public static class EditorManager
 {
     private static readonly Dictionary<string, EditorPanel> PANELS = new();
-    private static readonly EditorSelection SELECTION = new();
-    
+
     // Manager Properties
-    public static EditorSelection selection => SELECTION; // TODO: Make this more robust later
+    public static EditorSelection selection { get; } = new();
 
     public static void RegisterPanel(EditorPanel panel)
     {

@@ -10,6 +10,23 @@ public static class EditorImGuiEx
     private static bool m_inInvisible = false;
     private static Vector2 m_invisibleSizeCache = Vector2.ZERO;
     
+    // UnderLine
+    public static void UnderlineLastItem(float thickness = 1f, float yOffset = -1f)
+    {
+        var min = ImGuiNET.ImGui.GetItemRectMin();
+        var max = ImGuiNET.ImGui.GetItemRectMax();
+
+        float y = max.Y + yOffset;
+        var col = ImGuiNET.ImGui.GetColorU32(ImGuiCol.Text);
+
+        ImGuiNET.ImGui.GetWindowDrawList().AddLine(
+            new Vector2(min.X, y),
+            new Vector2(max.X, y),
+            col,
+            thickness
+        );
+    }
+    
     // Gizmos Overlay
     public static void DrawLine(Vector2 p1, Vector2 p2, Color color, float thickness = 1f)
     {

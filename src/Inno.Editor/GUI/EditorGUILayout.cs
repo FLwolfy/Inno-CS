@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+
 using ImGuiNET;
+
 using Inno.Core.Math;
-using Inno.Editor.Core;
 using Inno.Platform.ImGui;
 
 namespace Inno.Editor.GUI;
@@ -16,7 +17,7 @@ public static class EditorGUILayout
     public enum LayoutAlign { Front, Center, Back }
     [Flags] public enum FontStyle { None, Bold, Italic }
 
-    private static readonly Stack<FontStyle> FONTSTYLE_STACK = new();
+    private static readonly Stack<FontStyle> FONT_STYLE_STACK = new();
     private static readonly Stack<int> SCOPE_STACK = new();
     private static readonly Stack<LayoutAlign> ALIGN_STACK = new();
     private static readonly Stack<bool> COLUMN_DIRTY_STACK = new();
@@ -25,8 +26,8 @@ public static class EditorGUILayout
     private static readonly Dictionary<int, float> COLUMN_TOTAL_WEIGHT_MAP = new();
     private static readonly Dictionary<int, List<float>> COLUMN_WEIGHT_MAP = new();
 
-    private static int m_autoID = 0;
-    private static int m_autoMeasureID = 0;
+    private static int m_autoId = 0;
+    private static int m_autoMeasureId = 0;
     private static int m_columnDepth = 0;
     private static bool m_frameBegin = false;
 
@@ -40,8 +41,8 @@ public static class EditorGUILayout
         if (m_frameBegin)
             throw new InvalidOperationException("BeginFrame() can only be called once.");
 
-        m_autoID = 0;
-        m_autoMeasureID = 0;
+        m_autoId = 0;
+        m_autoMeasureId = 0;
         m_frameBegin = true;
     }
 
@@ -176,10 +177,10 @@ public static class EditorGUILayout
     /// </summary>
     public static void BeginFont(FontStyle style)
     {
-        FONTSTYLE_STACK.Push(style);
+        FONT_STYLE_STACK.Push(style);
 
         FontStyle result = FontStyle.None;
-        foreach (var s in FONTSTYLE_STACK) result |= s;
+        foreach (var s in FONT_STYLE_STACK) result |= s;
 
         if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
         else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
@@ -192,10 +193,10 @@ public static class EditorGUILayout
     /// </summary>
     public static void EndFont()
     {
-        FONTSTYLE_STACK.Pop();
+        FONT_STYLE_STACK.Pop();
 
         FontStyle result = FontStyle.None;
-        foreach (var s in FONTSTYLE_STACK) result |= s;
+        foreach (var s in FONT_STYLE_STACK) result |= s;
 
         if (result == FontStyle.Bold) IImGui.UseFont(ImGuiFontStyle.Bold);
         else if (result == FontStyle.Italic) IImGui.UseFont(ImGuiFontStyle.Italic);
@@ -374,19 +375,16 @@ public static class EditorGUILayout
     /// </summary>
     public static void Label(string text, bool enabled = true)
     {
-        float width = MeasureWidth(() => ImGui.Text(text));
+        float width = ImGui.CalcTextSize(text).X;
         SetAlignedCursorPosX(width);
 
         using (new DrawScope(enabled))
         {
-            float textHeight = ImGui.GetTextLineHeightWithSpacing();
-            float frameHeight = ImGui.GetFrameHeight();
-            float verticalOffset = (frameHeight - textHeight) * 0.5f;
-            Vector2 cursorPos = ImGui.GetCursorPos();
-            ImGui.SetCursorPosY(cursorPos.y + verticalOffset);
-            ImGui.Text(text);
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted(text);
         }
     }
+
 
     /// <summary>
     /// Render a button; returns true if clicked

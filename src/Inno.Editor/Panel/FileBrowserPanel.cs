@@ -10,6 +10,8 @@ using Inno.Assets;
 using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Editor.Core;
+using Inno.Editor.GUI;
+using Inno.Platform.ImGui;
 
 namespace Inno.Editor.Panel;
 
@@ -19,7 +21,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
     // Splitter
     private const float C_LEFT_DEFAULT_WIDTH = 280f;
-    private const float C_SPLITTER_WIDTH = 2f;
+    private const float C_SPLITTER_WIDTH = 3f;
     private const float C_LEFT_MIN_WIDTH = 10f;
     private const float C_RIGHT_MIN_WIDTH = 20f;
     private float m_leftWidth = C_LEFT_DEFAULT_WIDTH;
@@ -34,16 +36,18 @@ public sealed class FileBrowserPanel : EditorPanel
     private string m_currentDir;
     private readonly string m_rootPathNative;
     private string m_currentDirNative;
+
+    // Selection
     private string? m_selectedPath;
-    
-    // Cached directory snapshot (avoid enumerating every frame)
+
+    // Cached directory snapshot
     private const double C_SNAPSHOT_TTL_SECONDS = 0.5;
     private readonly DirectorySnapshot m_snapshot = new();
     private DateTime m_snapshotTime = DateTime.MinValue;
     private readonly List<string> m_history = new();
     private int m_historyIndex = -1;
-    
-    // File system watcher (auto refresh)
+
+    // File system watcher
     private FileSystemWatcher? m_watcher;
     private int m_fsChangeVersion;
     private int m_fsAppliedVersion;
@@ -60,10 +64,10 @@ public sealed class FileBrowserPanel : EditorPanel
     private ViewMode m_viewMode = ViewMode.Grid;
     private SortField m_sortField = SortField.Name;
     private bool m_sortAscending = true;
-    
-    // Grid
-    private const float C_GRID_SCALE_MIN = 0.70f;
-    private const float C_GRID_SCALE_MAX = 1.80f;
+
+    // Grid scale
+    private const float C_GRID_SCALE_MIN = 0.20f;
+    private const float C_GRID_SCALE_MAX = 5.0f;
     private float m_gridScale = 1.0f;
 
     // Rename / Delete UI state
@@ -74,29 +78,20 @@ public sealed class FileBrowserPanel : EditorPanel
     private enum ViewMode { Grid, List }
     private enum SortField { Name, Type, Source }
 
-    private readonly struct Entry
+    private readonly struct Entry(
+        string fullPath,
+        string name,
+        bool isDir,
+        string type,
+        string source)
     {
-        public readonly string fullPath;  // normalized
-        public readonly string name;      // display name (file/folder name)
-        public readonly bool isDir;
-        public readonly string type;
+        public readonly string fullPath = fullPath;  // normalized
+        public readonly string name = name;          // display name (file/folder name)
+        public readonly bool isDir = isDir;
+        public readonly string type = type;
 
         // Finder-like "Source" column: relative to current dir, using "~" prefix
-        public readonly string source;
-
-        public Entry(
-            string fullPath,
-            string name,
-            bool isDir,
-            string type,
-            string source)
-        {
-            this.fullPath = fullPath;
-            this.name = name;
-            this.isDir = isDir;
-            this.type = type;
-            this.source = source;
-        }
+        public readonly string source = source;
     }
 
     private sealed class DirectorySnapshot
@@ -114,6 +109,9 @@ public sealed class FileBrowserPanel : EditorPanel
         // Normalized paths
         m_rootPath = NormalizePath(m_rootPathNative);
         m_currentDir = m_rootPath;
+
+        // Selection
+        m_selectedPath = null;
 
         PushHistory(m_currentDir);
 
@@ -138,10 +136,8 @@ public sealed class FileBrowserPanel : EditorPanel
         var region = ImGui.GetContentRegionAvail();
         float totalW = Math.Max(0f, region.X);
         if (m_leftRatio < 0f && totalW > 0f)
-        {
             m_leftRatio = Math.Clamp(m_leftWidth / totalW, 0f, 1f);
-        }
-        
+
         // Left: tree
         {
             ImGui.BeginChild(
@@ -161,7 +157,7 @@ public sealed class FileBrowserPanel : EditorPanel
             float maxLeft = Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH);
             bool draggingSplitter = DrawSplitter(ref m_leftWidth, minLeft: C_LEFT_MIN_WIDTH, maxLeft: maxLeft);
             ImGui.SameLine();
-        
+
             if (totalW > 0f)
             {
                 float maxLeft2 = Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH);
@@ -184,7 +180,6 @@ public sealed class FileBrowserPanel : EditorPanel
             DrawContent();
             ImGui.EndChild();
         }
-  
 
         ImGui.EndChild(); // body
 
@@ -230,18 +225,47 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         string displayName = IsSamePath(pathNormalized, m_rootPath) ? "Assets" : Path.GetFileName(pathNative);
-        bool selected = IsSamePath(pathNormalized, m_currentDir);
+
+        // Highlight is driven by selection (single-click), not currentDir.
+        bool selected = IsSelected(pathNormalized);
 
         var flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanFullWidth;
         if (selected) flags |= ImGuiTreeNodeFlags.Selected;
 
-        bool shouldOpen = IsAncestorOrSelf(pathNormalized, m_currentDir);
+        bool shouldOpen =
+            IsAncestorOrSelf(pathNormalized, m_currentDir) ||
+            (m_selectedPath != null && IsAncestorOrSelf(pathNormalized, m_selectedPath));
+
         ImGui.SetNextItemOpen(shouldOpen, ImGuiCond.Once);
 
-        bool open = ImGui.TreeNodeEx($"##tree_{pathNormalized}", flags, $"{FolderIcon()} {displayName}");
+        bool open = ImGui.TreeNodeEx($"##tree_{pathNormalized}", flags);
 
+        // Single click: select only (do NOT enter)
         if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+        {
+            SelectFolder(pathNormalized);
+        }
+
+        // Double click: enter (navigate)
+        if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+        {
             NavigateTo(pathNormalized, pushHistory: true);
+        }
+
+        bool insideDirectory = IsSamePath(pathNormalized, m_currentDir);
+        if (insideDirectory)
+        {
+            IImGui.UseFont(ImGuiFontStyle.BoldItalic);
+            ImGui.SameLine();
+            ImGui.TextUnformatted($"{FolderIcon()} {displayName}");
+            EditorImGuiEx.UnderlineLastItem();
+            IImGui.UseFont(ImGuiFontStyle.Regular);
+        }
+        else
+        {
+            ImGui.SameLine();
+            ImGui.TextUnformatted($"{FolderIcon()} {displayName}");
+        }
 
         if (ImGui.BeginPopupContextItem($"##tree_ctx_{pathNormalized}"))
         {
@@ -283,7 +307,7 @@ public sealed class FileBrowserPanel : EditorPanel
         var fi = new FileInfo(filePathNative);
         string type = ToType(fi.Extension);
 
-        bool selected = IsSamePath(m_selectedPath, full);
+        bool selected = IsSelected(full);
 
         var flags =
             ImGuiTreeNodeFlags.Leaf |
@@ -292,22 +316,23 @@ public sealed class FileBrowserPanel : EditorPanel
 
         if (selected) flags |= ImGuiTreeNodeFlags.Selected;
 
-        ImGui.TreeNodeEx($"##tree_file_{full}", flags, $"{FileIcon(type)}  {name}");
+        ImGui.TreeNodeEx($"##tree_file_{full}", flags);
 
         if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            m_selectedPath = full;
+            SelectFile(full);
+
+        ImGui.SameLine();
+        ImGui.TextUnformatted($"{FileIcon(type)}  {name}");
 
         if (ImGui.BeginPopupContextItem($"##tree_file_ctx_{full}"))
         {
-            var entry = new Entry(
+            DrawItemContextItems(new Entry(
                 fullPath: full,
                 name: name,
                 isDir: false,
                 type: type,
                 source: "~"
-            );
-
-            DrawItemContextItems(entry);
+            ));
             ImGui.EndPopup();
         }
     }
@@ -317,7 +342,7 @@ public sealed class FileBrowserPanel : EditorPanel
     // ============================
     private void DrawContent()
     {
-        // TopBar: View toggle + Search (always on top of the view)
+        // TopBar: View toggle + Search
         DrawViewTopBar();
         ImGui.Separator();
 
@@ -336,27 +361,21 @@ public sealed class FileBrowserPanel : EditorPanel
         var entries = ApplyFilterAndSort(src);
 
         if (m_viewMode == ViewMode.Grid)
-        {
             DrawGridWithScaleBar(entries);
-        }
         else
-        {
             DrawListWithSortBar(entries);
-        }
     }
-    
+
     private void DrawViewTopBar()
     {
         ImGui.AlignTextToFramePadding();
 
-        // View toggle
         string viewLabel = m_viewMode == ViewMode.Grid ? "Grid" : "List";
         if (ImGui.Button(viewLabel))
             m_viewMode = m_viewMode == ViewMode.Grid ? ViewMode.List : ViewMode.Grid;
 
         ImGui.SameLine();
 
-        // Search fills remaining width; never overflow
         float avail = ImGui.GetContentRegionAvail().X;
         ImGui.SetNextItemWidth(Math.Max(120f, avail));
         ImGui.InputTextWithHint("##Search", "Search", ref m_search, 256);
@@ -408,10 +427,22 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.PushID(e.fullPath);
 
         var icon = e.isDir ? FolderIcon() : FileIcon(e.type);
+        bool selected = IsSelected(e.fullPath);
+
+        if (selected)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
+        }
+
         if (ImGui.Button(icon, new Vector2(iconSize, iconSize)))
         {
-            m_selectedPath = e.fullPath;
+            if (e.isDir) SelectFolder(e.fullPath);
+            else SelectFile(e.fullPath);
         }
+
+        if (selected)
+            ImGui.PopStyleColor(2);
 
         if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
@@ -432,8 +463,7 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.PopID();
         ImGui.EndGroup();
     }
-    
-       
+
     private void DrawGridWithScaleBar(List<Entry> entries)
     {
         float barH = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y * 2f;
@@ -456,7 +486,7 @@ public sealed class FileBrowserPanel : EditorPanel
         DrawGridScaleSlider();
         ImGui.EndChild();
     }
-    
+
     private void DrawGridScaleSlider()
     {
         ImGui.AlignTextToFramePadding();
@@ -509,12 +539,13 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGui.TableNextRow(ImGuiTableRowFlags.None, rowH);
             ImGui.TableSetColumnIndex(0);
 
-            bool selected = IsSamePath(m_selectedPath, e.fullPath);
+            bool selected = IsSelected(e.fullPath);
             string selId = $"##name_{e.fullPath}";
-            
+
             if (ImGui.Selectable(selId, selected, ImGuiSelectableFlags.SpanAllColumns, new Vector2(0, rowH)))
             {
-                m_selectedPath = e.fullPath;
+                if (e.isDir) SelectFolder(e.fullPath);
+                else SelectFile(e.fullPath);
             }
 
             if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
@@ -528,7 +559,7 @@ public sealed class FileBrowserPanel : EditorPanel
                 ImGui.EndPopup();
             }
 
-            // Col 0: Name (Selectable + draw text aligned like AlignTextToFramePadding)
+            // Col 0: Name
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(e.isDir ? FolderIcon() : FileIcon(e.type));
@@ -548,11 +579,10 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGui.EndTable();
     }
-    
+
     private void DrawListWithSortBar(List<Entry> entries)
     {
         float barH = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y * 2f;
-
         var avail = ImGui.GetContentRegionAvail();
         float listH = Math.Max(0f, avail.Y - barH);
 
@@ -626,14 +656,10 @@ public sealed class FileBrowserPanel : EditorPanel
     private void DrawCommonContextItems(string targetFolderNormalized)
     {
         if (ImGui.MenuItem("New Folder"))
-        {
             CreateNewFolder(targetFolderNormalized);
-        }
 
         if (ImGui.MenuItem("Reveal in Finder/Explorer"))
-        {
             RevealInSystem(targetFolderNormalized);
-        }
     }
 
     // ============================
@@ -647,14 +673,15 @@ public sealed class FileBrowserPanel : EditorPanel
         if (IsSamePath(dirNormalized, m_currentDir))
             return;
 
-        // Native dir for IO
         string dirNative = ToNativePath(dirNormalized);
         if (!Directory.Exists(dirNative))
             return;
 
         m_currentDir = dirNormalized;
         m_currentDirNative = dirNative;
-        m_selectedPath = null;
+
+        // Finder-like behavior: entering a folder clears selection
+        ClearSelection();
 
         if (pushHistory)
             PushHistory(dirNormalized);
@@ -715,7 +742,6 @@ public sealed class FileBrowserPanel : EditorPanel
             if (!Directory.Exists(m_currentDirNative))
                 return;
 
-            // Direct children => Source is "~"
             foreach (var d in Directory.GetDirectories(m_currentDirNative))
             {
                 if (IsHidden(d)) continue;
@@ -753,10 +779,6 @@ public sealed class FileBrowserPanel : EditorPanel
 
     private void RefreshSearchSnapshot(bool force)
     {
-        // rebuild when:
-        // - search query changed
-        // - fs changed (debounced)
-        // - TTL fallback
         if (!force)
         {
             bool queryChanged = !string.Equals(m_search, m_searchLast, StringComparison.Ordinal);
@@ -783,7 +805,6 @@ public sealed class FileBrowserPanel : EditorPanel
         m_searchLast = m_search;
         m_searchSnapshotTime = DateTime.UtcNow;
 
-        // If FS changed, consume version (so both normal & search paths align)
         m_fsAppliedVersion = Volatile.Read(ref m_fsChangeVersion);
 
         m_searchSnapshot.Clear();
@@ -800,9 +821,9 @@ public sealed class FileBrowserPanel : EditorPanel
             {
                 if (IsHidden(d)) continue;
 
-                string rel = GetRelativeDisplay(m_currentDirNative, d);     // e.g. "A/B"
-                string name = Path.GetFileName(d);                          // "B"
-                string src = BuildSourceFromRelative(rel);     // "~/A" or "~"
+                string rel = GetRelativeDisplay(m_currentDirNative, d);
+                string name = Path.GetFileName(d);
+                string src = BuildSourceFromRelative(rel);
 
                 m_searchSnapshot.entries.Add(new Entry(
                     fullPath: NormalizePath(d),
@@ -820,8 +841,8 @@ public sealed class FileBrowserPanel : EditorPanel
 
                 var fi = new FileInfo(f);
 
-                string rel = GetRelativeDisplay(m_currentDirNative, f);     // e.g. "A/a.bcd"
-                string src = BuildSourceFromRelative(rel);    // "~/A" or "~"
+                string rel = GetRelativeDisplay(m_currentDirNative, f);
+                string src = BuildSourceFromRelative(rel);
 
                 m_searchSnapshot.entries.Add(new Entry(
                     fullPath: NormalizePath(f),
@@ -850,7 +871,6 @@ public sealed class FileBrowserPanel : EditorPanel
                 e.source.Contains(s, StringComparison.OrdinalIgnoreCase));
         }
 
-        // directories first
         q = q.OrderByDescending(e => e.isDir);
 
         Func<Entry, object> key = m_sortField switch
@@ -921,14 +941,27 @@ public sealed class FileBrowserPanel : EditorPanel
             string oldNative = ToNativePath(oldPathNormalized);
             string newNative = ToNativePath(newPathNorm);
 
-            if (Directory.Exists(oldNative))
-                Directory.Move(oldNative, newNative);
-            else if (File.Exists(oldNative))
-                File.Move(oldNative, newNative);
-            else
-                return;
+            bool renamed = false;
 
-            RefreshSnapshot(force: true);
+            if (Directory.Exists(oldNative))
+            {
+                Directory.Move(oldNative, newNative);
+                renamed = true;
+            }
+            else if (File.Exists(oldNative))
+            {
+                File.Move(oldNative, newNative);
+                renamed = true;
+            }
+
+            if (renamed)
+            {
+                // keep selection on renamed item
+                if (IsSelected(oldPathNormalized))
+                    SelectPath(newPathNorm);
+
+                RefreshSnapshot(force: true);
+            }
         }
         catch (Exception e)
         {
@@ -978,12 +1011,26 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             string native = ToNativePath(pathNormalized);
 
-            if (Directory.Exists(native))
-                Directory.Delete(native, recursive: true);
-            else if (File.Exists(native))
-                File.Delete(native);
+            bool deleted = false;
 
-            RefreshSnapshot(force: true);
+            if (Directory.Exists(native))
+            {
+                Directory.Delete(native, recursive: true);
+                deleted = true;
+            }
+            else if (File.Exists(native))
+            {
+                File.Delete(native);
+                deleted = true;
+            }
+
+            if (deleted)
+            {
+                if (IsSelected(pathNormalized))
+                    ClearSelection();
+
+                RefreshSnapshot(force: true);
+            }
         }
         catch (Exception e)
         {
@@ -1012,6 +1059,9 @@ public sealed class FileBrowserPanel : EditorPanel
 
             string candidateNorm = NormalizePath(candidateNative);
             RefreshSnapshot(force: true);
+
+            // select then rename
+            SelectFolder(candidateNorm);
             BeginRename(candidateNorm);
         }
         catch (Exception e)
@@ -1120,9 +1170,45 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.EndChild();
     }
 
+    // ============================
+    // Selection API (extensible; no syncing)
+    // ============================
+    private void SelectPath(string? pathNormalized)
+    {
+        string? n = string.IsNullOrWhiteSpace(pathNormalized) ? null : NormalizePath(pathNormalized);
+        if (IsSamePath(n, m_selectedPath))
+            return;
+
+        m_selectedPath = n;
+    }
+
+    private void ClearSelection()
+    {
+        m_selectedPath = null;
+    }
+
+    private void SelectFile(string filePathNormalized)
+    {
+        // TODO: Future extension point: open inspector, preview, etc.
+        SelectPath(filePathNormalized);
+    }
+
+    private void SelectFolder(string folderPathNormalized)
+    {
+        // TODO: Future extension point: show folder meta, etc.
+        SelectPath(folderPathNormalized);
+    }
+
+    private bool IsSelected(string? pathNormalized)
+    {
+        if (string.IsNullOrWhiteSpace(pathNormalized) || string.IsNullOrWhiteSpace(m_selectedPath))
+            return false;
+
+        return IsSamePath(pathNormalized, m_selectedPath);
+    }
 
     // ============================
-    // Utilities
+    // Utility
     // ============================
     private static string NormalizePath(string p)
     {
@@ -1148,7 +1234,12 @@ public sealed class FileBrowserPanel : EditorPanel
     private static bool IsSamePath(string? a, string? b)
     {
         if (a == null || b == null) return false;
-        return string.Equals(NormalizePath(a).TrimEnd('/'), NormalizePath(b).TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
+        return string.Equals(
+            NormalizePath(a).TrimEnd('/'),
+            NormalizePath(b).TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 
     private static bool IsAncestorOrSelf(string ancestor, string path)
@@ -1175,7 +1266,7 @@ public sealed class FileBrowserPanel : EditorPanel
     }
 
     private static bool IsEditorFilteredFile(string file)
-    {
+    { 
         return file.EndsWith(AssetManager.C_ASSET_POSTFIX, StringComparison.OrdinalIgnoreCase);
     }
 

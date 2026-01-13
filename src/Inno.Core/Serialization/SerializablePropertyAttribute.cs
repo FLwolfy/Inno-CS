@@ -3,7 +3,7 @@ using System;
 namespace Inno.Core.Serialization;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class SerializablePropertyAttribute : Attribute
+public sealed class SerializablePropertyAttribute : Attribute
 {
     /// <summary>
     /// The visibility of the property.

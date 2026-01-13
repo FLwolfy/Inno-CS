@@ -5,6 +5,7 @@ using ImGuiNET;
 
 using Inno.Core.ECS;
 using Inno.Core.Events;
+using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.GUI;
 
@@ -21,6 +22,14 @@ public class HierarchyPanel : EditorPanel
 
     internal override void OnGUI()
     {
+        // Scrollable area for the whole hierarchy
+        ImGui.BeginChild(
+            "##HierarchyScroll",
+            new Vector2(0,0),
+            ImGuiChildFlags.None,
+            ImGuiWindowFlags.HorizontalScrollbar
+        );
+
         // Draw Scene root
         DrawSceneObjectRoot();
 
@@ -29,8 +38,8 @@ public class HierarchyPanel : EditorPanel
         {
             DrawRootGameObject(obj);
         }
-        
-        // Handle Menu Events
+
+        // Handle Menu Events (must be inside the child, so hover checks refer to this child)
         HandleMenu();
 
         // Apply delayed actions
@@ -38,6 +47,8 @@ public class HierarchyPanel : EditorPanel
         {
             m_pendingGuiUpdateAction.Dequeue().Invoke();
         }
+
+        ImGui.EndChild();
     }
 
     private void HandleMenu()
