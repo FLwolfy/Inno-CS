@@ -101,7 +101,10 @@ public class HierarchyPanel : EditorPanel
 
         // TreeNodeFlags with Selected flag
         var flags = hasChildren ? ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.OpenOnDoubleClick : ImGuiTreeNodeFlags.Leaf;
-        if (isSelected) { flags |= ImGuiTreeNodeFlags.Selected; }
+        if (isSelected)
+        {
+            flags |= ImGuiTreeNodeFlags.Selected;
+        }
 
         ////////////// Begin Tree Node //////////////
         var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
@@ -155,6 +158,9 @@ public class HierarchyPanel : EditorPanel
         }
         
         ////////////// End Tree Node //////////////
-        if (isOpenTree) { ImGui.TreePop(); }
+        if (isOpenTree)
+        {
+            ImGui.TreePop();
+        }
     }
 }

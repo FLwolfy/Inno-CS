@@ -143,11 +143,20 @@ internal class ImGuiNETVeldridController : IDisposable
         {
             m_baseCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_baseCfg.FontDataOwnedByAtlas = false;
+
+            m_baseCfg.OversampleH = 3;
+            m_baseCfg.OversampleV = 2;
+            m_baseCfg.PixelSnapH = false;
+
             m_mergeCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_mergeCfg.MergeMode = true;
-            m_mergeCfg.PixelSnapH = true;
             m_mergeCfg.FontDataOwnedByAtlas = false;
+
+            m_mergeCfg.OversampleH = 3;
+            m_mergeCfg.OversampleV = 3;
+            m_mergeCfg.PixelSnapH = true;
         }
+
         m_fontCache = new Dictionary<string, (IntPtr, int)>();
         m_iconSizeCache = new Dictionary<string, (float, (ushort, ushort))>();
         ImGuiNET.ImGui.GetIO().Fonts.AddFontDefault();

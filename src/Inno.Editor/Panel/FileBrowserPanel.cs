@@ -306,7 +306,6 @@ public sealed class FileBrowserPanel : EditorPanel
 
         var fi = new FileInfo(filePathNative);
         string type = ToType(fi.Extension);
-
         bool selected = IsSelected(full);
 
         var flags =
@@ -426,24 +425,49 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.BeginGroup();
         ImGui.PushID(e.fullPath);
 
-        var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
+        var drawList = ImGui.GetWindowDrawList();
         bool selected = IsSelected(e.fullPath);
+        string icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
 
-        if (selected)
+        Vector2 p0 = ImGui.GetCursorScreenPos();
+        Vector2 size = new Vector2(iconSize, iconSize);
+
+        ImGui.InvisibleButton("##grid_item_btn", size);
+
+        bool hovered = ImGui.IsItemHovered();
+        bool clicked = ImGui.IsItemClicked(ImGuiMouseButton.Left);
+
+        if (hovered || selected)
         {
-            ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
+            var col = ImGui.GetColorU32(selected ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered);
+            uint a = (uint)(hovered && !selected ? 80 : 110);
+            uint bg = (col & 0x00FFFFFFu) | (a << 24);
+            float rounding = 10f;
+            drawList.AddRectFilled(p0, p0 + size, bg, rounding);
         }
 
-        if (ImGui.Button(icon, new Vector2(iconSize, iconSize)))
+        ImFontPtr font = ImGui.GetFont();
+        float fontSize = iconSize;
+        uint iconCol = ImGui.GetColorU32(ImGuiCol.Text);
+
+        Vector2 textSize = ImGui.CalcTextSize(icon);
+        float scale = fontSize / ImGui.GetFontSize();
+        Vector2 scaledTextSize = textSize * scale;
+
+        Vector2 iconPos = new Vector2(
+            p0.x + (size.x - scaledTextSize.x) * 0.5f,
+            p0.y + (size.y - scaledTextSize.y) * 0.5f
+        );
+
+        drawList.AddText(font, fontSize, iconPos, iconCol, icon);
+
+        if (clicked)
         {
             if (e.isDir) SelectFolder(e.fullPath);
             else SelectFile(e.fullPath);
         }
 
-        if (selected) ImGui.PopStyleColor(2);
-
-        if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+        if (hovered && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
             if (e.isDir)
                 NavigateTo(e.fullPath, pushHistory: true);
@@ -462,6 +486,7 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.PopID();
         ImGui.EndGroup();
     }
+
 
     private void DrawGridWithScaleBar(List<Entry> entries)
     {
