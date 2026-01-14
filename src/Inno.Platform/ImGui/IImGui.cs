@@ -33,12 +33,23 @@ public enum ImGuiFontStyle
 }
 
 /// <summary>
+/// Identifies the size of the font used
+/// </summary>
+public enum ImGuiFontSize
+{
+    Small = 8,
+    Medium = 16,
+    Large = 32,
+}
+
+/// <summary>
 /// Interface for ImGui renderer abstraction.
 /// Responsible for handling frame lifecycle, rendering ImGui draw data,
 /// and binding textures for use in ImGui.
 /// </summary>
 public interface IImGui : IDisposable
 {
+    internal const ImGuiFontSize C_DEFAULT_FONT_SIZE = ImGuiFontSize.Medium;
     internal static IImGui impl { get; set; } = new ImGuiNoOp();
     
     /// <summary>
@@ -71,8 +82,14 @@ public interface IImGui : IDisposable
     /// <summary>
     /// Push a specific font style.
     /// </summary>
-    static void UseFont(ImGuiFontStyle style) => impl.UseFontImpl(style);
-    internal void UseFontImpl(ImGuiFontStyle style);
+    static void UseFont(ImGuiFontStyle style, ImGuiFontSize size = C_DEFAULT_FONT_SIZE) => impl.UseFontImpl(style, size);
+    internal void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size);
+    
+    /// <summary>
+    /// Push a specific font style.
+    /// </summary>
+    static void UseFont(ImGuiFontStyle style, float size) => impl.UseFontImpl(style, size);
+    internal void UseFontImpl(ImGuiFontStyle style, float size);
     
     /// <summary>
     /// Zoom in or out based on the given zoom rate.

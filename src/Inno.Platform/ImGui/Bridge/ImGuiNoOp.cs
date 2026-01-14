@@ -29,7 +29,12 @@ internal class ImGuiNoOp : IImGui
         // Do nothing
     }
 
-    public void UseFontImpl(ImGuiFontStyle style)
+    public void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size)
+    {
+        // Do nothing
+    }
+    
+    public void UseFontImpl(ImGuiFontStyle style, float size)
     {
         // Do nothing
     }

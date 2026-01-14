@@ -10,10 +10,10 @@ namespace Inno.Editor.Core;
 
 public class EditorLayer() : Layer("EditorLayer")
 {
-    private static readonly float MIN_ZOOM_RATE = 0.5f;
-    private static readonly float MAX_ZOOM_RATE = 3.1f;
-    private static readonly float ZOOM_RATE_STEP = 0.2f;
-    private static readonly float DEFAULT_ZOOM_RATE = 1.5f;
+    private static readonly float MIN_ZOOM_RATE = 0.2f;
+    private static readonly float MAX_ZOOM_RATE = 2.0f;
+    private static readonly float ZOOM_RATE_STEP = 0.1f;
+    private static readonly float DEFAULT_ZOOM_RATE = 1.0f;
     
     private float m_currentZoomRate;
 
