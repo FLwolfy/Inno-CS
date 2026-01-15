@@ -31,7 +31,6 @@ public static class EditorImGuiEx
     public static void DrawIconAndText(string iconText, string text, float iconGap = 1.5f)
     {
         float iconCellWidth = ImGui.GetFontSize() + iconGap;
-
         ImGui.BeginGroup();
 
         // Row info
@@ -41,7 +40,6 @@ public static class EditorImGuiEx
         var textFont = currentFont.Item1;
         var fontSize = currentFont.Item2;
 
-        
         // icon
         IImGui.UseFont(ImGuiFontStyle.Font, fontSize);
         Vector2 iconSize = ImGui.CalcTextSize(iconText);

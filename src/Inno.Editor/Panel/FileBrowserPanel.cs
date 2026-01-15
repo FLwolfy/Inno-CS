@@ -585,7 +585,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
             // Col 0: Name
             ImGui.SameLine();
-            ImGui.AlignTextToFramePadding();
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + ImGui.GetStyle().FramePadding.Y);
             EditorImGuiEx.DrawIconAndText(e.isDir ? ImGuiIcon.Folder : FileIcon(e.type), e.name);
 
             // Col 1: Type
