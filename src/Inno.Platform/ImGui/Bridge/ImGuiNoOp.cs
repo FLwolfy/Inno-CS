@@ -33,10 +33,10 @@ internal class ImGuiNoOp : IImGui
     {
         // Do nothing
     }
-    
-    public void UseFontImpl(ImGuiFontStyle style, float size)
+
+    public (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl()
     {
-        // Do nothing
+        return default;
     }
 
     public void ZoomImpl(float zoomRate)

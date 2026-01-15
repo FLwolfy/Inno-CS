@@ -32,9 +32,12 @@ public static class EditorImGuiEx
     {
         float w = ImGui.GetFontSize() * iconGap;
         float x0 = ImGui.GetCursorPosX();
+        var currentFont = IImGui.GetCurrentFont();
         
+        IImGui.UseFont(ImGuiFontStyle.Font, currentFont.Item2);
         ImGui.TextUnformatted(iconText);
         ImGui.SameLine();
+        IImGui.UseFont(currentFont.Item1, currentFont.Item2);
         ImGui.SetCursorPosX(x0 + w);
         ImGui.TextUnformatted(text);
     }

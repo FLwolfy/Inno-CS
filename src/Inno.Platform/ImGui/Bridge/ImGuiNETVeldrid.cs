@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using Veldrid;
 using ImGuiNET;
-
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Graphics.Bridge;
@@ -26,11 +25,14 @@ internal class ImGuiNETVeldrid : IImGui
     public IntPtr virtualContextPtrImpl { get; }
     
     // Fonts
+    private float m_zoomRate;
+    private (ImGuiFontStyle, ImGuiFontSize) m_currentFont;
     private readonly float m_dpiScale;
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontRegular = new();
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontBold = new();
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontItalic = new();
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontBoldItalic = new();
+    private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_icon = new();
     
     // IO
     private readonly string m_iniPath;
@@ -51,13 +53,17 @@ internal class ImGuiNETVeldrid : IImGui
 
         var (sx, sy) = VeldridSdl2HiDpi.GetFramebufferScale(m_veldridWindow.inner);
         m_dpiScale = MathF.Max(sx, sy);
+        
+        // Fonts
+        m_imGuiVeldridController.ClearAllFonts();
+        SetupFonts(m_dpiScale);
+        SetupIcons(m_dpiScale);
 
         // Main Context
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
-        SetupFonts(m_dpiScale);
 
         // Main IO
         m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
@@ -70,7 +76,6 @@ internal class ImGuiNETVeldrid : IImGui
         ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupImGuiStyle();
-        SetupFonts(m_dpiScale);
 
         // Virtual IO: Ensure virtual context never saves ini (avoid main/virtual competing)
         var io = ImGuiNET.ImGui.GetIO();
@@ -96,6 +101,9 @@ internal class ImGuiNETVeldrid : IImGui
 	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
 	    m_imGuiVeldridController.Update(deltaTime, m_veldridWindow.inputSnapshot, m_imGuiVeldridController.PumpExtraWindowInputs());
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
+	    
+	    // Default Font
+	    UseFontImpl(ImGuiFontStyle.Regular, IImGui.C_DEFAULT_FONT_SIZE);
     }
 
     public void EndLayoutImpl()
@@ -150,31 +158,17 @@ internal class ImGuiNETVeldrid : IImGui
 
     public void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size)
     {
-	    var font = style switch
-	    {
-		    ImGuiFontStyle.Bold => m_fontBold,
-		    ImGuiFontStyle.Italic => m_fontItalic,
-		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
-		    _ => m_fontRegular
-	    };
-		
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    ImGuiNET.ImGui.PushFont(font[size]);
+	    m_currentFont = (style, size);
+	    var sizeInFloat = (float)size * m_zoomRate;
 	    
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    ImGuiNET.ImGui.PushFont(font[size]);
-    }
-    
-    public void UseFontImpl(ImGuiFontStyle style, float size)
-    {
 	    // 1. Select font family by style
 	    var family = style switch
 	    {
 		    ImGuiFontStyle.Bold       => m_fontBold,
 		    ImGuiFontStyle.Italic     => m_fontItalic,
 		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
+		    
+		    ImGuiFontStyle.Font		  => m_icon,
 		    _                         => m_fontRegular
 	    };
 
@@ -185,11 +179,11 @@ internal class ImGuiNETVeldrid : IImGui
 
 	    foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
 	    {
-		    float enumSize = (float)(int)s;
-		    float dist = MathF.Abs(size - enumSize);
+		    float enumSize = (float)s;
+		    float dist = MathF.Abs(sizeInFloat - enumSize);
 
 		    // exact hit (with tolerance)
-		    if (MathHelper.AlmostEquals(size, enumSize))
+		    if (MathHelper.AlmostEquals(sizeInFloat, enumSize))
 		    {
 			    nearest = s;
 			    exactMatch = true;
@@ -204,26 +198,30 @@ internal class ImGuiNETVeldrid : IImGui
 		    }
 	    }
 
-	    float scale = exactMatch ? 1f : size / (float)(int)nearest;
+	    float scale = exactMatch ? 1f : sizeInFloat / (float)nearest;
 	    var font = family[nearest];
 
 	    // 4. Apply to virtual context
 	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.PushFont(font);
-	    ImGuiNET.ImGui.SetWindowFontScale(scale);
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
 
 	    // 5. Apply to main context
 	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.PushFont(font);
-	    ImGuiNET.ImGui.SetWindowFontScale(scale);
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+    }
+
+    public (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl()
+    {
+	    return m_currentFont;
     }
 
     public void ZoomImpl(float zoomRate)
     {
-	    var scale = zoomRate * m_dpiScale;
-	    SetupFonts(scale);
+	    m_zoomRate = zoomRate;
     }
     
     public void SetStorageDataImpl(string key, object? value)
@@ -249,19 +247,31 @@ internal class ImGuiNETVeldrid : IImGui
     
     private void SetupFonts(float scale)
 	{
-	    m_imGuiVeldridController.ClearAllFonts();
-
 	    foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
 	    {
 		    var sizePixels = (float)fontSize * scale;
-		    
-		    m_imGuiVeldridController.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * 0.8f, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
-		    m_imGuiVeldridController.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * 0.8f, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
 
 		    m_fontRegular[fontSize] = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Regular.ttf", sizePixels);
 		    m_fontBold[fontSize] = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Bold.ttf", sizePixels);
 		    m_fontItalic[fontSize] = m_imGuiVeldridController.AddFontBase("JetBrainsMono-Italic.ttf", sizePixels);
 		    m_fontBoldItalic[fontSize] = m_imGuiVeldridController.AddFontBase("JetBrainsMono-BoldItalic.ttf", sizePixels);
+	    }
+
+	    m_imGuiVeldridController.RecreateFontDeviceTexture();
+	}
+    
+    private void SetupIcons(float scale)
+    {
+	    const float c_iconScaleMultiplier = 1f;
+		
+	    foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
+	    {
+		    var sizePixels = (float)fontSize * scale;
+		    
+		    m_imGuiVeldridController.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+		    m_imGuiVeldridController.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+
+		    m_icon[fontSize] = m_imGuiVeldridController.AddIcons();
 	    }
 
 	    m_imGuiVeldridController.RecreateFontDeviceTexture();

@@ -29,7 +29,9 @@ public enum ImGuiFontStyle
     Regular,
     Bold,
     Italic,
-    BoldItalic
+    BoldItalic,
+    
+    Font
 }
 
 /// <summary>
@@ -37,10 +39,30 @@ public enum ImGuiFontStyle
 /// </summary>
 public enum ImGuiFontSize
 {
-    Small = 8,
-    Medium = 16,
-    Large = 32,
+    // Small text / dense UI
+    // XS      = 8,
+    // Small   = 10,
+    // SmallM  = 12,
+
+    // Default UI
+    Medium  = 16,
+    // MediumL = 18,
+    // Large   = 20,
+    //
+    // // Headings / emphasized UI
+    // XL      = 24,
+    // XXL     = 28,
+    // XXXL    = 32,
+    //
+    // // Big titles
+    // Huge    = 40,
+    // HugeL   = 48,
+    // HugeXL  = 56,
+    //
+    // // Maximum common editor size
+    // Massive = 72,
 }
+
 
 /// <summary>
 /// Interface for ImGui renderer abstraction.
@@ -86,10 +108,11 @@ public interface IImGui : IDisposable
     internal void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size);
     
     /// <summary>
-    /// Push a specific font style.
+    /// Get the font style and size in the current context.
     /// </summary>
-    static void UseFont(ImGuiFontStyle style, float size) => impl.UseFontImpl(style, size);
-    internal void UseFontImpl(ImGuiFontStyle style, float size);
+    /// <returns></returns>
+    static (ImGuiFontStyle, ImGuiFontSize) GetCurrentFont() => impl.GetCurrentFontImpl();
+    internal (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl();
     
     /// <summary>
     /// Zoom in or out based on the given zoom rate.

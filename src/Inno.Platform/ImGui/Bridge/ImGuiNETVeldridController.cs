@@ -85,8 +85,11 @@ internal class ImGuiNETVeldridController : IDisposable
     // Font
     private readonly ImFontConfigPtr m_baseCfg;
     private readonly ImFontConfigPtr m_mergeCfg;
+    private readonly List<string> m_iconNames = new();
+    private readonly List<IntPtr> m_fontVirtualContexts = new();
     private readonly Dictionary<string, (IntPtr, int)> m_fontCache;
     private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache;
+    private readonly Dictionary<string, IntPtr> m_rangePtrCache = new();
     
     // ============================================================
     // Initialization and Loads
@@ -143,7 +146,7 @@ internal class ImGuiNETVeldridController : IDisposable
         {
             m_baseCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_baseCfg.FontDataOwnedByAtlas = false;
-            m_baseCfg.PixelSnapH = false;
+            m_baseCfg.PixelSnapH = true;
 
             m_mergeCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_mergeCfg.MergeMode = true;
@@ -525,15 +528,46 @@ internal class ImGuiNETVeldridController : IDisposable
         
         foreach (var (ptr, _) in m_fontCache.Values) if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr);
         m_fontCache.Clear();
+        
+        foreach (var p in m_rangePtrCache.Values) if (p != IntPtr.Zero) Marshal.FreeHGlobal(p);
+        m_rangePtrCache.Clear();
+        
+        m_iconNames.Clear();
         m_iconSizeCache.Clear();
     }
 
-    public ImFontPtr RegisterFontIcon(string baseFontFile, float sizePixels, (ushort, ushort) range)
+    public void RegisterFontIcon(string baseFontFile, float sizePixels, (ushort, ushort) range)
     {
-        var iconPtr = LoadEmbeddedFontTTF(baseFontFile, out _);
+        LoadEmbeddedFontTTF(baseFontFile, out _);
+        m_iconNames.Add(baseFontFile);
         m_iconSizeCache[baseFontFile] = (sizePixels, range);
+    }
+
+    public ImFontPtr AddIcons()
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        ImFontPtr iconFont = new ImFontPtr();
+
+        bool first = true;
+        foreach (var iconName in m_iconNames)
+        {
+            var fontCache = m_fontCache[iconName];
+            var sizeCache = m_iconSizeCache[iconName];
+            var rangePtr = GetOrCreateIconRangePtr(iconName, sizeCache.Item2);
+
+            if (first)
+            {
+                iconFont = io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_baseCfg, rangePtr);
+                first = false;
+            }
+            else
+            {
+                io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_mergeCfg, rangePtr);
+            }
+            
+        }
         
-        return iconPtr;
+        return iconFont;
     }
 
     public ImFontPtr AddFontBase(string baseFontFile, float sizePixels)
@@ -542,29 +576,6 @@ internal class ImGuiNETVeldridController : IDisposable
         var basePtr = LoadEmbeddedFontTTF(baseFontFile, out var baseLen);
         var baseFont = io.Fonts.AddFontFromMemoryTTF(basePtr, baseLen, sizePixels, m_baseCfg);
 
-        // Merge icon glyphs into "baseFont"
-        foreach (var iconName in m_iconSizeCache.Keys)
-        {
-            var fontCache = m_fontCache[iconName];
-            var sizeCache = m_iconSizeCache[iconName];
-            
-            nint iconRanges;
-            unsafe
-            {
-#pragma warning disable CA2014
-                ushort* ranges = stackalloc ushort[]
-                {
-                    sizeCache.Item2.Item1, sizeCache.Item2.Item2,
-                    0
-                };
-#pragma warning restore CA2014
-
-                iconRanges = (nint)ranges;
-            }
-            
-            io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_mergeCfg, iconRanges);
-        }
-        
         return baseFont;
     }
     
@@ -597,7 +608,26 @@ internal class ImGuiNETVeldridController : IDisposable
         length = fontData.Length;
         return ptr;
     }
+    
+    private IntPtr GetOrCreateIconRangePtr(string iconName, (ushort start, ushort end) range)
+    {
+        string key = $"{iconName}:{range.start:X4}-{range.end:X4}";
+        if (m_rangePtrCache.TryGetValue(key, out var p) && p != IntPtr.Zero)
+            return p;
 
+        IntPtr mem = Marshal.AllocHGlobal(sizeof(ushort) * 3);
+
+        unsafe
+        {
+            ushort* u = (ushort*)mem;
+            u[0] = range.start;
+            u[1] = range.end;
+            u[2] = 0;
+        }
+
+        m_rangePtrCache[key] = mem;
+        return mem;
+    }
     
     /// <summary>
     /// Recreates the device texture used to render text.
