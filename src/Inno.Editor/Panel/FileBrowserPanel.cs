@@ -130,9 +130,6 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 10));
         ImGui.BeginChild("##FileBrowserRoot", new Vector2(0, 0));
 
-        DrawToolbar();
-        ImGui.Separator();
-
         float statusH = ImGui.GetFrameHeight(); // fits SmallButton nicely
         var avail = ImGui.GetContentRegionAvail();
         float bodyH = Math.Max(0f, avail.Y - statusH - 6f);
@@ -190,6 +187,7 @@ public sealed class FileBrowserPanel : EditorPanel
         // Right: content
         {
             ImGui.BeginChild("##Content", new Vector2(0, 0));
+            DrawToolbar();
             DrawContent();
             ImGui.EndChild();
         }
