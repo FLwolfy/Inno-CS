@@ -69,7 +69,7 @@ public sealed class FileBrowserPanel : EditorPanel
     private bool m_sortAscending = true;
 
     // Grid scale
-    private const float C_GRID_SCALE_MIN = 0.5f;
+    private const float C_GRID_SCALE_MIN = 0.2f;
     private const float C_GRID_SCALE_MAX = 5.0f;
     private float m_gridScale = 1.0f;
 
