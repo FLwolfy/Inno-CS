@@ -47,6 +47,7 @@ internal class ImGuiNETVeldridController : IDisposable
 
     // Window info
     private readonly ImGuiNETVeldridWindow m_mainImGuiWindow;
+    // ReSharper disable once CollectionNeverQueried.Local
     private readonly Dictionary<uint, ImGuiNETVeldridWindow> m_windowHolders = new(); // keep this to avoid GC
     private bool m_controlDown;
     private bool m_shiftDown;
@@ -86,7 +87,6 @@ internal class ImGuiNETVeldridController : IDisposable
     private readonly ImFontConfigPtr m_baseCfg;
     private readonly ImFontConfigPtr m_mergeCfg;
     private readonly List<string> m_iconNames = new();
-    private readonly List<IntPtr> m_fontVirtualContexts = new();
     private readonly Dictionary<string, (IntPtr, int)> m_fontCache;
     private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache;
     private readonly Dictionary<string, IntPtr> m_rangePtrCache = new();
@@ -147,6 +147,8 @@ internal class ImGuiNETVeldridController : IDisposable
             m_baseCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_baseCfg.FontDataOwnedByAtlas = false;
             m_baseCfg.PixelSnapH = true;
+            m_baseCfg.OversampleH = 2;
+            m_baseCfg.OversampleV = 2;
 
             m_mergeCfg = ImGuiNative.ImFontConfig_ImFontConfig();
             m_mergeCfg.MergeMode = true;

@@ -586,13 +586,12 @@ public sealed class FileBrowserPanel : EditorPanel
             // Col 0: Name
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
-            var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
-            EditorImGuiEx.DrawIconAndText(icon, e.name);
+            EditorImGuiEx.DrawIconAndText(e.isDir ? ImGuiIcon.Folder : FileIcon(e.type), e.name);
 
             // Col 1: Type
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted(e.isDir ? "Folder" : e.type);
+            ImGui.TextUnformatted(e.isDir ? "FOLDER" : e.type);
 
             // Col 2: Source
             ImGui.TableSetColumnIndex(2);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Veldrid;
 using ImGuiNET;
+using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Graphics.Bridge;
@@ -262,7 +263,7 @@ internal class ImGuiNETVeldrid : IImGui
     
     private void SetupIcons(float scale)
     {
-	    const float c_iconScaleMultiplier = 1f;
+	    const float c_iconScaleMultiplier = 0.8f;
 		
 	    foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
 	    {

@@ -35,34 +35,22 @@ public enum ImGuiFontStyle
 }
 
 /// <summary>
-/// Identifies the size of the font used
+/// Identifies the size of the font used.
 /// </summary>
 public enum ImGuiFontSize
 {
-    // Small text / dense UI
-    // XS      = 8,
-    // Small   = 10,
-    // SmallM  = 12,
+    // Tips
+    Tiny    = 8,
+    Small   = 12,
 
-    // Default UI
+    // Text
     Medium  = 16,
-    // MediumL = 18,
-    // Large   = 20,
-    //
-    // // Headings / emphasized UI
-    // XL      = 24,
-    // XXL     = 28,
-    // XXXL    = 32,
-    //
-    // // Big titles
-    // Huge    = 40,
-    // HugeL   = 48,
-    // HugeXL  = 56,
-    //
-    // // Maximum common editor size
-    // Massive = 72,
+    Large   = 24,
+    Huge    = 32,
+    
+    // Titles
+    Massive = 48
 }
-
 
 /// <summary>
 /// Interface for ImGui renderer abstraction.

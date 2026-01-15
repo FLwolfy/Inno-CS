@@ -101,15 +101,14 @@ public class HierarchyPanel : EditorPanel
 
         // TreeNodeFlags with Selected flag
         var flags = hasChildren ? ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.OpenOnDoubleClick : ImGuiTreeNodeFlags.Leaf;
+        flags |= ImGuiTreeNodeFlags.SpanFullWidth;
         if (isSelected)
         {
             flags |= ImGuiTreeNodeFlags.Selected;
         }
 
         ////////////// Begin Tree Node //////////////
-        var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
-        var icon = isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube;
-        bool isOpenTree = ImGui.TreeNodeEx($"{icon} {obj.name}###{obj.id}", flags);
+        bool isOpenTree = ImGui.TreeNodeEx($"###{obj.id}", flags);
         
         // Handle Right Click menu
         if (ImGui.BeginPopupContextItem($"Popup_{obj.id}"))
@@ -150,6 +149,11 @@ public class HierarchyPanel : EditorPanel
             }
             ImGui.EndDragDropTarget();
         }
+        
+        // Tree Node Text
+        var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
+        ImGui.SameLine();
+        EditorImGuiEx.DrawIconAndText(isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube, obj.name);
 
         // Draw Children
         if (hasChildren && isOpenTree)

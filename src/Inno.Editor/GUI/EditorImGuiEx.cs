@@ -28,18 +28,33 @@ public static class EditorImGuiEx
     }
     
     // Icon
-    public static void DrawIconAndText(string iconText, string text, float iconGap = 1.2f)
+    public static void DrawIconAndText(string iconText, string text, float iconGap = 1.5f)
     {
-        float w = ImGui.GetFontSize() * iconGap;
-        float x0 = ImGui.GetCursorPosX();
+        float iconCellWidth = ImGui.GetFontSize() + iconGap;
+
+        ImGui.BeginGroup();
+
+        // Row info
+        float rowHeight = ImGui.GetFrameHeight();
+        Vector2 rowStart = ImGui.GetCursorScreenPos();
         var currentFont = IImGui.GetCurrentFont();
+        var textFont = currentFont.Item1;
+        var fontSize = currentFont.Item2;
+
         
-        IImGui.UseFont(ImGuiFontStyle.Font, currentFont.Item2);
+        // icon
+        IImGui.UseFont(ImGuiFontStyle.Font, fontSize);
+        Vector2 iconSize = ImGui.CalcTextSize(iconText);
+        float iconYOffset = (rowHeight - iconSize.y) * 0.5f - ImGui.GetStyle().FramePadding.Y;
+        ImGui.SetCursorScreenPos(new Vector2(rowStart.x, rowStart.y + iconYOffset));
         ImGui.TextUnformatted(iconText);
-        ImGui.SameLine();
-        IImGui.UseFont(currentFont.Item1, currentFont.Item2);
-        ImGui.SetCursorPosX(x0 + w);
+
+        // Text
+        IImGui.UseFont(textFont, fontSize);
+        ImGui.SetCursorScreenPos(new Vector2(rowStart.x + iconCellWidth, rowStart.y));
         ImGui.TextUnformatted(text);
+        
+        ImGui.EndGroup();
     }
     
     // Gizmos Overlay
