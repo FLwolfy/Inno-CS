@@ -20,11 +20,11 @@ public sealed class FileBrowserPanel : EditorPanel
     public override string title => "File";
 
     // Splitter
-    private const float C_LEFT_DEFAULT_WIDTH = 280f;
+    private const float C_SPLITTER_DEFAULT_WIDTH = 280f;
     private const float C_SPLITTER_WIDTH = 3f;
     private const float C_LEFT_MIN_WIDTH = 10f;
     private const float C_RIGHT_MIN_WIDTH = 20f;
-    private float m_leftWidth = C_LEFT_DEFAULT_WIDTH;
+    private float m_leftWidth;
     private float m_leftRatio = -1f; // keep ratio when window resizes
 
     // Grid
@@ -39,6 +39,10 @@ public sealed class FileBrowserPanel : EditorPanel
 
     // Selection
     private string? m_selectedPath;
+
+    // Reveal selection in tree (one-frame force-open)
+    private readonly HashSet<string> m_revealOpenPaths = new(StringComparer.OrdinalIgnoreCase);
+    private bool m_revealOpenPending;
 
     // Cached directory snapshot
     private const double C_SNAPSHOT_TTL_SECONDS = 0.5;
@@ -113,8 +117,10 @@ public sealed class FileBrowserPanel : EditorPanel
         // Selection
         m_selectedPath = null;
 
-        PushHistory(m_currentDir);
+        // UI
+        m_leftWidth = IImGui.GetStorageData("Editor.File.SplitterLeftWidth", C_SPLITTER_DEFAULT_WIDTH);
 
+        PushHistory(m_currentDir);
         SetupWatcher();
         RefreshSnapshot(force: true);
     }
@@ -149,6 +155,13 @@ public sealed class FileBrowserPanel : EditorPanel
 
             DrawDirectoryTree(m_rootPathNative, m_rootPath);
             ImGui.EndChild();
+        }
+
+        // Clear one-frame reveal request after tree has been rendered
+        if (m_revealOpenPending)
+        {
+            m_revealOpenPending = false;
+            m_revealOpenPaths.Clear();
         }
 
         // Middle: Splitter
@@ -232,11 +245,18 @@ public sealed class FileBrowserPanel : EditorPanel
         var flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanFullWidth;
         if (selected) flags |= ImGuiTreeNodeFlags.Selected;
 
-        bool shouldOpen =
-            IsAncestorOrSelf(pathNormalized, m_currentDir) ||
-            (m_selectedPath != null && IsAncestorOrSelf(pathNormalized, m_selectedPath));
+        // Keep currentDir open behavior
+        bool shouldOpen = IsAncestorOrSelf(pathNormalized, m_currentDir);
 
-        ImGui.SetNextItemOpen(shouldOpen, ImGuiCond.Once);
+        // One-frame forced reveal for selection path chain
+        if (m_revealOpenPending && m_revealOpenPaths.Contains(pathNormalized))
+        {
+            ImGui.SetNextItemOpen(true, ImGuiCond.Always);
+        }
+        else
+        {
+            ImGui.SetNextItemOpen(shouldOpen, ImGuiCond.Once);
+        }
 
         bool open = ImGui.TreeNodeEx($"##tree_{pathNormalized}", flags);
 
@@ -407,7 +427,7 @@ public sealed class FileBrowserPanel : EditorPanel
         foreach (var e in entries)
         {
             ImGui.TableSetColumnIndex(col);
-            DrawGridItem(e, iconSize);
+            DrawGridItem(e, iconSize, 2.5f);
 
             col++;
             if (col >= cols)
@@ -420,7 +440,7 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.EndTable();
     }
 
-    private void DrawGridItem(Entry e, float iconSize)
+    private void DrawGridItem(Entry e, float itemSize, float iconScale)
     {
         ImGui.BeginGroup();
         ImGui.PushID(e.fullPath);
@@ -430,7 +450,7 @@ public sealed class FileBrowserPanel : EditorPanel
         string icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
 
         Vector2 p0 = ImGui.GetCursorScreenPos();
-        Vector2 size = new Vector2(iconSize, iconSize);
+        Vector2 size = new Vector2(itemSize, itemSize);
 
         ImGui.InvisibleButton("##grid_item_btn", size);
 
@@ -446,20 +466,24 @@ public sealed class FileBrowserPanel : EditorPanel
             drawList.AddRectFilled(p0, p0 + size, bg, rounding);
         }
 
+        var currentFont = IImGui.GetCurrentFont();
+        var gridScale = itemSize / C_GRID_ICON_SIZE;
+        float fontSize = iconScale * gridScale * currentFont.size;
+
+        IImGui.UseFont(ImGuiFontStyle.Icon, fontSize);
         ImFontPtr font = ImGui.GetFont();
-        float fontSize = iconSize;
+
         uint iconCol = ImGui.GetColorU32(ImGuiCol.Text);
-
-        Vector2 textSize = ImGui.CalcTextSize(icon);
         float scale = fontSize / ImGui.GetFontSize();
+        Vector2 textSize = ImGui.CalcTextSize(icon);
         Vector2 scaledTextSize = textSize * scale;
-
         Vector2 iconPos = new Vector2(
             p0.x + (size.x - scaledTextSize.x) * 0.5f,
             p0.y + (size.y - scaledTextSize.y) * 0.5f
         );
 
         drawList.AddText(font, fontSize, iconPos, iconCol, icon);
+        IImGui.UseFont(currentFont); // This is to be used for the drawList
 
         if (clicked)
         {
@@ -469,8 +493,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
         if (hovered && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
-            if (e.isDir)
-                NavigateTo(e.fullPath, pushHistory: true);
+            if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
         }
 
         if (ImGui.BeginPopupContextItem("##item_ctx"))
@@ -479,14 +502,14 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGui.EndPopup();
         }
 
-        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + iconSize);
+        IImGui.UseFont(currentFont); // This is to be used for the regular context
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + itemSize);
         ImGui.TextWrapped(e.name);
         ImGui.PopTextWrapPos();
 
         ImGui.PopID();
         ImGui.EndGroup();
     }
-
 
     private void DrawGridWithScaleBar(List<Entry> entries)
     {
@@ -1109,6 +1132,7 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             float delta = ImGui.GetIO().MouseDelta.X;
             leftWidth = Math.Clamp(leftWidth + delta, minLeft, maxLeft);
+            IImGui.SetStorageData("Editor.File.SplitterLeftWidth", leftWidth);
         }
 
         if (ImGui.IsItemHovered())
@@ -1202,11 +1226,67 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         m_selectedPath = n;
+
+        // Ensure tree opens to reveal selection
+        BuildRevealOpenPathsForSelection(n);
+    }
+
+    private void BuildRevealOpenPathsForSelection(string? selectedNormalized)
+    {
+        m_revealOpenPaths.Clear();
+        m_revealOpenPending = false;
+
+        if (string.IsNullOrWhiteSpace(selectedNormalized))
+            return;
+
+        // If selection is a file, reveal its parent folder chain
+        string targetFolderNorm = GetFolderNormalizedForPath(selectedNormalized);
+
+        // Must be inside root to reveal
+        if (!IsAncestorOrSelf(m_rootPath, targetFolderNorm))
+            return;
+
+        // Build root -> ... -> target chain
+        string running = m_rootPath.TrimEnd('/');
+        var parts = SplitPathRelativeToRoot(targetFolderNorm, m_rootPath);
+
+        m_revealOpenPaths.Add(m_rootPath);
+
+        foreach (var part in parts)
+        {
+            running = NormalizePath(Path.Combine(running, part));
+            m_revealOpenPaths.Add(running);
+        }
+
+        m_revealOpenPending = true;
+    }
+
+    private string GetFolderNormalizedForPath(string pathNormalized)
+    {
+        try
+        {
+            string native = ToNativePath(pathNormalized);
+
+            if (Directory.Exists(native))
+                return NormalizePath(native);
+
+            string? parent = Path.GetDirectoryName(native);
+            if (string.IsNullOrWhiteSpace(parent))
+                return pathNormalized;
+
+            return NormalizePath(parent);
+        }
+        catch
+        {
+            return pathNormalized;
+        }
     }
 
     private void ClearSelection()
     {
         m_selectedPath = null;
+        m_revealOpenPending = false;
+        m_revealOpenPaths.Clear();
     }
 
     private void SelectFile(string filePathNormalized)
@@ -1288,7 +1368,7 @@ public sealed class FileBrowserPanel : EditorPanel
     }
 
     private static bool IsEditorFilteredFile(string file)
-    { 
+    {
         return file.EndsWith(AssetManager.C_ASSET_POSTFIX, StringComparison.OrdinalIgnoreCase);
     }
 

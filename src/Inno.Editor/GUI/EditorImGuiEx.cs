@@ -37,18 +37,16 @@ public static class EditorImGuiEx
         float rowHeight = ImGui.GetFrameHeight();
         Vector2 rowStart = ImGui.GetCursorScreenPos();
         var currentFont = IImGui.GetCurrentFont();
-        var textFont = currentFont.Item1;
-        var fontSize = currentFont.Item2;
 
         // icon
-        IImGui.UseFont(ImGuiFontStyle.Font, fontSize);
+        IImGui.UseFont(ImGuiFontStyle.Icon, currentFont.size);
         Vector2 iconSize = ImGui.CalcTextSize(iconText);
         float iconYOffset = (rowHeight - iconSize.y) * 0.5f - ImGui.GetStyle().FramePadding.Y;
         ImGui.SetCursorScreenPos(new Vector2(rowStart.x, rowStart.y + iconYOffset));
         ImGui.TextUnformatted(iconText);
 
         // Text
-        IImGui.UseFont(textFont, fontSize);
+        IImGui.UseFont(currentFont);
         ImGui.SetCursorScreenPos(new Vector2(rowStart.x + iconCellWidth, rowStart.y));
         ImGui.TextUnformatted(text);
         

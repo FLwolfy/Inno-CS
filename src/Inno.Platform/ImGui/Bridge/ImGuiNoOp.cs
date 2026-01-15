@@ -28,13 +28,13 @@ internal class ImGuiNoOp : IImGui
     {
         // Do nothing
     }
-
-    public void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size)
+    
+    public void UseFontImpl(ImGuiFontStyle style, float? size)
     {
         // Do nothing
     }
 
-    public (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl()
+    public ImGuiAlias GetCurrentFontImpl()
     {
         return default;
     }

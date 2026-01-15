@@ -31,7 +31,7 @@ public enum ImGuiFontStyle
     Italic,
     BoldItalic,
     
-    Font
+    Icon
 }
 
 /// <summary>
@@ -52,6 +52,12 @@ public enum ImGuiFontSize
     Massive = 48
 }
 
+public readonly struct ImGuiAlias(ImGuiFontStyle style, float size)
+{
+    public readonly ImGuiFontStyle style = style;
+    public readonly float size = size;
+}
+
 /// <summary>
 /// Interface for ImGui renderer abstraction.
 /// Responsible for handling frame lifecycle, rendering ImGui draw data,
@@ -61,6 +67,7 @@ public interface IImGui : IDisposable
 {
     internal const ImGuiFontSize C_DEFAULT_FONT_SIZE = ImGuiFontSize.Medium;
     internal static IImGui impl { get; set; } = new ImGuiNoOp();
+    
     
     /// <summary>
     /// Starts a new ImGui frame. Should be called before any ImGui calls each frame.
@@ -92,15 +99,23 @@ public interface IImGui : IDisposable
     /// <summary>
     /// Push a specific font style.
     /// </summary>
-    static void UseFont(ImGuiFontStyle style, ImGuiFontSize size = C_DEFAULT_FONT_SIZE) => impl.UseFontImpl(style, size);
-    internal void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size);
+    static void UseFont(ImGuiAlias alias) => impl.UseFontImpl(alias.style, alias.size);
+    /// <summary>
+    /// Push a specific font style.
+    /// </summary>
+    static void UseFont(ImGuiFontStyle style, ImGuiFontSize size) => impl.UseFontImpl(style, (float)size);
+    /// <summary>
+    /// Push a specific font style.
+    /// </summary>
+    static void UseFont(ImGuiFontStyle style, float? size = null) => impl.UseFontImpl(style, size);
+    internal void UseFontImpl(ImGuiFontStyle style, float? size);
     
     /// <summary>
     /// Get the font style and size in the current context.
     /// </summary>
     /// <returns></returns>
-    static (ImGuiFontStyle, ImGuiFontSize) GetCurrentFont() => impl.GetCurrentFontImpl();
-    internal (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl();
+    static ImGuiAlias GetCurrentFont() => impl.GetCurrentFontImpl();
+    internal ImGuiAlias GetCurrentFontImpl();
     
     /// <summary>
     /// Zoom in or out based on the given zoom rate.

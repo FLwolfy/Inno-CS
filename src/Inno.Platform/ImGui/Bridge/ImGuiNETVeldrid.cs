@@ -27,7 +27,7 @@ internal class ImGuiNETVeldrid : IImGui
     
     // Fonts
     private float m_zoomRate;
-    private (ImGuiFontStyle, ImGuiFontSize) m_currentFont;
+    private ImGuiAlias m_currentFont;
     private readonly float m_dpiScale;
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontRegular = new();
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontBold = new();
@@ -104,7 +104,7 @@ internal class ImGuiNETVeldrid : IImGui
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
 	    
 	    // Default Font
-	    UseFontImpl(ImGuiFontStyle.Regular, IImGui.C_DEFAULT_FONT_SIZE);
+	    UseFontImpl(ImGuiFontStyle.Regular, (float)IImGui.C_DEFAULT_FONT_SIZE);
     }
 
     public void EndLayoutImpl()
@@ -156,11 +156,11 @@ internal class ImGuiNETVeldrid : IImGui
         
         m_imGuiVeldridController.RemoveImGuiBinding(veldridTexture.inner);
     }
-
-    public void UseFontImpl(ImGuiFontStyle style, ImGuiFontSize size)
+    
+    public void UseFontImpl(ImGuiFontStyle style, float? size)
     {
-	    m_currentFont = (style, size);
-	    var sizeInFloat = (float)size * m_zoomRate;
+	    m_currentFont = size == null ? new ImGuiAlias(style, m_currentFont.size) : new ImGuiAlias(style, (float)size);
+	    var sizeInFloat = m_currentFont.size * m_zoomRate;
 	    
 	    // 1. Select font family by style
 	    var family = style switch
@@ -169,7 +169,7 @@ internal class ImGuiNETVeldrid : IImGui
 		    ImGuiFontStyle.Italic     => m_fontItalic,
 		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
 		    
-		    ImGuiFontStyle.Font		  => m_icon,
+		    ImGuiFontStyle.Icon		  => m_icon,
 		    _                         => m_fontRegular
 	    };
 
@@ -215,7 +215,7 @@ internal class ImGuiNETVeldrid : IImGui
 	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
     }
 
-    public (ImGuiFontStyle, ImGuiFontSize) GetCurrentFontImpl()
+    public ImGuiAlias GetCurrentFontImpl()
     {
 	    return m_currentFont;
     }
