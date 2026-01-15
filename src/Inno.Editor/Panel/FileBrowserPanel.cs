@@ -29,7 +29,6 @@ public sealed class FileBrowserPanel : EditorPanel
 
     // Grid
     private const float C_GRID_ICON_SIZE = 54f;
-    private const float C_GRID_CELL_PADDING = 10f;
 
     // Root Paths
     private readonly string m_rootPath;
@@ -70,7 +69,7 @@ public sealed class FileBrowserPanel : EditorPanel
     private bool m_sortAscending = true;
 
     // Grid scale
-    private const float C_GRID_SCALE_MIN = 0.20f;
+    private const float C_GRID_SCALE_MIN = 0.5f;
     private const float C_GRID_SCALE_MAX = 5.0f;
     private float m_gridScale = 1.0f;
 
@@ -401,10 +400,10 @@ public sealed class FileBrowserPanel : EditorPanel
     // ============================
     // Grid (fixed spacing; no periodic jitter on resize)
     // ============================
-    private void DrawGrid(List<Entry> entries, float iconSize, float cellPadding)
+    private void DrawGrid(List<Entry> entries, float iconSize)
     {
         float availW = ImGui.GetContentRegionAvail().X;
-        float cellW = iconSize + cellPadding;
+        float cellW = iconSize;
 
         int cols = Math.Max(1, (int)Math.Floor(availW / cellW));
 
@@ -425,7 +424,7 @@ public sealed class FileBrowserPanel : EditorPanel
         foreach (var e in entries)
         {
             ImGui.TableSetColumnIndex(col);
-            DrawGridItem(e, iconSize, 2.5f);
+            DrawGridItem(e, iconSize, 2.75f);
 
             col++;
             if (col >= cols)
@@ -502,6 +501,10 @@ public sealed class FileBrowserPanel : EditorPanel
 
         IImGui.UseFont(currentFont); // This is to be used for the regular context
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + itemSize);
+        var textWidth = ImGui.CalcTextSize(e.name).X;
+        var currentCursorX = ImGui.GetCursorPosX();
+        var offsetX = textWidth <= itemSize ? (itemSize - textWidth) / 2 : 0;
+        ImGui.SetCursorPosX(currentCursorX + offsetX);
         ImGui.TextWrapped(e.name);
         ImGui.PopTextWrapPos();
 
@@ -517,12 +520,8 @@ public sealed class FileBrowserPanel : EditorPanel
         float gridH = Math.Max(0f, avail.Y - barH);
 
         ImGui.BeginChild("##GridArea", new Vector2(0, gridH));
-
         float iconSize = C_GRID_ICON_SIZE * m_gridScale;
-        float cellPadding = C_GRID_CELL_PADDING * m_gridScale;
-
-        DrawGrid(entries, iconSize, cellPadding);
-
+        DrawGrid(entries, iconSize);
         ImGui.EndChild();
 
         ImGui.Separator();
