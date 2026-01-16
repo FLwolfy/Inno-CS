@@ -1105,46 +1105,43 @@ internal class ImGuiNETVeldridController : IDisposable
     private void UpdateImGuiGlobalMouseButtonInput(InputSnapshot mainWindowSnapShot)
     {
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
-        
-        // Mouse: Determine if any of the mouse buttons were pressed during this snapshot period, even if they are no longer held.
+
+        // Snapshot pressed (edge) + held (level)
         bool leftPressed = false;
         bool middlePressed = false;
         bool rightPressed = false;
+
         foreach (VeldridMouseEvent me in mainWindowSnapShot.MouseEvents)
         {
-            if (me.Down)
+            if (!me.Down) continue;
+
+            switch (me.MouseButton)
             {
-                switch (me.MouseButton)
-                {
-                    case MouseButton.Left:
-                        leftPressed = true;
-                        break;
-                    case MouseButton.Middle:
-                        middlePressed = true;
-                        break;
-                    case MouseButton.Right:
-                        rightPressed = true;
-                        break;
-                }
+                case MouseButton.Left:   leftPressed = true; break;
+                case MouseButton.Middle: middlePressed = true; break;
+                case MouseButton.Right:  rightPressed = true; break;
             }
         }
-        
-        io.MouseDown[0] = leftPressed || mainWindowSnapShot.IsMouseDown(MouseButton.Left);
-        io.MouseDown[1] = middlePressed || mainWindowSnapShot.IsMouseDown(MouseButton.Right);
-        io.MouseDown[2] = rightPressed || mainWindowSnapShot.IsMouseDown(MouseButton.Middle);
-        
-        m_pSdlGetGlobalMouseState ??=
-            Sdl2Native.LoadFunction<SdlGetGlobalMouseStateT>("SDL_GetGlobalMouseState");
-        
+
+        // ImGui index convention: 0=Left, 1=Right, 2=Middle
+        io.MouseDown[0] = leftPressed   || mainWindowSnapShot.IsMouseDown(MouseButton.Left);
+        io.MouseDown[1] = rightPressed  || mainWindowSnapShot.IsMouseDown(MouseButton.Right);
+        io.MouseDown[2] = middlePressed || mainWindowSnapShot.IsMouseDown(MouseButton.Middle);
+
+        // If you insist on global mouse state (multi-viewport), override WITH CORRECT MAPPING.
+        m_pSdlGetGlobalMouseState ??= Sdl2Native.LoadFunction<SdlGetGlobalMouseStateT>("SDL_GetGlobalMouseState");
+
         int x, y;
         unsafe
         {
             uint buttons = m_pSdlGetGlobalMouseState(&x, &y);
+
+            // SDL: 1=Left, 2=Middle, 4=Right
             io.MouseDown[0] = (buttons & 0b0001) != 0;
-            io.MouseDown[1] = (buttons & 0b0010) != 0;
-            io.MouseDown[2] = (buttons & 0b0100) != 0;
+            io.MouseDown[1] = (buttons & 0b0100) != 0; // Right
+            io.MouseDown[2] = (buttons & 0b0010) != 0; // Middle
         }
-        
+
         io.MousePos = new SYSVector2(x, y);
     }
 
