@@ -9,7 +9,7 @@ public abstract class Serializable
     /// <summary>
     /// Gets all serialized properties of this Serializable instance.
     /// </summary>
-    public List<SerializedProperty> GetSerializedProperties()
+    public IReadOnlyList<SerializedProperty> GetSerializedProperties()
     {
         var result = new List<SerializedProperty>();
         var properties = GetType()

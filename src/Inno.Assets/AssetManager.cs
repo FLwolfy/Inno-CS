@@ -47,7 +47,7 @@ public static class AssetManager
     public static void LoadAllFromAssetDirectory()
     {
         if (string.IsNullOrEmpty(assetDirectory) || !Directory.Exists(assetDirectory)) return;
-
+        
         foreach (var file in Directory.GetFiles(assetDirectory, "*.*", SearchOption.AllDirectories))
         {
             if (file.EndsWith(C_ASSET_POSTFIX, StringComparison.OrdinalIgnoreCase)) continue;
@@ -56,7 +56,7 @@ public static class AssetManager
             var relativePath = Path.GetRelativePath(assetDirectory, file);
             var asset = loader.Load(relativePath);
             if (asset == null) continue;
-
+            
             RegisterLoaded(relativePath, asset);
         }
     }
@@ -194,17 +194,17 @@ public static class AssetManager
 
     private static void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        var abs = Path.GetFullPath(e.FullPath);
+        var relativePath = Path.GetRelativePath(assetDirectory, e.FullPath);
 
         Guid guid;
         InnoAsset existing;
 
         lock (SYNC)
         {
-            if (!PATH_GUID_PAIRS.TryGetValue(abs, out guid)) return;
+            if (!PATH_GUID_PAIRS.TryGetValue(relativePath, out guid)) return;
             if (!LOADED_ASSETS.TryGetValue(guid, out existing!)) return;
         }
-
+        
         if (!AssetLoaderRegistry.TryGetLoader(existing.GetType(), out var loader) || loader == null) return;
 
         var reloaded = loader.Load(existing.sourcePath);
@@ -213,23 +213,22 @@ public static class AssetManager
         {
             if (reloaded == null)
             {
-                PATH_GUID_PAIRS.Remove(abs);
+                PATH_GUID_PAIRS.Remove(relativePath);
                 LOADED_ASSETS.Remove(guid);
                 return;
             }
 
             // If sourcePath changed during reload, refresh mapping under the new path as well.
-            var actualAbs = Path.GetFullPath(Path.Combine(assetDirectory, reloaded.sourcePath));
-            PATH_GUID_PAIRS[actualAbs] = guid;
+            PATH_GUID_PAIRS[reloaded.sourcePath] = guid;
             LOADED_ASSETS[guid] = reloaded;
         }
     }
 
-    private static void RegisterLoaded(string absSourcePath, InnoAsset asset)
+    private static void RegisterLoaded(string relativePath, InnoAsset asset)
     {
         lock (SYNC)
         {
-            PATH_GUID_PAIRS[absSourcePath] = asset.guid;
+            PATH_GUID_PAIRS[relativePath] = asset.guid;
             LOADED_ASSETS[asset.guid] = asset;
         }
     }
