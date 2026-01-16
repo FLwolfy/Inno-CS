@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 using ImGuiNET;
 
@@ -50,12 +49,8 @@ public sealed class FileBrowserPanel : EditorPanel
     private readonly List<string> m_history = new();
     private int m_historyIndex = -1;
 
-    // File system watcher
-    private FileSystemWatcher? m_watcher;
-    private int m_fsChangeVersion;
-    private int m_fsAppliedVersion;
-    private DateTime m_lastFsEventUtc = DateTime.MinValue;
-    private const double C_FS_DEBOUNCE_SECONDS = 0.15;
+    // Asset directory change versioning (single source of truth is AssetManager watcher)
+    private int m_assetAppliedVersion;
 
     // Search
     private readonly DirectorySnapshot m_searchSnapshot = new();
@@ -120,7 +115,9 @@ public sealed class FileBrowserPanel : EditorPanel
         m_leftWidth = IImGui.GetStorageData("Editor.File.SplitterLeftWidth", C_SPLITTER_DEFAULT_WIDTH);
 
         PushHistory(m_currentDir);
-        SetupWatcher();
+
+        // Snapshot refresh is driven by AssetManager's single watcher (coalesced).
+        m_assetAppliedVersion = AssetManager.assetDirectoryChangeVersion;
         RefreshSnapshot(force: true);
     }
 
@@ -757,16 +754,12 @@ public sealed class FileBrowserPanel : EditorPanel
     {
         if (!force)
         {
-            int ver = Volatile.Read(ref m_fsChangeVersion);
-            bool fsChanged = ver != m_fsAppliedVersion;
+            int ver = AssetManager.assetDirectoryChangeVersion;
+            bool changed = ver != m_assetAppliedVersion;
 
-            if (fsChanged)
+            if (changed)
             {
-                var now = DateTime.UtcNow;
-                if ((now - m_lastFsEventUtc).TotalSeconds < C_FS_DEBOUNCE_SECONDS)
-                    return;
-
-                m_fsAppliedVersion = ver;
+                m_assetAppliedVersion = ver;
             }
             else
             {
@@ -824,16 +817,14 @@ public sealed class FileBrowserPanel : EditorPanel
         if (!force)
         {
             bool queryChanged = !string.Equals(m_search, m_searchLast, StringComparison.Ordinal);
-            int ver = Volatile.Read(ref m_fsChangeVersion);
-            bool fsChanged = ver != m_fsAppliedVersion;
+            int ver = AssetManager.assetDirectoryChangeVersion;
+            bool changed = ver != m_assetAppliedVersion;
 
             if (!queryChanged)
             {
-                if (fsChanged)
+                if (changed)
                 {
-                    var now = DateTime.UtcNow;
-                    if ((now - m_lastFsEventUtc).TotalSeconds < C_FS_DEBOUNCE_SECONDS)
-                        return;
+                    // AssetManager already coalesces bursts; refresh immediately.
                 }
                 else
                 {
@@ -847,7 +838,7 @@ public sealed class FileBrowserPanel : EditorPanel
         m_searchLast = m_search;
         m_searchSnapshotTime = DateTime.UtcNow;
 
-        m_fsAppliedVersion = Volatile.Read(ref m_fsChangeVersion);
+        m_assetAppliedVersion = AssetManager.assetDirectoryChangeVersion;
 
         m_searchSnapshot.Clear();
 
@@ -1136,49 +1127,6 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
 
         return active;
-    }
-
-    // ============================
-    // Watcher
-    // ============================
-    private void SetupWatcher()
-    {
-        try
-        {
-            m_watcher?.Dispose();
-
-            if (string.IsNullOrWhiteSpace(m_rootPathNative) || !Directory.Exists(m_rootPathNative))
-                return;
-
-            m_watcher = new FileSystemWatcher(m_rootPathNative)
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                InternalBufferSize = 64 * 1024,
-                EnableRaisingEvents = true
-            };
-
-            m_watcher.Changed += OnFsChanged;
-            m_watcher.Created += OnFsChanged;
-            m_watcher.Deleted += OnFsChanged;
-            m_watcher.Renamed += OnFsRenamed;
-        }
-        catch (Exception e)
-        {
-            Log.Error(e.Message);
-        }
-    }
-
-    private void OnFsChanged(object sender, FileSystemEventArgs e)
-    {
-        Interlocked.Increment(ref m_fsChangeVersion);
-        m_lastFsEventUtc = DateTime.UtcNow;
-    }
-
-    private void OnFsRenamed(object sender, RenamedEventArgs e)
-    {
-        Interlocked.Increment(ref m_fsChangeVersion);
-        m_lastFsEventUtc = DateTime.UtcNow;
     }
 
     // ============================

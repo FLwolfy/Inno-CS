@@ -129,6 +129,9 @@ public abstract class EngineCore
         IImGui.DisposeImpl();
         m_fileSink.Dispose();
         m_graphicsDevice.Dispose();
+        
+        // Assets
+        AssetManager.Shutdown();
     }
     
     /// <summary>
