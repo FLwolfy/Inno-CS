@@ -465,7 +465,8 @@ public static class EditorGUILayout
             changed |= DrawAxisDrag("X", ref x, ImGui.GetColumnWidth(), new Color(0.75f, 0.20f, 0.20f));
             SplitColumns();
             changed |= DrawAxisDrag("Y", ref y, ImGui.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f));
-
+            SplitColumns();
+            
             EndColumns();
 
             if (changed) value = new Vector2(x, y);
@@ -532,6 +533,7 @@ public static class EditorGUILayout
             SplitColumns();
             changed |= DrawAxisDrag("Y", ref y, ImGui.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f)); // Green
             changed |= DrawAxisDrag("W", ref w, ImGui.GetColumnWidth(), new Color(0.65f, 0.65f, 0.65f)); // Gray
+            SplitColumns();
             
             EndColumns();
 
