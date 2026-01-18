@@ -2,7 +2,7 @@ using System;
 
 namespace Inno.Core.Serialization;
 
-[AttributeUsage(AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class SerializablePropertyAttribute : Attribute
 {
     /// <summary>
@@ -10,10 +10,6 @@ public sealed class SerializablePropertyAttribute : Attribute
     /// </summary>
     public SerializedProperty.PropertyVisibility propertyVisibility { get; }
 
-    /// <summary>
-    /// Creates a new SerializablePropertyAttribute with the specified visibility.
-    /// Default visibility is Show.
-    /// </summary>
     public SerializablePropertyAttribute(SerializedProperty.PropertyVisibility visibility = SerializedProperty.PropertyVisibility.Show)
     {
         propertyVisibility = visibility;

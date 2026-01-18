@@ -5,7 +5,6 @@ using Inno.Core.Math;
 using Inno.Editor.Panel;
 using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources.CpuResources;
-using Inno.Runtime.RenderObject;
 
 namespace Inno.Editor.GUI.PropertyGUI.PropertyRenderer;
 
@@ -24,16 +23,15 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
             EditorGUILayout.Indent(16);
             if (EditorGUILayout.GuidDrop("source", FileBrowserPanel.C_ASSET_GUID_TYPE, ref spriteGuid, displayName, enabled))
             {
-                if (!AssetManager.Get<TextureAsset>(spriteGuid).isValid)
+                var assetRef = AssetManager.Get<TextureAsset>(spriteGuid);
+                if (!assetRef.isValid)
                 {
-                    sprite.texture = null;
-                    sprite.size = Vector2.ONE;
+                    setter(Sprite.SolidColor(Vector2.ONE));
                 }
                 else
                 {
-                    var texture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(AssetManager.Get<TextureAsset>(spriteGuid).Resolve()!);
-                    sprite.texture = texture;
-                    sprite.size = new Vector2(texture.width, texture.height);
+                    var texture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(assetRef.Resolve()!);
+                    setter(Sprite.FromTexture(texture));
                 }
             }
             

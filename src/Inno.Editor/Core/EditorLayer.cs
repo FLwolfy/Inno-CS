@@ -63,9 +63,18 @@ public class EditorLayer() : Layer("EditorLayer")
         // DockSpace
         ImGui.DockSpaceOverViewport(ImGui.GetMainViewport().ID);
 
+        // Play/Pause/Stop overlay
+        EditorPlayBar.Draw();
+
         // Layout GUI
         EditorGUILayout.BeginFrame();
         EditorManager.DrawPanels();
         EditorGUILayout.EndFrame();
+    }
+
+    public override void OnUpdate()
+    {
+        // Run scene simulation only in Play mode.
+        EditorRuntimeController.Update();
     }
 }

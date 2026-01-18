@@ -37,6 +37,37 @@ internal class ComponentManager
     {
         m_isRunning = true;
     }
+
+    public void EndRuntime()
+    {
+        m_isRunning = false;
+        m_isUpdating = false;
+        m_pendingAddRemoveAction.Clear();
+        m_pendingStartComponents.Clear();
+        m_pendingToSortLists.Clear();
+    }
+
+    public void ClearAll()
+    {
+        // Detach all components
+        foreach (var entity in m_componentsByEntity.Values)
+        {
+            foreach (var comp in entity.Values)
+            {
+                comp.OnDetach();
+            }
+        }
+
+        m_componentsByEntity.Clear();
+        m_componentsByType.Clear();
+
+        foreach (var tag in Enum.GetValues<ComponentTag>())
+        {
+            m_componentsByTag[tag].Clear();
+        }
+
+        EndRuntime();
+    }
     
     /// <summary>
     /// Adds a component of type T to the entity if it doesn't exist.

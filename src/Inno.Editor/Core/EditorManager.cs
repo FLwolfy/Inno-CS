@@ -9,8 +9,26 @@ public static class EditorManager
 {
     private static readonly Dictionary<string, EditorPanel> PANELS = new();
 
+    // =========================
+    // Editor runtime (Play/Pause)
+    // =========================
+    public static EditorMode mode { get; private set; } = EditorMode.Edit;
+
+    /// <summary>
+    /// Fired when editor mode changes.
+    /// </summary>
+    public static event Action<EditorMode, EditorMode>? ModeChanged;
+
     // Manager Properties
     public static EditorSelection selection { get; } = new();
+
+    internal static void SetMode(EditorMode newMode)
+    {
+        if (mode == newMode) return;
+        var prev = mode;
+        mode = newMode;
+        ModeChanged?.Invoke(prev, newMode);
+    }
 
     public static void RegisterPanel(EditorPanel panel)
     {

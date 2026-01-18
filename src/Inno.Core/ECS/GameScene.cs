@@ -34,6 +34,74 @@ public class GameScene : Serializable
     /// </summary>
     internal ComponentManager GetComponentManager() => m_componentManager;
 
+    internal void EndRuntime()
+    {
+        m_isRunning = false;
+        m_isUpdating = false;
+        m_componentManager.EndRuntime();
+        m_pendingGameObjectRemoves.Clear();
+    }
+
+    internal void ClearForRestore()
+    {
+        mainCamera = null;
+        m_pendingGameObjectRemoves.Clear();
+        m_componentManager.ClearAll();
+        m_gameObjects.Clear();
+        m_isRunning = false;
+        m_isUpdating = false;
+    }
+
+    internal void RestoreFromSnapshot(SceneSnapshot.SceneSnapshotData data)
+    {
+        // Defensive: only restore into an edit-state scene.
+        ClearForRestore();
+
+        // First pass: create all objects (so parenting can resolve).
+        var created = new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        foreach (var o in data.objects)
+        {
+            var go = new GameObject(this, o.name);
+            created[o.name] = go;
+        }
+
+        // Second pass: restore components and state.
+        foreach (var o in data.objects)
+        {
+            if (!created.TryGetValue(o.name, out var go)) continue;
+
+            foreach (var c in o.components)
+            {
+                var compType = Type.GetType(c.type);
+                if (compType == null) continue;
+
+                GameComponent? comp;
+                if (compType == typeof(Transform))
+                {
+                    comp = go.transform;
+                }
+                else
+                {
+                    comp = go.AddComponent(compType);
+                }
+
+                if (comp == null) continue;
+
+                if (comp is Serializable s)
+                    s.RestoreState(c.state);
+            }
+        }
+
+        // Third pass: restore parenting (keep local transform).
+        foreach (var o in data.objects)
+        {
+            if (o.parentName == null) continue;
+            if (!created.TryGetValue(o.name, out var child)) continue;
+            if (!created.TryGetValue(o.parentName, out var parent)) continue;
+            child.transform.SetParent(parent.transform, worldTransformStays: false);
+        }
+    }
+
     /// <summary>
     /// Gets all components of a specific type in the current game scene.
     /// </summary>

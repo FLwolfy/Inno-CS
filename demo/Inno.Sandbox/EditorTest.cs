@@ -3,13 +3,13 @@ using Inno.Assets.AssetType;
 using Inno.Core.ECS;
 using Inno.Core.Layers;
 using Inno.Core.Math;
+using Inno.Core.Utility;
 using Inno.Editor.Core;
 using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources;
 using Inno.Graphics.Resources.CpuResources;
 using Inno.Runtime.Component;
 using Inno.Runtime.Core;
-using Inno.Runtime.RenderObject;
 
 namespace Inno.Sandbox;
 
@@ -82,10 +82,21 @@ public class EditorTest
             testObject6.transform.worldScale = new Vector3(1f, 1f, 1f);
             testObject6.transform.localRotationZ = 0;
             SpriteRenderer sr6 = testObject6.AddComponent<SpriteRenderer>();
+            testObject6.AddComponent<TestComponent>();
 
             AssetRef<TextureAsset> testTextureAsset = AssetManager.Get<TextureAsset>("TestTextures/coin.png");
             Texture testTexture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(testTextureAsset.Resolve()!);
             sr6.sprite = Sprite.FromTexture(testTexture);
+        }
+    }
+
+    private class TestComponent : GameBehavior
+    {
+        public override ComponentTag orderTag => ComponentTag.Behavior;
+        
+        public override void Update()
+        {
+            transform.localRotationZ += Time.deltaTime * 100f;
         }
     }
 }

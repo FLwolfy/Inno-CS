@@ -89,6 +89,15 @@ public static class SceneManager
     }
 
     /// <summary>
+    /// Ends runtime. This does NOT destroy scenes; it only returns ECS to an editor-safe state.
+    /// </summary>
+    public static void EndRuntime()
+    {
+        m_runtimeStarted = false;
+        foreach (var scene in SceneManager.GetAllScenes()) { scene.EndRuntime(); }
+    }
+
+    /// <summary>
     /// Updates the current active scene, if the runtime is started.
     /// </summary>
     public static void UpdateActiveScene()
