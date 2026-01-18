@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Inno.Core.Events;
 
 public class EventSnapshot

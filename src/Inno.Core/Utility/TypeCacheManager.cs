@@ -1,7 +1,41 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Inno.Core.Utility;
 
+/// <summary>
+/// Marks a static method to be invoked automatically
+/// once when TypeCacheManager.Initialize() is called.
+/// 
+/// Constraints:
+/// - Method MUST be static
+/// - Method MUST return void
+/// - Method MUST take no parameters
+/// </summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class TypeCacheInitializeAttribute : Attribute;
+
+
+/// <summary>
+/// Marks a static method to be invoked automatically
+/// whenever the TypeCache is refreshed.
+/// (TypeCache is always refreshed once after initialization)
+/// 
+/// <p>
+/// Constraints: 
+/// - Method MUST be static <br/>
+/// - Method MUST return void <br/>
+/// - Method MUST take no parameters
+/// </p>
+/// 
+/// <code>
+///     [TypeCacheRefresh]
+///     static void OnTypeCacheRefreshed() { ... }
+/// </code>
+/// 
+/// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class TypeCacheRefreshAttribute : Attribute;
 
@@ -13,22 +47,44 @@ public static class TypeCacheManager
     private static readonly Dictionary<Type, List<Type>> INTERFACE_CACHE = new();
     private static readonly Dictionary<Type, List<Type>> ATTRIBUTE_CACHE = new();
 
-    private static bool m_isDirty = true;
+    private static bool m_isDirty = false;
+    
     private static event Action? OnRefreshed;
 
     public static void Initialize()
     {
+        Refresh();
+        
+        InvokeInitializeHooks();
         SubscribeRefreshHooks();
             
-        AppDomain.CurrentDomain.AssemblyLoad += (_, __) =>
+        AppDomain.CurrentDomain.AssemblyLoad += (_, _) =>
         {
             m_isDirty = true;
         };
-        
-        Refresh();
+
+        OnRefreshed?.Invoke();
     }
     
+    private static void InvokeInitializeHooks()
+    {
+        foreach (var method in EnumerateHookMethods(typeof(TypeCacheInitializeAttribute)))
+        {
+            ValidateHookSignature(method);
+            method.Invoke(null, null);
+        }
+    }
+
     private static void SubscribeRefreshHooks()
+    {
+        foreach (var method in EnumerateHookMethods(typeof(TypeCacheRefreshAttribute)))
+        {
+            ValidateHookSignature(method);
+            OnRefreshed += () => method.Invoke(null, null);
+        }
+    }
+
+    private static IEnumerable<MethodInfo> EnumerateHookMethods(Type attributeType)
     {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic);
@@ -39,29 +95,25 @@ public static class TypeCacheManager
                 try { return a.GetTypes(); }
                 catch { return Type.EmptyTypes; }
             })
-            .Where(t => t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false)
-            .ToArray();
-        
+            .Where(t => t.Namespace?.StartsWith(C_INNO_NAMESPACE) ?? false);
+
         foreach (var type in allTypes)
         {
-            foreach (var method in type.GetMethods(
-                         BindingFlags.Static |
-                         BindingFlags.Public |
-                         BindingFlags.NonPublic))
+            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            foreach (var method in methods)
             {
-                if (!method.IsDefined(typeof(TypeCacheRefreshAttribute), false))
-                    continue;
-
-                if (method.ReturnType != typeof(void) ||
-                    method.GetParameters().Length != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"[TypeCacheRefresh] method must be 'static void Method()': " +
-                        $"{type.FullName}.{method.Name}");
-                }
-
-                OnRefreshed += () => method.Invoke(null, null);
+                if (method.IsDefined(attributeType, inherit: false))
+                    yield return method;
             }
+        }
+    }
+
+    private static void ValidateHookSignature(MethodInfo method)
+    {
+        if (method.ReturnType != typeof(void) || method.GetParameters().Length != 0)
+        {
+            throw new InvalidOperationException(
+                $"[{method.GetCustomAttributes(false).First(a => a.GetType().Name.Contains("TypeCache"))}] " + $"method must be 'static void Method()': {method.DeclaringType?.FullName}.{method.Name}");
         }
     }
     

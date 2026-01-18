@@ -1,8 +1,6 @@
+using System;
 using Inno.Platform.Graphics;
-using Inno.Platform.Graphics.Bridge;
 using Inno.Platform.ImGui.Bridge;
-using Inno.Platform.Window;
-using Inno.Platform.Window.Bridge;
 
 namespace Inno.Platform.ImGui;
 
@@ -31,7 +29,33 @@ public enum ImGuiFontStyle
     Regular,
     Bold,
     Italic,
-    BoldItalic
+    BoldItalic,
+    
+    Icon
+}
+
+/// <summary>
+/// Identifies the size of the font used.
+/// </summary>
+public enum ImGuiFontSize
+{
+    // Tips
+    Tiny    = 8,
+    Small   = 12,
+
+    // Text
+    Medium  = 16,
+    Large   = 24,
+    Huge    = 32,
+    
+    // Titles
+    Massive = 48
+}
+
+public readonly struct ImGuiAlias(ImGuiFontStyle style, float size)
+{
+    public readonly ImGuiFontStyle style = style;
+    public readonly float size = size;
 }
 
 /// <summary>
@@ -41,7 +65,9 @@ public enum ImGuiFontStyle
 /// </summary>
 public interface IImGui : IDisposable
 {
+    internal const ImGuiFontSize C_DEFAULT_FONT_SIZE = ImGuiFontSize.Medium;
     internal static IImGui impl { get; set; } = new ImGuiNoOp();
+    
     
     /// <summary>
     /// Starts a new ImGui frame. Should be called before any ImGui calls each frame.
@@ -73,8 +99,23 @@ public interface IImGui : IDisposable
     /// <summary>
     /// Push a specific font style.
     /// </summary>
-    static void UseFont(ImGuiFontStyle style) => impl.UseFontImpl(style);
-    internal void UseFontImpl(ImGuiFontStyle style);
+    static void UseFont(ImGuiAlias alias) => impl.UseFontImpl(alias.style, alias.size);
+    /// <summary>
+    /// Push a specific font style.
+    /// </summary>
+    static void UseFont(ImGuiFontStyle style, ImGuiFontSize size) => impl.UseFontImpl(style, (float)size);
+    /// <summary>
+    /// Push a specific font style.
+    /// </summary>
+    static void UseFont(ImGuiFontStyle style, float? size = null) => impl.UseFontImpl(style, size);
+    internal void UseFontImpl(ImGuiFontStyle style, float? size);
+    
+    /// <summary>
+    /// Get the font style and size in the current context.
+    /// </summary>
+    /// <returns></returns>
+    static ImGuiAlias GetCurrentFont() => impl.GetCurrentFontImpl();
+    internal ImGuiAlias GetCurrentFontImpl();
     
     /// <summary>
     /// Zoom in or out based on the given zoom rate.
@@ -93,6 +134,18 @@ public interface IImGui : IDisposable
     /// </summary>
     static IntPtr virtualContextPtr => impl.virtualContextPtrImpl;
     internal IntPtr virtualContextPtrImpl { get; }
+    
+    /// <summary>
+    /// Sets the UI storage data into ImGui.ini.
+    /// </summary>
+    static void SetStorageData(string key, object? value) => impl.SetStorageDataImpl(key, value);
+    internal void SetStorageDataImpl(string key, object? value);
+    
+    /// <summary>
+    /// Gets the UI storage data from ImGui.ini.
+    /// </summary>
+    static T? GetStorageData<T>(string key, T? defaultValue = default) => impl.GetStorageDataImpl(key, defaultValue);
+    internal T? GetStorageDataImpl<T>(string key, T? defaultValue);
 
     /// <summary>
     /// Dispose the implementation of ImGui.

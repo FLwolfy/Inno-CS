@@ -1,3 +1,4 @@
+using System.Linq;
 using Inno.Core.ECS;
 using Inno.Core.Utility;
 
@@ -16,7 +17,6 @@ public class GameObjectEditor : IInspectorEditor
         OnShowAddComponent(gameObject);
         EditorGUILayout.EndScope();
     }
-    
 
     private static void OnShowComponents(GameObject gameObject)
     {

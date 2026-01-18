@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Veldrid;
 using VeldridRSDescription = Veldrid.ResourceSetDescription;
 
@@ -18,17 +20,32 @@ internal class VeldridResourceSet : IResourceSet
     
     private VeldridRSDescription ToVeldridRSDesc(ResourceSetBinding binding)
     {
+        // Add to boundResources
+        var boundResources = new List<BindableResource>();
+        
+        // Uniforms
         var uniformBuffers = binding.uniformBuffers.Length > 0
             ? binding.uniformBuffers
                 .Select(ub => ((VeldridUniformBuffer)ub).inner)
                 .ToArray()
             : [];
-        
-        // TODO: Add support for other resource types (e.g., textures, samplers) here.
-        
-        // Add to boundResources
-        var boundResources = new List<BindableResource>();
         boundResources.AddRange(uniformBuffers);
+
+        // Textures
+        var textures = binding.textures.Length > 0
+            ? binding.textures
+                .Select(t => ((VeldridTexture)t).inner)
+                .ToArray()
+            : [];
+        boundResources.AddRange(textures);
+        
+        // Samplers
+        var samplers = binding.samplers.Length > 0
+            ? binding.samplers
+                .Select(s => ((VeldridSampler)s).inner)
+                .ToArray()
+            : [];
+        boundResources.AddRange(samplers);
         
         return new VeldridRSDescription
         {
@@ -42,6 +59,7 @@ internal class VeldridResourceSet : IResourceSet
         var elements = new List<ResourceLayoutElementDescription>();
         ShaderStages stages = VeldridShader.ToVeldridShaderStage(b.shaderStages);
 
+        // Uniforms
         for (int i = 0; i < b.uniformBuffers.Length; i++)
         {
             elements.Add(new ResourceLayoutElementDescription(
@@ -49,10 +67,27 @@ internal class VeldridResourceSet : IResourceSet
                 ResourceKind.UniformBuffer, 
                 stages
             ));
-            
         }
         
-        // TODO: Add support for other resource types (e.g., textures, samplers) here.
+        // Textures
+        for (int i = 0; i < b.textures.Length; i++)
+        {
+            elements.Add(new ResourceLayoutElementDescription(
+                $"Texture{i}",
+                ResourceKind.TextureReadOnly,
+                stages
+            ));
+        }
+
+        // Samplers
+        for (int i = 0; i < b.samplers.Length; i++)
+        {
+            elements.Add(new ResourceLayoutElementDescription(
+                $"Sampler{i}",
+                ResourceKind.Sampler,
+                stages
+            ));
+        }
 
         return new ResourceLayoutDescription(elements.ToArray());
     }

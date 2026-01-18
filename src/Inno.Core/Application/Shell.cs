@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using Inno.Core.Events;
 using Inno.Core.Logging;
@@ -32,6 +33,7 @@ public class Shell
         m_timer = new Stopwatch();
         m_eventDispatcher = new EventDispatcher();
         
+        LogManager.RegisterSink(new ConsoleLogSink());
         TypeCacheManager.Initialize();
         LogManager.Initialize();
     }

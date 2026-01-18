@@ -1,5 +1,9 @@
+using System;
 using System.Collections.Concurrent;
+using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace Inno.Core.Logging;
 
@@ -106,7 +110,7 @@ public class FileLogSink : ILogSink, IDisposable
 
     private string FormatEntry(LogEntry entry)
     {
-        return $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{entry.level}] [{entry.category}] {entry.message} ({entry.file}:{entry.line})";
+        return $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{entry.source}] [{entry.level}]: {entry.message} ({entry.file}:{entry.line})";
     }
 
     private string GetNewLogFilePath()

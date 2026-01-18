@@ -1,9 +1,11 @@
+using System;
 using ImGuiNET;
 using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.Gizmo;
 using Inno.Editor.Utility;
+using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
@@ -64,11 +66,11 @@ public class SceneViewPanel : EditorPanel
     
     private void EnsureSceneRenderTarget()
     {
-        if (RenderTargetPool.Get("scene") == null)
+        if (RenderGraphics.targetPool.Get("scene") == null)
         {
             var renderTexDesc = new TextureDescription
             {
-                format = PixelFormat.B8_G8_R8_A8_UNorm,
+                format = PixelFormat.R8_G8_B8_A8_UNorm,
                 usage = TextureUsage.RenderTarget | TextureUsage.Sampled,
                 dimension = TextureDimension.Texture2D
             };
@@ -86,7 +88,7 @@ public class SceneViewPanel : EditorPanel
                 colorAttachmentDescriptions = [renderTexDesc]
             };
             
-            m_renderTarget = RenderTargetPool.Create("scene", renderTargetDesc);
+            m_renderTarget = RenderGraphics.targetPool.Create("scene", renderTargetDesc);
             m_currentTexture = m_renderTarget.GetColorAttachment(0)!;
         }
     }
@@ -119,7 +121,7 @@ public class SceneViewPanel : EditorPanel
 
     private void RenderSceneToBuffer()
     {
-        if (RenderTargetPool.Get("scene") != null)
+        if (RenderGraphics.targetPool.Get("scene") != null)
         {
             var flipYViewMatrix = m_editorCamera2D.viewMatrix;
             flipYViewMatrix.m42 *= -1;
@@ -136,11 +138,7 @@ public class SceneViewPanel : EditorPanel
         var io = ImGui.GetIO();
         
         float zoomDelta = io.MouseWheel;
-        
-        Vector2 windowPos = ImGui.GetWindowPos();
-        Vector2 screenPos = ImGui.GetCursorStartPos();
-        Vector2 mousePos = io.MousePos;
-        Vector2 localMousePos = mousePos - screenPos - windowPos;
+        Vector2 localMousePos = io.MousePos - ImGui.GetCursorScreenPos();
 
         bool isMouseInContent = localMousePos.y > 0 && ImGui.IsWindowHovered();
         bool isPanning = io.MouseDown[(int)MOUSE_BUTTON_PAN] || zoomDelta != 0.0f;
@@ -158,7 +156,7 @@ public class SceneViewPanel : EditorPanel
 
     private void DrawScene()
     {
-        var targetTexture = RenderTargetPool.Get("scene")?.GetColorAttachment(0);
+        var targetTexture = RenderGraphics.targetPool.Get("scene")?.GetColorAttachment(0);
         if (targetTexture != null)
         {
             var newTextureHandle = IImGui.GetOrBindTexture(targetTexture);

@@ -1,8 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using ImGuiNET;
 
 using Inno.Core.ECS;
 using Inno.Core.Events;
+using Inno.Core.Math;
 using Inno.Editor.Core;
+using Inno.Editor.GUI;
+using Inno.Runtime.Component;
 
 namespace Inno.Editor.Panel;
 
@@ -17,6 +23,14 @@ public class HierarchyPanel : EditorPanel
 
     internal override void OnGUI()
     {
+        // Scrollable area for the whole hierarchy
+        ImGui.BeginChild(
+            "##HierarchyScroll",
+            new Vector2(0,0),
+            ImGuiChildFlags.None,
+            ImGuiWindowFlags.HorizontalScrollbar
+        );
+
         // Draw Scene root
         DrawSceneObjectRoot();
 
@@ -25,8 +39,8 @@ public class HierarchyPanel : EditorPanel
         {
             DrawRootGameObject(obj);
         }
-        
-        // Handle Menu Events
+
+        // Handle Menu Events (must be inside the child, so hover checks refer to this child)
         HandleMenu();
 
         // Apply delayed actions
@@ -34,6 +48,8 @@ public class HierarchyPanel : EditorPanel
         {
             m_pendingGuiUpdateAction.Dequeue().Invoke();
         }
+
+        ImGui.EndChild();
     }
 
     private void HandleMenu()
@@ -67,7 +83,7 @@ public class HierarchyPanel : EditorPanel
         ImGui.Text("[ Scene Root ]");
         if (ImGui.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragDropPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null)
             {
                 var obj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
@@ -85,10 +101,14 @@ public class HierarchyPanel : EditorPanel
 
         // TreeNodeFlags with Selected flag
         var flags = hasChildren ? ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.OpenOnDoubleClick : ImGuiTreeNodeFlags.Leaf;
-        if (isSelected) { flags |= ImGuiTreeNodeFlags.Selected; }
+        flags |= ImGuiTreeNodeFlags.SpanFullWidth;
+        if (isSelected)
+        {
+            flags |= ImGuiTreeNodeFlags.Selected;
+        }
 
         ////////////// Begin Tree Node //////////////
-        bool isOpenTree = ImGui.TreeNodeEx($"{obj.name}###{obj.id}", flags);
+        bool isOpenTree = ImGui.TreeNodeEx($"###{obj.id}", flags);
         
         // Handle Right Click menu
         if (ImGui.BeginPopupContextItem($"Popup_{obj.id}"))
@@ -113,7 +133,7 @@ public class HierarchyPanel : EditorPanel
         // Drag Source
         if (ImGui.BeginDragDropSource())
         {
-            EditorImGuiEx.SetDragDropPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
+            EditorImGuiEx.SetDragPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
             ImGui.Text($"Dragging {obj.name}");
             ImGui.EndDragDropSource();
         }
@@ -121,7 +141,7 @@ public class HierarchyPanel : EditorPanel
         // Drag Target
         if (ImGui.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragDropPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null && payload != obj.id)
             {
                 var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
@@ -129,6 +149,11 @@ public class HierarchyPanel : EditorPanel
             }
             ImGui.EndDragDropTarget();
         }
+        
+        // Tree Node Text
+        var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
+        ImGui.SameLine();
+        EditorImGuiEx.DrawIconAndText(isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube, obj.name);
 
         // Draw Children
         if (hasChildren && isOpenTree)
@@ -137,6 +162,9 @@ public class HierarchyPanel : EditorPanel
         }
         
         ////////////// End Tree Node //////////////
-        if (isOpenTree) { ImGui.TreePop(); }
+        if (isOpenTree)
+        {
+            ImGui.TreePop();
+        }
     }
 }

@@ -2,15 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ImGui.NET" Version="1.91.6.1" PrivateAssets="compile"/>
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\Inno.Assets\Inno.Assets.csproj" />
     <ProjectReference Include="..\Inno.Platform\Inno.Platform.csproj" />
   </ItemGroup>
 

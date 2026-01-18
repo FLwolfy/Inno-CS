@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -5,6 +9,7 @@ using System.Runtime.InteropServices;
 
 using ImGuiNET;
 using Inno.Core.Math;
+using Inno.Platform.Window.Bridge;
 using Veldrid;
 using Veldrid.Sdl2;
 
@@ -42,7 +47,8 @@ internal class ImGuiNETVeldridController : IDisposable
 
     // Window info
     private readonly ImGuiNETVeldridWindow m_mainImGuiWindow;
-    private readonly Dictionary<uint, ImGuiNETVeldridWindow> m_windowHolders = new();
+    // ReSharper disable once CollectionNeverQueried.Local
+    private readonly Dictionary<uint, ImGuiNETVeldridWindow> m_windowHolders = new(); // keep this to avoid GC
     private bool m_controlDown;
     private bool m_shiftDown;
     private bool m_altDown;
@@ -77,9 +83,13 @@ internal class ImGuiNETVeldridController : IDisposable
     private readonly Dictionary<IntPtr, ResourceSetInfo> m_viewsById = new();
     private readonly List<IDisposable> m_ownedResources = new();
     
-    // Font trackers
+    // Font
+    private readonly ImFontConfigPtr m_baseCfg;
+    private readonly ImFontConfigPtr m_mergeCfg;
+    private readonly List<string> m_iconNames = new();
     private readonly Dictionary<string, (IntPtr, int)> m_fontCache;
-    
+    private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache;
+    private readonly Dictionary<string, IntPtr> m_rangePtrCache = new();
     
     // ============================================================
     // Initialization and Loads
@@ -132,7 +142,22 @@ internal class ImGuiNETVeldridController : IDisposable
         io.BackendFlags |= ImGuiBackendFlags.RendererHasViewports;
 
         // Fonts
+        unsafe
+        {
+            m_baseCfg = ImGuiNative.ImFontConfig_ImFontConfig();
+            m_baseCfg.FontDataOwnedByAtlas = false;
+            m_baseCfg.PixelSnapH = true;
+            m_baseCfg.OversampleH = 2;
+            m_baseCfg.OversampleV = 2;
+
+            m_mergeCfg = ImGuiNative.ImFontConfig_ImFontConfig();
+            m_mergeCfg.MergeMode = true;
+            m_mergeCfg.FontDataOwnedByAtlas = false;
+            m_mergeCfg.PixelSnapH = true;
+        }
+
         m_fontCache = new Dictionary<string, (IntPtr, int)>();
+        m_iconSizeCache = new Dictionary<string, (float, (ushort, ushort))>();
         ImGuiNET.ImGui.GetIO().Fonts.AddFontDefault();
         ImGuiNET.ImGui.GetIO().Fonts.Flags |= ImFontAtlasFlags.NoBakedLines;
 
@@ -180,11 +205,12 @@ internal class ImGuiNETVeldridController : IDisposable
         m_projMatrixBuffer = factory.CreateBuffer(new BufferDescription(64, BufferUsage.UniformBuffer | BufferUsage.Dynamic));
         m_projMatrixBuffer.Name = "ImGui.NET Projection Buffer";
 
-        byte[] vertexShaderBytes = LoadEmbeddedShaderCode(m_graphicsDevice.ResourceFactory, "imgui-vertex", ShaderStages.Vertex, m_colorSpaceHandling);
-        byte[] fragmentShaderBytes = LoadEmbeddedShaderCode(m_graphicsDevice.ResourceFactory, "imgui-frag", ShaderStages.Fragment, m_colorSpaceHandling);
-        m_vertexShader = factory.CreateShader(new ShaderDescription(ShaderStages.Vertex, vertexShaderBytes, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "VS"));
+        var vertexShaderBin = LoadEmbeddedShaderCode(m_graphicsDevice.BackendType, "imgui-vertex", ShaderStages.Vertex, m_colorSpaceHandling);
+        var fragmentShaderBin = LoadEmbeddedShaderCode(m_graphicsDevice.BackendType, "imgui-frag", ShaderStages.Fragment, m_colorSpaceHandling);
+        
+        m_vertexShader = factory.CreateShader(new ShaderDescription(ShaderStages.Vertex, vertexShaderBin, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "VS"));
         m_vertexShader.Name = "ImGui.NET Vertex Shader";
-        m_fragmentShader = factory.CreateShader(new ShaderDescription(ShaderStages.Fragment, fragmentShaderBytes, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "FS"));
+        m_fragmentShader = factory.CreateShader(new ShaderDescription(ShaderStages.Fragment, fragmentShaderBin, m_graphicsDevice.BackendType == GraphicsBackend.Vulkan ? "main" : "FS"));
         m_fragmentShader.Name = "ImGui.NET Fragment Shader";
 
         VertexLayoutDescription[] vertexLayouts =
@@ -229,13 +255,13 @@ internal class ImGuiNETVeldridController : IDisposable
         RecreateFontDeviceTexture();
     }
     
-        private byte[] LoadEmbeddedShaderCode(
-        ResourceFactory factory,
+    private byte[] LoadEmbeddedShaderCode(
+        GraphicsBackend backendType,
         string name,
         ShaderStages stage,
         ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        switch (factory.BackendType)
+        switch (backendType)
         {
             case GraphicsBackend.Direct3D11:
             {
@@ -496,9 +522,73 @@ internal class ImGuiNETVeldridController : IDisposable
     // ============================================================
     
     #region Fonts
-    
-    public IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+
+    public void ClearAllFonts()
     {
+        var io = ImGuiNET.ImGui.GetIO();
+        io.Fonts.Clear();
+        
+        foreach (var (ptr, _) in m_fontCache.Values) if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr);
+        m_fontCache.Clear();
+        
+        foreach (var p in m_rangePtrCache.Values) if (p != IntPtr.Zero) Marshal.FreeHGlobal(p);
+        m_rangePtrCache.Clear();
+        
+        m_iconNames.Clear();
+        m_iconSizeCache.Clear();
+    }
+
+    public void RegisterFontIcon(string baseFontFile, float sizePixels, (ushort, ushort) range)
+    {
+        LoadEmbeddedFontTTF(baseFontFile, out _);
+        m_iconNames.Add(baseFontFile);
+        m_iconSizeCache[baseFontFile] = (sizePixels, range);
+    }
+
+    public ImFontPtr AddIcons()
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        ImFontPtr iconFont = new ImFontPtr();
+
+        bool first = true;
+        foreach (var iconName in m_iconNames)
+        {
+            var fontCache = m_fontCache[iconName];
+            var sizeCache = m_iconSizeCache[iconName];
+            var rangePtr = GetOrCreateIconRangePtr(iconName, sizeCache.Item2);
+
+            if (first)
+            {
+                iconFont = io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_baseCfg, rangePtr);
+                first = false;
+            }
+            else
+            {
+                io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_mergeCfg, rangePtr);
+            }
+            
+        }
+        
+        return iconFont;
+    }
+
+    public ImFontPtr AddFontBase(string baseFontFile, float sizePixels)
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        var basePtr = LoadEmbeddedFontTTF(baseFontFile, out var baseLen);
+        var baseFont = io.Fonts.AddFontFromMemoryTTF(basePtr, baseLen, sizePixels, m_baseCfg);
+
+        return baseFont;
+    }
+    
+    private IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+    {
+        if (m_fontCache.TryGetValue(shortName, out var cached))
+        {
+            length = cached.Item2;
+            return cached.Item1;
+        }
+
         var resources = m_assembly.GetManifestResourceNames();
         var match = resources.FirstOrDefault(r => r.EndsWith(shortName, StringComparison.OrdinalIgnoreCase));
         if (match == null)
@@ -514,10 +604,31 @@ internal class ImGuiNETVeldridController : IDisposable
 
         var ptr = Marshal.AllocHGlobal(fontData.Length);
         Marshal.Copy(fontData, 0, ptr, fontData.Length);
+
         m_fontCache[shortName] = (ptr, fontData.Length);
-	    
+
         length = fontData.Length;
         return ptr;
+    }
+    
+    private IntPtr GetOrCreateIconRangePtr(string iconName, (ushort start, ushort end) range)
+    {
+        string key = $"{iconName}:{range.start:X4}-{range.end:X4}";
+        if (m_rangePtrCache.TryGetValue(key, out var p) && p != IntPtr.Zero)
+            return p;
+
+        IntPtr mem = Marshal.AllocHGlobal(sizeof(ushort) * 3);
+
+        unsafe
+        {
+            ushort* u = (ushort*)mem;
+            u[0] = range.start;
+            u[1] = range.end;
+            u[2] = 0;
+        }
+
+        m_rangePtrCache[key] = mem;
+        return mem;
     }
     
     /// <summary>
@@ -664,8 +775,6 @@ internal class ImGuiNETVeldridController : IDisposable
         cl.SetPipeline(m_pipeline);
         cl.SetGraphicsResourceSet(0, m_mainResourceSet);
 
-        drawData.ScaleClipRects(io.DisplayFramebufferScale);
-
         // Render command lists
         int vtxOffset = 0;
         int idxOffset = 0;
@@ -688,13 +797,14 @@ internal class ImGuiNETVeldridController : IDisposable
                             : GetImageResourceSet(pcmd.TextureId));
                 }
 
-                cl.SetScissorRect(
-                    0,
-                    (uint)(pcmd.ClipRect.X - pos.X),
-                    (uint)(pcmd.ClipRect.Y - pos.Y),
-                    (uint)(pcmd.ClipRect.Z - pcmd.ClipRect.X),
-                    (uint)(pcmd.ClipRect.W - pcmd.ClipRect.Y));
+                // ClipRect is in ImGui coordinates (points). Convert to framebuffer pixels for scissor.
+                var scale = io.DisplayFramebufferScale;
+                uint clipX = (uint)((pcmd.ClipRect.X - pos.X) * scale.X);
+                uint clipY = (uint)((pcmd.ClipRect.Y - pos.Y) * scale.Y);
+                uint clipW = (uint)((pcmd.ClipRect.Z - pcmd.ClipRect.X) * scale.X);
+                uint clipH = (uint)((pcmd.ClipRect.W - pcmd.ClipRect.Y) * scale.Y);
 
+                cl.SetScissorRect(0, clipX, clipY, clipW, clipH);
                 cl.DrawIndexed(pcmd.ElemCount, 1, pcmd.IdxOffset + (uint)idxOffset, (int)pcmd.VtxOffset + vtxOffset, 0);
             }
             vtxOffset += cmdList.VtxBuffer.Size;
@@ -807,12 +917,19 @@ internal class ImGuiNETVeldridController : IDisposable
     private void SetPerFrameImGuiData(float deltaSeconds)
     {
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
+
+        // DisplaySize is in logical units (points).
         io.DisplaySize = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
-        io.DeltaTime = deltaSeconds; // DeltaTime is in seconds.
+        io.DeltaTime = deltaSeconds;
+
+        // FramebufferScale is (drawablePixels / logicalPoints). On macOS Retina this is typically 2x2.
+        var (sx, sy) = VeldridSdl2HiDpi.GetFramebufferScale(m_mainWindow);
+        io.DisplayFramebufferScale = new SYSVector2(sx, sy);
 
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new SYSVector2(m_mainWindow.X, m_mainWindow.Y);
         ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new SYSVector2(m_mainWindow.Width, m_mainWindow.Height);
     }
+
     
     #endregion
     
@@ -988,46 +1105,43 @@ internal class ImGuiNETVeldridController : IDisposable
     private void UpdateImGuiGlobalMouseButtonInput(InputSnapshot mainWindowSnapShot)
     {
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
-        
-        // Mouse: Determine if any of the mouse buttons were pressed during this snapshot period, even if they are no longer held.
+
+        // Snapshot pressed (edge) + held (level)
         bool leftPressed = false;
         bool middlePressed = false;
         bool rightPressed = false;
+
         foreach (VeldridMouseEvent me in mainWindowSnapShot.MouseEvents)
         {
-            if (me.Down)
+            if (!me.Down) continue;
+
+            switch (me.MouseButton)
             {
-                switch (me.MouseButton)
-                {
-                    case MouseButton.Left:
-                        leftPressed = true;
-                        break;
-                    case MouseButton.Middle:
-                        middlePressed = true;
-                        break;
-                    case MouseButton.Right:
-                        rightPressed = true;
-                        break;
-                }
+                case MouseButton.Left:   leftPressed = true; break;
+                case MouseButton.Middle: middlePressed = true; break;
+                case MouseButton.Right:  rightPressed = true; break;
             }
         }
-        
-        io.MouseDown[0] = leftPressed || mainWindowSnapShot.IsMouseDown(MouseButton.Left);
-        io.MouseDown[1] = middlePressed || mainWindowSnapShot.IsMouseDown(MouseButton.Right);
-        io.MouseDown[2] = rightPressed || mainWindowSnapShot.IsMouseDown(MouseButton.Middle);
-        
-        m_pSdlGetGlobalMouseState ??=
-            Sdl2Native.LoadFunction<SdlGetGlobalMouseStateT>("SDL_GetGlobalMouseState");
-        
+
+        // ImGui index convention: 0=Left, 1=Right, 2=Middle
+        io.MouseDown[0] = leftPressed   || mainWindowSnapShot.IsMouseDown(MouseButton.Left);
+        io.MouseDown[1] = rightPressed  || mainWindowSnapShot.IsMouseDown(MouseButton.Right);
+        io.MouseDown[2] = middlePressed || mainWindowSnapShot.IsMouseDown(MouseButton.Middle);
+
+        // If you insist on global mouse state (multi-viewport), override WITH CORRECT MAPPING.
+        m_pSdlGetGlobalMouseState ??= Sdl2Native.LoadFunction<SdlGetGlobalMouseStateT>("SDL_GetGlobalMouseState");
+
         int x, y;
         unsafe
         {
             uint buttons = m_pSdlGetGlobalMouseState(&x, &y);
+
+            // SDL: 1=Left, 2=Middle, 4=Right
             io.MouseDown[0] = (buttons & 0b0001) != 0;
-            io.MouseDown[1] = (buttons & 0b0010) != 0;
-            io.MouseDown[2] = (buttons & 0b0100) != 0;
+            io.MouseDown[1] = (buttons & 0b0100) != 0; // Right
+            io.MouseDown[2] = (buttons & 0b0010) != 0; // Middle
         }
-        
+
         io.MousePos = new SYSVector2(x, y);
     }
 
@@ -1104,6 +1218,8 @@ internal class ImGuiNETVeldridController : IDisposable
     /// </summary>
     public void Dispose()
     {
+        ClearAllFonts();
+        
         m_vertexBuffer?.Dispose();
         m_indexBuffer?.Dispose();
         m_projMatrixBuffer?.Dispose();
@@ -1116,8 +1232,7 @@ internal class ImGuiNETVeldridController : IDisposable
         m_mainResourceSet?.Dispose();
         m_fontTextureResourceSet?.Dispose();
         
-	    foreach (var (ptr, _) in m_fontCache.Values) if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr);
-        foreach (IDisposable resource in m_ownedResources) resource.Dispose();
+        foreach (var resource in m_ownedResources) resource.Dispose();
     }
     
     #endregion

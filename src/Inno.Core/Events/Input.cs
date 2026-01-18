@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Core.Events;
 
 public static class Input

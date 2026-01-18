@@ -1,25 +1,24 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Inno.Assets\Inno.Assets.csproj" />
-        <ProjectReference Include="..\Inno.Core\Inno.Core.csproj" />
-        <ProjectReference Include="..\Inno.Graphics\Inno.Graphics.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Inno.Assets\Inno.Assets.csproj"/>
+    <ProjectReference Include="..\Inno.Core\Inno.Core.csproj"/>
+    <ProjectReference Include="..\Inno.Graphics\Inno.Graphics.csproj"/>
+  </ItemGroup>
 
-    <ItemGroup>
-        <EmbeddedResource Include="**\Assets\**\*.*">
-            <LogicalName>%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
-        </EmbeddedResource>
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" PrivateAssets="all"/>
+  </ItemGroup>
 
-    <ItemGroup>
-      <PackageReference Include="ImGui.NET" Version="1.91.6.1" PrivateAssets="all"/>
-    </ItemGroup>
-    
+  <ItemGroup>
+    <EmbeddedResource Include="**\Assets\**\*.*">
+      <LogicalName>%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

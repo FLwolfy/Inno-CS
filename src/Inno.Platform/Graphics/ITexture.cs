@@ -1,8 +1,10 @@
+using System;
+
 namespace Inno.Platform.Graphics;
 
 public enum PixelFormat
 {
-    B8_G8_R8_A8_UNorm,
+    R8_G8_B8_A8_UNorm,
     D32_Float_S8_UInt
 }
 
@@ -22,15 +24,15 @@ public enum TextureUsage : byte
 
 public enum TextureDimension
 {
-    Texture1D,
-    Texture2D
+    Texture2D,
+    Texture3D
 }
 
 public struct TextureDescription()
 {
     public int width;
     public int height;
-    public int mipLevels = 1;
+    public int mipLevelCount = 1;
     
     public PixelFormat format;
     public TextureUsage usage;

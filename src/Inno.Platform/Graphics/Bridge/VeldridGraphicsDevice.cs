@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Inno.Platform.Window.Bridge;
 using Veldrid;
@@ -11,6 +12,7 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
     private readonly GraphicsDevice m_graphicsDevice;
     internal GraphicsDevice inner => m_graphicsDevice;
 
+    public GraphicsBackend backend { get; }
     public IFrameBuffer swapchainFrameBuffer { get; }
 
     public VeldridGraphicsDevice(VeldridSdl2Window window, GraphicsBackend backend)
@@ -24,10 +26,22 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
             preferStandardClipSpaceYDirection: true
         );
 
+        this.backend = backend;
         m_graphicsDevice = VeldridStartup.CreateGraphicsDevice(window.inner, deviceOptions, ToVeldridGraphicsBackend(backend));
         swapchainFrameBuffer = new VeldridFrameBuffer(m_graphicsDevice, m_graphicsDevice.SwapchainFramebuffer);
+
+        // Ensure swapchain/backbuffer matches drawable pixel size on HiDPI displays.
+        {
+            var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+            if (fbW != window.width || fbH != window.height)
+                swapchainFrameBuffer.Resize(fbW, fbH);
+        }
         
-        window.inner.Resized += () => swapchainFrameBuffer.Resize(window.width, window.height);
+        window.inner.Resized += () =>
+        {
+            var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+            swapchainFrameBuffer.Resize(fbW, fbH);
+        };
     }
 
     private VeldridGraphicsBackend ToVeldridGraphicsBackend(GraphicsBackend backend)
@@ -86,6 +100,11 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
     public ITexture CreateTexture(TextureDescription desc)
     {
         return VeldridTexture.Create(m_graphicsDevice, desc);
+    }
+    
+    public ISampler CreateSampler(SamplerDescription desc)
+    {
+        return VeldridSampler.Create(m_graphicsDevice, desc);
     }
 
     public IPipelineState CreatePipelineState(PipelineStateDescription desc)

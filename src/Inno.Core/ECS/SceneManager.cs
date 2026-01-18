@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace Inno.Core.ECS;
 
 /// <summary>
@@ -82,6 +86,15 @@ public static class SceneManager
     {
         m_runtimeStarted = true;
         foreach (var scene in SceneManager.GetAllScenes()) { scene.BeginRuntime(); }
+    }
+
+    /// <summary>
+    /// Ends runtime. This does NOT destroy scenes; it only returns ECS to an editor-safe state.
+    /// </summary>
+    public static void EndRuntime()
+    {
+        m_runtimeStarted = false;
+        foreach (var scene in SceneManager.GetAllScenes()) { scene.EndRuntime(); }
     }
 
     /// <summary>

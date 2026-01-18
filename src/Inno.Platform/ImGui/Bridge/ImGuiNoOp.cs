@@ -1,3 +1,4 @@
+using System;
 using Inno.Platform.Graphics;
 
 namespace Inno.Platform.ImGui.Bridge;
@@ -26,6 +27,31 @@ internal class ImGuiNoOp : IImGui
     public void UnbindTextureImpl(ITexture texture)
     {
         // Do nothing
+    }
+    
+    public void UseFontImpl(ImGuiFontStyle style, float? size)
+    {
+        // Do nothing
+    }
+
+    public ImGuiAlias GetCurrentFontImpl()
+    {
+        return default;
+    }
+
+    public void ZoomImpl(float zoomRate)
+    {
+        // Do nothing
+    }
+    
+    public void SetStorageDataImpl(string key, object? value)
+    {
+        // Do nothing
+    }
+
+    public T? GetStorageDataImpl<T>(string key, T? defaultValue = default)
+    {
+        return default;
     }
 
     public void UseFontImpl(ImGuiFontStyle style)

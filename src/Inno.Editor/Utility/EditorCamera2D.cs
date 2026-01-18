@@ -1,3 +1,4 @@
+using System;
 using Inno.Core.Math;
 
 namespace Inno.Editor.Utility;

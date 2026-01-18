@@ -1,4 +1,6 @@
 #nullable disable
+using System;
+
 namespace Inno.Core.Math;
 
 /// <summary>
@@ -70,7 +72,9 @@ public static class MathHelper
     return (float) (0.5 * (2.0 * (double) value2 + ((double) value3 - (double) value1) * (double) amount + (2.0 * (double) value1 - 5.0 * (double) value2 + 4.0 * (double) value3 - (double) value4) * num1 + (3.0 * (double) value2 - (double) value1 - 3.0 * (double) value3 + (double) value4) * num2));
   }
 
-  /// <summary>Restricts a value to be within a specified range.</summary>
+  /// <summary>
+  /// Restricts a value to be within a specified range.
+  /// </summary>
   /// <param name="value">The value to clamp.</param>
   /// <param name="min">The minimum value. If <c>value</c> is less than <c>min</c>, <c>min</c> will be returned.</param>
   /// <param name="max">The maximum value. If <c>value</c> is greater than <c>max</c>, <c>max</c> will be returned.</param>
@@ -102,7 +106,9 @@ public static class MathHelper
   /// <returns>Distance between the two values.</returns>
   public static float Distance(float value1, float value2) => MathF.Abs(value1 - value2);
 
-  /// <summary>Performs a Hermite spline interpolation.</summary>
+  /// <summary>
+  /// Performs a Hermite spline interpolation.
+  /// </summary>
   /// <param name="value1">Source position.</param>
   /// <param name="tangent1">Source tangent.</param>
   /// <param name="value2">Source position.</param>
@@ -132,9 +138,9 @@ public static class MathHelper
   /// <param name="amount">Value between 0 and 1 indicating the weight of value2.</param>
   /// <returns>Interpolated value.</returns>
   /// <remarks>This method performs the linear interpolation based on the following formula:
-  /// <code>value1 + (value2 - value1) * amount</code>.
+  /// <code>value1 + (value2 - value1) * amount</code>
   /// Passing amount a value of 0 will cause value1 to be returned, a value of 1 will cause value2 to be returned.
-  /// See <see cref="M:Inno.Runtime.Base.MathHelper.LerpPrecise(System.Single,System.Single,System.Single)" /> for a less efficient version with more precision around edge cases.
+  /// See <see cref="M:Inno.Core.Math.MathHelper.LerpPrecise(System.Single,System.Single,System.Single)" /> for a less efficient version with more precision around edge cases.
   /// </remarks>
   public static float Lerp(float value1, float value2, float amount)
   {
@@ -143,7 +149,7 @@ public static class MathHelper
 
   /// <summary>
   /// Linearly interpolates between two values.
-  /// This method is a less efficient, more precise version of <see cref="M:Inno.Runtime.Base.MathHelper.Lerp(System.Single,System.Single,System.Single)" />.
+  /// This method is a less efficient, more precise version of <see cref="M:Inno.Core.Math.MathHelper.Lerp(System.Single,System.Single,System.Single)" />.
   /// See remarks for more info.
   /// </summary>
   /// <param name="value1">Source value.</param>
@@ -166,37 +172,9 @@ public static class MathHelper
     return (float) ((1.0 - (double) amount) * (double) value1 + (double) value2 * (double) amount);
   }
 
-  /// <summary>Returns the greater of two values.</summary>
-  /// <param name="value1">Source value.</param>
-  /// <param name="value2">Source value.</param>
-  /// <returns>The greater value.</returns>
-  public static float Max(float value1, float value2)
-  {
-    return (double) value1 <= (double) value2 ? value2 : value1;
-  }
-
-  /// <summary>Returns the greater of two values.</summary>
-  /// <param name="value1">Source value.</param>
-  /// <param name="value2">Source value.</param>
-  /// <returns>The greater value.</returns>
-  public static int Max(int value1, int value2) => value1 <= value2 ? value2 : value1;
-
-  /// <summary>Returns the lesser of two values.</summary>
-  /// <param name="value1">Source value.</param>
-  /// <param name="value2">Source value.</param>
-  /// <returns>The lesser value.</returns>
-  public static float Min(float value1, float value2)
-  {
-    return (double) value1 >= (double) value2 ? value2 : value1;
-  }
-
-  /// <summary>Returns the lesser of two values.</summary>
-  /// <param name="value1">Source value.</param>
-  /// <param name="value2">Source value.</param>
-  /// <returns>The lesser value.</returns>
-  public static int Min(int value1, int value2) => value1 >= value2 ? value2 : value1;
-
-  /// <summary>Interpolates between two values using a cubic equation.</summary>
+  /// <summary>
+  /// Interpolates between two values using a cubic equation.
+  /// </summary>
   /// <param name="value1">Source value.</param>
   /// <param name="value2">Source value.</param>
   /// <param name="amount">Weighting value.</param>
@@ -207,7 +185,9 @@ public static class MathHelper
     return Hermite(value1, 0.0f, value2, 0.0f, amount1);
   }
 
-  /// <summary>Converts radians to degrees.</summary>
+  /// <summary>
+  /// Converts radians to degrees.
+  /// </summary>
   /// <param name="radians">The angle in radians.</param>
   /// <returns>The angle in degrees.</returns>
   /// <remarks>
@@ -217,7 +197,9 @@ public static class MathHelper
   /// </remarks>
   public static float ToDegrees(float radians) => radians * 57.29578f;
 
-  /// <summary>Converts degrees to radians.</summary>
+  /// <summary>
+  /// Converts degrees to radians.
+  /// </summary>
   /// <param name="degrees">The angle in degrees.</param>
   /// <returns>The angle in radians.</returns>
   /// <remarks>
@@ -227,7 +209,9 @@ public static class MathHelper
   /// </remarks>
   public static float ToRadians(float degrees) => degrees * ((float) MathF.PI / 180f);
 
-  /// <summary>Reduces a given angle to a value between π and -π.</summary>
+  /// <summary>
+  /// Reduces a given angle to a value between π and -π.
+  /// </summary>
   /// <param name="angle">The angle to reduce, in radians.</param>
   /// <returns>The new angle, in radians.</returns>
   public static float WrapAngle(float angle)
@@ -240,7 +224,9 @@ public static class MathHelper
     return (double) angle > 3.1415927410125732 ? angle - 6.2831855f : angle;
   }
 
-  /// <summary>Determines if value is powered by two.</summary>
+  /// <summary>
+  /// Determines if value is powered by two.
+  /// </summary>
   /// <param name="value">A value.</param>
   /// <returns><c>true</c> if <c>value</c> is powered by two; otherwise <c>false</c>.</returns>
   public static bool IsPowerOfTwo(int value) => value > 0 && (value & value - 1) == 0;

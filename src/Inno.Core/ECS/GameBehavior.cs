@@ -5,7 +5,7 @@ namespace Inno.Core.ECS;
 /// GameBehaviors are GameComponents whose active states can be set.
 /// </summary>
 public abstract class GameBehavior : GameComponent
-{
+{        
     public new bool isActive
     {
         get => base.isActive;

@@ -1,41 +1,37 @@
-using Inno.Core.ECS;
-using Inno.Core.Logging;
+using System.Runtime.Serialization;
+using Inno.Core.Serialization;
 
 namespace Inno.Editor.Utility;
 
 public class EditorSelection
 {
-    public delegate void SelectionChangedHandler(GameObject? oldObj, GameObject? newObj);
+    public Serializable? selectedObject { get; private set; }
+    public delegate void SelectionChangedHandler(Serializable? oldObj, Serializable? newObj);
     public event SelectionChangedHandler? OnSelectionChanged;
-    
-    private GameObject? m_selectedObject;
-    public GameObject? selectedObject => m_selectedObject;
 
-    public void Select(GameObject obj)
+    public void Select(Serializable obj)
     {
-        Log.Debug("Selecting " + obj.name);
-        
-        if (m_selectedObject != obj)
+        if (selectedObject != obj)
         {
-            var old = m_selectedObject;
-            m_selectedObject = obj;
+            var old = selectedObject;
+            selectedObject = obj;
             OnSelectionChanged?.Invoke(old, obj);
         }
     }
 
     public void Deselect()
     {
-        if (m_selectedObject != null)
+        if (selectedObject != null)
         {
-            var old = m_selectedObject;
-            m_selectedObject = null;
+            var old = selectedObject;
+            selectedObject = null;
             OnSelectionChanged?.Invoke(old, null);
         }
     }
 
-    public bool IsSelected(GameObject obj)
+    public bool IsSelected(object obj)
     {
-        return m_selectedObject == obj;
+        return selectedObject == obj;
     }
 }
 

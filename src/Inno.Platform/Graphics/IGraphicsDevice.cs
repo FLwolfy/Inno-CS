@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Platform.Graphics;
 
 public enum GraphicsBackend
@@ -11,6 +13,7 @@ public enum GraphicsBackend
 
 public interface IGraphicsDevice : IDisposable
 {
+    GraphicsBackend backend { get; }
     IFrameBuffer swapchainFrameBuffer { get; }
     
     IVertexBuffer CreateVertexBuffer(uint sizeInBytes);
@@ -23,6 +26,7 @@ public interface IGraphicsDevice : IDisposable
     IShader CreateComputeShader(ShaderDescription desc);
     
     ITexture CreateTexture(TextureDescription desc);
+    ISampler CreateSampler(SamplerDescription desc);
     IPipelineState CreatePipelineState(PipelineStateDescription desc);
     
     ICommandList CreateCommandList();

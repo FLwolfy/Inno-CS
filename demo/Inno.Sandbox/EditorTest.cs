@@ -1,7 +1,13 @@
+using Inno.Assets;
+using Inno.Assets.AssetType;
 using Inno.Core.ECS;
 using Inno.Core.Layers;
 using Inno.Core.Math;
+using Inno.Core.Utility;
 using Inno.Editor.Core;
+using Inno.Graphics.Decoder;
+using Inno.Graphics.Resources;
+using Inno.Graphics.Resources.CpuResources;
 using Inno.Runtime.Component;
 using Inno.Runtime.Core;
 
@@ -23,7 +29,7 @@ public class EditorTest
         {
             m_editorLayer = new TestEditorLayer();
             
-            SetWindowSize(1920, 1080);
+            SetWindowSize(1200, 720);
             SetWindowResizable(true);
         }
         protected override void RegisterLayers(LayerStack layerStack)
@@ -57,7 +63,7 @@ public class EditorTest
             testObject.transform.worldScale = new Vector3(100f, 100f, 1f);
             testObject.transform.localRotationZ = 45;
             testObject.AddComponent<SpriteRenderer>();
-        
+            
             // Object 2 - 5
             for (int i = 2; i <= 5; i++)
             {
@@ -69,6 +75,28 @@ public class EditorTest
             
                 to.transform.SetParent(testObject.transform);
             }
+            
+            // Object 6
+            GameObject testObject6 = new GameObject("Textured Object");
+            testObject6.transform.worldPosition = new Vector3(0, 200, 0);
+            testObject6.transform.worldScale = new Vector3(1f, 1f, 1f);
+            testObject6.transform.localRotationZ = 0;
+            SpriteRenderer sr6 = testObject6.AddComponent<SpriteRenderer>();
+            testObject6.AddComponent<TestComponent>();
+
+            AssetRef<TextureAsset> testTextureAsset = AssetManager.Get<TextureAsset>("TestTextures/coin.png");
+            Texture testTexture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(testTextureAsset.Resolve()!);
+            sr6.sprite = Sprite.FromTexture(testTexture);
+        }
+    }
+
+    private class TestComponent : GameBehavior
+    {
+        public override ComponentTag orderTag => ComponentTag.Behavior;
+        
+        public override void Update()
+        {
+            transform.localRotationZ += Time.deltaTime * 100f;
         }
     }
 }

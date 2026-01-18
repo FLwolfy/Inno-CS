@@ -1,3 +1,4 @@
+using System;
 using Veldrid;
 using VeldridTEXDescription = Veldrid.TextureDescription;
 using InnoPixelFormat = Inno.Platform.Graphics.PixelFormat;
@@ -47,7 +48,7 @@ internal class VeldridTexture : ITexture
             width,
             height,
             1,
-            (uint)desc.mipLevels,
+            (uint)desc.mipLevelCount,
             1,
             ToVeldridPixelFormat(desc.format),
             ToVeldridTextureUsage(desc.usage),
@@ -59,7 +60,7 @@ internal class VeldridTexture : ITexture
     {
         return format switch
         {
-            InnoPixelFormat.B8_G8_R8_A8_UNorm => VeldridPixelFormat.B8_G8_R8_A8_UNorm,
+            InnoPixelFormat.R8_G8_B8_A8_UNorm => VeldridPixelFormat.R8_G8_B8_A8_UNorm,
             InnoPixelFormat.D32_Float_S8_UInt => VeldridPixelFormat.D32_Float_S8_UInt,
             _ => throw new NotSupportedException($"Unsupported pixel format: {format}")
         };
@@ -74,8 +75,8 @@ internal class VeldridTexture : ITexture
     {
         return dim switch
         {
-            TextureDimension.Texture1D => TextureType.Texture1D,
             TextureDimension.Texture2D => TextureType.Texture2D,
+            TextureDimension.Texture3D => TextureType.Texture3D,
             _ => throw new NotSupportedException($"Unsupported texture type: {dim}")
         };
     }

@@ -1,3 +1,4 @@
+using System;
 using ImGuiNET;
 using Inno.Core.ECS;
 using Inno.Core.Events;
@@ -6,6 +7,7 @@ using Inno.Editor.Core;
 using Inno.Editor.Gizmo;
 using Inno.Editor.GUI;
 using Inno.Editor.Utility;
+using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
@@ -46,11 +48,11 @@ public class GameViewPanel : EditorPanel
     
     private void EnsureSceneRenderTarget()
     {
-        if (RenderTargetPool.Get("game") == null)
+        if (RenderGraphics.targetPool.Get("game") == null)
         {
             var renderTexDesc = new TextureDescription
             {
-                format = PixelFormat.B8_G8_R8_A8_UNorm,
+                format = PixelFormat.R8_G8_B8_A8_UNorm,
                 usage = TextureUsage.RenderTarget | TextureUsage.Sampled,
                 dimension = TextureDimension.Texture2D
             };
@@ -68,7 +70,7 @@ public class GameViewPanel : EditorPanel
                 colorAttachmentDescriptions = [renderTexDesc]
             };
             
-            m_renderTarget = RenderTargetPool.Create("game", renderTargetDesc);
+            m_renderTarget = RenderGraphics.targetPool.Create("game", renderTargetDesc);
             m_currentTexture = m_renderTarget.GetColorAttachment(0)!;
         }
     }
@@ -100,7 +102,7 @@ public class GameViewPanel : EditorPanel
 
     private void RenderSceneToBuffer()
     {
-        if (RenderTargetPool.Get("game") != null)
+        if (RenderGraphics.targetPool.Get("game") != null)
         {
             var camera = SceneManager.GetActiveScene()?.GetMainCamera();
             if (camera == null) { return; }
@@ -113,7 +115,7 @@ public class GameViewPanel : EditorPanel
 
     private void DrawScene()
     {
-        var targetTexture = RenderTargetPool.Get("game")?.GetColorAttachment(0);
+        var targetTexture = RenderGraphics.targetPool.Get("game")?.GetColorAttachment(0);
         if (targetTexture != null)
         {
             var newTextureHandle = IImGui.GetOrBindTexture(targetTexture);

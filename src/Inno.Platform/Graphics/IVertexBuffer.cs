@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Platform.Graphics;
 
 public interface IVertexBuffer : IDisposable

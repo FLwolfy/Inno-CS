@@ -1,6 +1,6 @@
 using Inno.Core.Math;
 using Inno.Editor.Core;
-using Inno.Platform.ImGui;
+using Inno.Editor.GUI;
 
 namespace Inno.Editor.Gizmo;
 

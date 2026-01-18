@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using ImGuiNET;
 using Inno.Core.Logging;
 using Inno.Core.Math;
@@ -14,8 +17,8 @@ public class LogPanel : EditorPanel, ILogSink
 
     private readonly Queue<LogEntry> m_pendingEntries = new();
     private readonly List<LogEntry> m_entries = new();
-    private readonly HashSet<LogLevel> m_filterLevels = Enum.GetValues(typeof(LogLevel)).Cast<LogLevel>().ToHashSet();
-    private readonly LogLevel[] m_levels = (LogLevel[])Enum.GetValues(typeof(LogLevel));
+    private readonly HashSet<LogLevel> m_filterLevels = Enum.GetValues<LogLevel>().ToHashSet();
+    private readonly LogLevel[] m_levels = Enum.GetValues<LogLevel>();
 
     private bool m_collapse = true;
 
@@ -168,6 +171,7 @@ public class LogPanel : EditorPanel, ILogSink
         if (open)
         {
             ImGui.TextWrapped($"Time: {entry.time:HH:mm:ss}");
+            ImGui.TextWrapped($"Source: {entry.source}");
             ImGui.TextWrapped($"File: {entry.file}");
             ImGui.TextWrapped($"Line: {entry.line}");
             ImGui.Dummy(new Vector2(0, 8));

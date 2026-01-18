@@ -1,5 +1,7 @@
+using System;
 using System.Runtime.InteropServices;
 using ImGuiNET;
+using Inno.Platform.Window.Bridge;
 using Veldrid;
 using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
@@ -29,7 +31,7 @@ internal class ImGuiNETVeldridWindow : IDisposable
         m_viewportPtr = vp;
         m_isMainWindow = false;
 
-        SDL_WindowFlags flags = SDL_WindowFlags.Hidden;
+        SDL_WindowFlags flags = SDL_WindowFlags.Hidden | SDL_WindowFlags.AllowHighDpi;
         if ((vp.Flags & ImGuiViewportFlags.NoTaskBarIcon) != 0)
         {
             flags |= SDL_WindowFlags.SkipTaskbar;
@@ -58,19 +60,25 @@ internal class ImGuiNETVeldridWindow : IDisposable
         m_window.Closed += () => m_viewportPtr.PlatformRequestClose = true;
         m_window.Moved += _ => m_viewportPtr.PlatformRequestMove = true;
         m_window.FocusGained += () => currentWindow = this;
-
+        
+        var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(m_window);
         SwapchainSource scSource = VeldridStartup.GetSwapchainSource(m_window);
         SwapchainDescription scDesc = new SwapchainDescription(
             scSource, 
-            (uint)m_window.Width, 
-            (uint)m_window.Height, 
+            (uint)fbW, 
+            (uint)fbH, 
             m_graphicsDevice.SwapchainFramebuffer.OutputDescription.DepthAttachment?.Format,
             true, 
             false
         );
-        
+
         m_swapchain = m_graphicsDevice.ResourceFactory.CreateSwapchain(scDesc);
-        m_window.Resized += () => m_swapchain.Resize((uint)m_window.Width, (uint)m_window.Height);
+        m_swapchain.Resize((uint)fbW, (uint)fbH);
+        m_window.Resized += () =>
+        {
+            var (nw, nh) = VeldridSdl2HiDpi.GetFramebufferSize(m_window);
+            m_swapchain.Resize((uint)nw, (uint)nh);
+        };
 
         vp.PlatformUserData = (IntPtr)m_gcHandle;
     }

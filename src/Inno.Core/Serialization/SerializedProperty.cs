@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Core.Serialization;
 
 public class SerializedProperty

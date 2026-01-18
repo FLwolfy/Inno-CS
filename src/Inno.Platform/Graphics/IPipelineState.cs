@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Inno.Platform.Graphics;
 
 public enum PrimitiveTopology

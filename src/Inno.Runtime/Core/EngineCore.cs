@@ -5,6 +5,8 @@ using Inno.Core.Layers;
 using Inno.Core.Logging;
 using Inno.Core.Utility;
 using Inno.Graphics;
+using Inno.Graphics.Renderer;
+using Inno.Graphics.Resources.GpuResources.Cache;
 using Inno.Graphics.Targets;
 using Inno.Platform;
 using Inno.Platform.Graphics;
@@ -48,17 +50,16 @@ public abstract class EngineCore
         // Initialize Asset
         AssetManager.Initialize(
             assetDir: "Project/Assets",
-            libraryDir: "Project/Library"
+            binDir: "Project/Library"
         );
         
         // Initialize Logging
         m_fileSink = new FileLogSink("Project/Logs", 5 * 1024 * 1024, 20);
+        LogManager.SetMinimumLevel(LogLevel.Debug);
         LogManager.RegisterSink(m_fileSink);
-        LogManager.RegisterSink(new ConsoleLogSink());
         
         // Initialize Render
-        RenderTargetPool.Initialize(m_graphicsDevice);
-        Renderer2D.Initialize(m_graphicsDevice);
+        RenderGraphics.Initialize(m_graphicsDevice);
         
         // Initialization Callbacks
         m_gameShell.SetOnLoad(OnLoad);
@@ -72,7 +73,7 @@ public abstract class EngineCore
     private void OnLoad()
     {
         // InnoAsset Initialization
-        AssetManager.LoadAllAssets();
+        AssetManager.LoadAllFromAssetDirectory();
         
         // Graphics Resources
         Renderer2D.LoadResources();
@@ -122,13 +123,15 @@ public abstract class EngineCore
     private void OnClose()
     {
         // Clean Graphics Cache
-        RenderTargetPool.Clear();
-        Renderer2D.CleanResources();
+        RenderGraphics.Clear();
         
         // Dispose Resources
         IImGui.DisposeImpl();
         m_fileSink.Dispose();
         m_graphicsDevice.Dispose();
+        
+        // Assets
+        AssetManager.Shutdown();
     }
     
     /// <summary>

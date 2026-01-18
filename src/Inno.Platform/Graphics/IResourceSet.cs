@@ -1,11 +1,18 @@
+using System;
+
 namespace Inno.Platform.Graphics;
 
-public struct ResourceSetBinding
+public struct ResourceSetBinding()
 {
+    // Shaders
     public ShaderStage shaderStages;
     
-    public IUniformBuffer[] uniformBuffers;
-    // public ITexture[] textures;
+    // Uniforms
+    public IUniformBuffer[] uniformBuffers = [];
+    
+    // Textures
+    public ITexture[] textures = [];
+    public ISampler[] samplers = [];
 }
 
 public interface IResourceSet : IDisposable;

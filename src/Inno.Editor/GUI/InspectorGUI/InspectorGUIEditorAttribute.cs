@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Editor.GUI.InspectorGUI;
 
 [AttributeUsage(AttributeTargets.Class)]

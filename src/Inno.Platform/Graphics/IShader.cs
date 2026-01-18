@@ -1,3 +1,5 @@
+using System;
+
 namespace Inno.Platform.Graphics;
 
 [Flags]
@@ -16,7 +18,7 @@ public enum ShaderStage : byte
 public struct ShaderDescription
 {
     public ShaderStage stage;
-    public string sourceCode;
+    public byte[] sourceBytes;
 }
 
 public interface IShader : IDisposable

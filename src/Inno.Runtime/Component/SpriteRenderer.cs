@@ -1,7 +1,7 @@
 using Inno.Core.ECS;
 using Inno.Core.Math;
 using Inno.Core.Serialization;
-using Inno.Runtime.RenderObject;
+using Inno.Graphics.Resources.CpuResources;
 
 namespace Inno.Runtime.Component;
 
