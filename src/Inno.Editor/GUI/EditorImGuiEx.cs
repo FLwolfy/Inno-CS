@@ -92,15 +92,21 @@ public static class EditorImGuiEx
     public static Vector2 GetInvisibleItemRectSize() => m_invisibleSizeCache;
     
     // Payload
-    public static unsafe void SetDragDropPayload<T>(string type, T data) where T : unmanaged
+    public static void SetDragPayload<T>(string type, T data) where T : unmanaged
     {
-        T* ptr = &data;
-        ImGui.SetDragDropPayload(type, (IntPtr)ptr, (uint)sizeof(T));
+        unsafe
+        {
+            T* ptr = &data;
+            ImGui.SetDragDropPayload(type, (IntPtr)ptr, (uint)sizeof(T));
+        }
     }
-    public static unsafe T? AcceptDragDropPayload<T>(string type) where T : unmanaged
+    public static T? AcceptDragPayload<T>(string type) where T : unmanaged
     {
         var payload = ImGui.AcceptDragDropPayload(type);
-        if (payload.NativePtr == null || payload.Data == IntPtr.Zero) { return null; }
-        return *(T*)payload.Data.ToPointer();
+        unsafe
+        {
+            if (payload.NativePtr == null || payload.Data == IntPtr.Zero) { return null; }
+            return *(T*)payload.Data.ToPointer();
+        }
     }
 }

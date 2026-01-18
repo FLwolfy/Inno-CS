@@ -83,7 +83,7 @@ public class HierarchyPanel : EditorPanel
         ImGui.Text("[ Scene Root ]");
         if (ImGui.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragDropPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null)
             {
                 var obj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
@@ -133,7 +133,7 @@ public class HierarchyPanel : EditorPanel
         // Drag Source
         if (ImGui.BeginDragDropSource())
         {
-            EditorImGuiEx.SetDragDropPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
+            EditorImGuiEx.SetDragPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
             ImGui.Text($"Dragging {obj.name}");
             ImGui.EndDragDropSource();
         }
@@ -141,7 +141,7 @@ public class HierarchyPanel : EditorPanel
         // Drag Target
         if (ImGui.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragDropPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null && payload != obj.id)
             {
                 var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);

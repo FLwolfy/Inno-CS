@@ -208,6 +208,20 @@ public static class AssetManager
     // Get (AssetRef)
     // ===========
 
+    public static Guid GetGuid(string relativePath)
+    {
+        lock (SYNC)
+        {
+            if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
+            {
+                return guid;
+            }
+        }
+        
+        Log.Warn($"Could not find asset guid for {relativePath}. Has the asset already loaded?");
+        return Guid.Empty;
+    }
+
     public static AssetRef<T> Get<T>(string relativePath) where T : InnoAsset
     {
         lock (SYNC)

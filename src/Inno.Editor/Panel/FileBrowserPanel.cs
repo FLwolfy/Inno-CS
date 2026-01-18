@@ -17,6 +17,9 @@ namespace Inno.Editor.Panel;
 public sealed class FileBrowserPanel : EditorPanel
 {
     public override string title => "File";
+    
+    // Drag typeID
+    public const string C_ASSET_GUID_TYPE = "FileAssetGUID";
 
     // Splitter
     private const float C_SPLITTER_DEFAULT_WIDTH = 280f;
@@ -494,6 +497,15 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             DrawItemContextItems(e);
             ImGui.EndPopup();
+        }
+        
+        // Drag
+        if (!e.isDir && ImGui.BeginDragDropSource())
+        {
+            var relativePath = GetRelativeDisplay(AssetManager.assetDirectory, e.fullPath);
+            EditorImGuiEx.SetDragPayload(C_ASSET_GUID_TYPE, AssetManager.GetGuid(relativePath));
+            ImGui.Text($"Dragging {relativePath}");
+            ImGui.EndDragDropSource();
         }
 
         IImGui.UseFont(currentFont); // This is to be used for the regular context
