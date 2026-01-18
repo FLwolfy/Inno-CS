@@ -20,6 +20,7 @@ public static class EditorGUILayout
     private static readonly Stack<int> SCOPE_STACK = new();
     private static readonly Stack<LayoutAlign> ALIGN_STACK = new();
     private static readonly Stack<bool> COLUMN_DIRTY_STACK = new();
+    private static readonly Stack<int> COLUMN_KEY_STACK = new();
 
     private static readonly Dictionary<int, int> COLUMN_COUNT_MAP = new();
     private static readonly Dictionary<int, float> COLUMN_TOTAL_WEIGHT_MAP = new();
@@ -79,22 +80,26 @@ public static class EditorGUILayout
     public static void BeginColumns(float firstColumnWeight = 1.0f, bool bordered = false)
     {
         var flags = ImGuiTableFlags.SizingStretchProp;
-
-        if (bordered)
-            flags |= ImGuiTableFlags.BordersInner | ImGuiTableFlags.BordersOuter;
+        if (bordered) flags |= ImGuiTableFlags.BordersInner | ImGuiTableFlags.BordersOuter;
 
         m_columnDepth++;
-        bool dirty = !COLUMN_COUNT_MAP.ContainsKey(m_columnDepth);
+
+        int layoutKey = (int)ImGui.GetID($"__EditorGUILayout_Columns__{m_columnDepth}");
+        COLUMN_KEY_STACK.Push(layoutKey);
+
+        bool dirty = !COLUMN_COUNT_MAP.ContainsKey(layoutKey);
         COLUMN_DIRTY_STACK.Push(dirty);
 
         if (!dirty)
         {
-            int columnCount = COLUMN_COUNT_MAP[m_columnDepth];
-            ImGui.BeginTable($"EditorLayout##{m_columnDepth}", columnCount, flags);
+            int columnCount = COLUMN_COUNT_MAP[layoutKey];
 
+            ImGui.BeginTable($"EditorLayout##{layoutKey}", columnCount, flags);
+
+            var weights = COLUMN_WEIGHT_MAP[layoutKey];
             for (int i = 0; i < columnCount; i++)
             {
-                ImGui.TableSetupColumn($"Column {i}", ImGuiTableColumnFlags.None, COLUMN_WEIGHT_MAP[m_columnDepth][i]);
+                ImGui.TableSetupColumn($"Column {i}", ImGuiTableColumnFlags.None, weights[i]);
             }
 
             float rowH = ImGui.GetFrameHeight();
@@ -103,9 +108,9 @@ public static class EditorGUILayout
         }
         else
         {
-            COLUMN_COUNT_MAP[m_columnDepth] = 1;
-            COLUMN_TOTAL_WEIGHT_MAP[m_columnDepth] = firstColumnWeight;
-            COLUMN_WEIGHT_MAP[m_columnDepth] = new List<float> { firstColumnWeight };
+            COLUMN_COUNT_MAP[layoutKey] = 1;
+            COLUMN_TOTAL_WEIGHT_MAP[layoutKey] = firstColumnWeight;
+            COLUMN_WEIGHT_MAP[layoutKey] = new List<float> { firstColumnWeight };
         }
     }
 
@@ -114,7 +119,11 @@ public static class EditorGUILayout
     /// </summary>
     public static void EndColumns()
     {
+        if (COLUMN_DIRTY_STACK.Count == 0 || COLUMN_KEY_STACK.Count == 0)
+            throw new InvalidOperationException("EndColumns() called without BeginColumns().");
+
         bool dirty = COLUMN_DIRTY_STACK.Pop();
+        int layoutKey = COLUMN_KEY_STACK.Pop();
 
         if (!dirty)
         {
@@ -122,11 +131,13 @@ public static class EditorGUILayout
         }
         else
         {
-            float totalWeight = COLUMN_TOTAL_WEIGHT_MAP[m_columnDepth];
+            float totalWeight = COLUMN_TOTAL_WEIGHT_MAP[layoutKey];
             if (totalWeight != 0)
             {
-                for (int i = 0; i < COLUMN_COUNT_MAP[m_columnDepth]; i++)
-                    COLUMN_WEIGHT_MAP[m_columnDepth][i] /= totalWeight;
+                var weights = COLUMN_WEIGHT_MAP[layoutKey];
+                int count = COLUMN_COUNT_MAP[layoutKey];
+                for (int i = 0; i < count; i++)
+                    weights[i] /= totalWeight;
             }
         }
 
@@ -138,7 +149,7 @@ public static class EditorGUILayout
     /// </summary>
     public static void SplitColumns(float nextColumnWeight = 1.0f)
     {
-        if (COLUMN_DIRTY_STACK.Count == 0)
+        if (COLUMN_DIRTY_STACK.Count == 0 || COLUMN_KEY_STACK.Count == 0)
             throw new InvalidOperationException("SplitColumns() called without BeginColumns().");
 
         if (!COLUMN_DIRTY_STACK.Peek())
@@ -147,11 +158,14 @@ public static class EditorGUILayout
         }
         else
         {
-            COLUMN_COUNT_MAP[m_columnDepth]++;
-            COLUMN_TOTAL_WEIGHT_MAP[m_columnDepth] += nextColumnWeight;
-            COLUMN_WEIGHT_MAP[m_columnDepth].Add(nextColumnWeight);
+            int layoutKey = COLUMN_KEY_STACK.Peek();
+
+            COLUMN_COUNT_MAP[layoutKey]++;
+            COLUMN_TOTAL_WEIGHT_MAP[layoutKey] += nextColumnWeight;
+            COLUMN_WEIGHT_MAP[layoutKey].Add(nextColumnWeight);
         }
     }
+
 
     /// <summary>
     /// Inserts vertical spacing.
@@ -514,13 +528,10 @@ public static class EditorGUILayout
             BeginColumns();
             
             changed |= DrawAxisDrag("X", ref x, ImGui.GetColumnWidth(), new Color(0.75f, 0.20f, 0.20f)); // Red
-            SplitColumns();
             changed |= DrawAxisDrag("Z", ref z, ImGui.GetColumnWidth(), new Color(0.25f, 0.35f, 0.80f)); // Blue
             SplitColumns();
             changed |= DrawAxisDrag("Y", ref y, ImGui.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f)); // Green
-            SplitColumns();
             changed |= DrawAxisDrag("W", ref w, ImGui.GetColumnWidth(), new Color(0.65f, 0.65f, 0.65f)); // Gray
-            SplitColumns();
             
             EndColumns();
 
