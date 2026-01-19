@@ -54,14 +54,13 @@ internal sealed class ImGuiImpl : IImGui
         m_controller.ClearAllFonts();
         SetupFonts(m_dpiScale);
         SetupIcons(m_dpiScale);
-
         m_controller.RebuildFontTexture();
 
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
         virtualContextPtrImpl = mainMainContextPtrImpl;
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
-        ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
+        // ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
 
         SetupImGuiStyle();
 
@@ -122,47 +121,47 @@ internal sealed class ImGuiImpl : IImGui
 
     public void UseFontImpl(ImGuiFontStyle style, float? size)
     {
-        m_currentFont = size == null
-            ? new ImGuiAlias(style, m_currentFont.size)
-            : new ImGuiAlias(style, (float)size);
-
-        var requested = m_currentFont.size * m_zoomRate;
-        var family = style switch
-        {
-            ImGuiFontStyle.Bold => m_fontBold,
-            ImGuiFontStyle.Italic => m_fontItalic,
-            ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
-            ImGuiFontStyle.Icon => m_icon,
-            _ => m_fontRegular
-        };
-
-        ImGuiFontSize nearest = default;
-        float nearestDist = float.MaxValue;
-        bool exact = false;
-
-        foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
-        {
-            float v = (float)s;
-            float dist = MathF.Abs(requested - v);
-            if (MathHelper.AlmostEquals(requested, v))
-            {
-                nearest = s;
-                exact = true;
-                break;
-            }
-            if (dist < nearestDist)
-            {
-                nearestDist = dist;
-                nearest = s;
-            }
-        }
-
-        float scale = exact ? 1f : requested / (float)nearest;
-        var font = family[nearest];
-
-        ImGuiNET.ImGui.PopFont();
-        ImGuiNET.ImGui.PushFont(font);
-        ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+        // m_currentFont = size == null
+        //     ? new ImGuiAlias(style, m_currentFont.size)
+        //     : new ImGuiAlias(style, (float)size);
+        //
+        // var requested = m_currentFont.size * m_zoomRate;
+        // var family = style switch
+        // {
+        //     ImGuiFontStyle.Bold => m_fontBold,
+        //     ImGuiFontStyle.Italic => m_fontItalic,
+        //     ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
+        //     ImGuiFontStyle.Icon => m_icon,
+        //     _ => m_fontRegular
+        // };
+        //
+        // ImGuiFontSize nearest = default;
+        // float nearestDist = float.MaxValue;
+        // bool exact = false;
+        //
+        // foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
+        // {
+        //     float v = (float)s;
+        //     float dist = MathF.Abs(requested - v);
+        //     if (MathHelper.AlmostEquals(requested, v))
+        //     {
+        //         nearest = s;
+        //         exact = true;
+        //         break;
+        //     }
+        //     if (dist < nearestDist)
+        //     {
+        //         nearestDist = dist;
+        //         nearest = s;
+        //     }
+        // }
+        //
+        // float scale = exact ? 1f : requested / (float)nearest;
+        // var font = family[nearest];
+        //
+        // ImGuiNET.ImGui.PopFont();
+        // ImGuiNET.ImGui.PushFont(font);
+        // ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
     }
 
     public ImGuiAlias GetCurrentFontImpl() => m_currentFont;
@@ -186,20 +185,27 @@ internal sealed class ImGuiImpl : IImGui
     {
         foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
         {
-            var px = (float)fontSize * scale;
-            m_fontRegular[fontSize] = m_controller.AddFontBase("JetBrainsMono-Regular.ttf", px);
-            m_fontBold[fontSize] = m_controller.AddFontBase("JetBrainsMono-Bold.ttf", px);
-            m_fontItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-Italic.ttf", px);
-            m_fontBoldItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-BoldItalic.ttf", px);
+            var sizePixels = (float)fontSize * scale;
+
+            m_fontRegular[fontSize] = m_controller.AddFontBase("JetBrainsMono-Regular.ttf", sizePixels);
+            m_fontBold[fontSize] = m_controller.AddFontBase("JetBrainsMono-Bold.ttf", sizePixels);
+            m_fontItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-Italic.ttf", sizePixels);
+            m_fontBoldItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-BoldItalic.ttf", sizePixels);
         }
     }
-
+    
     private void SetupIcons(float scale)
     {
+        const float c_iconScaleMultiplier = 0.8f;
+		
         foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
         {
-            var px = (float)fontSize * scale;
-            m_icon[fontSize] = m_controller.AddFontIconMerged("FA-Solid-900.ttf", px, 0xE000, 0xF8FF);
+            var sizePixels = (float)fontSize * scale;
+		    
+            m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+            m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+
+            m_icon[fontSize] = m_controller.AddIcons();
         }
     }
 

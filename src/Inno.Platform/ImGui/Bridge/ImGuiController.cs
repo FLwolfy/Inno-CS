@@ -61,6 +61,10 @@ internal sealed class ImGuiController : IDisposable
     // Fonts
     private readonly ImFontConfigPtr m_baseCfg;
     private readonly ImFontConfigPtr m_mergeCfg;
+    private readonly List<string> m_iconNames = new();
+    private readonly Dictionary<string, (IntPtr, int)> m_fontCache = new();
+    private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache = new();
+    private readonly Dictionary<string, IntPtr> m_rangePtrCache = new();
 
     public ImGuiController(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
@@ -105,53 +109,115 @@ internal sealed class ImGuiController : IDisposable
     }
 
     // ============================================================
-    // Public helpers used by ImGuiImpl
+    // Fonts
     // ============================================================
-
+    
     public void ClearAllFonts()
     {
-        ImGuiNET.ImGui.GetIO().Fonts.Clear();
+        var io = ImGuiNET.ImGui.GetIO();
+        io.Fonts.Clear();
+        
+        foreach (var (ptr, _) in m_fontCache.Values) if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr);
+        m_fontCache.Clear();
+        
+        foreach (var p in m_rangePtrCache.Values) if (p != IntPtr.Zero) Marshal.FreeHGlobal(p);
+        m_rangePtrCache.Clear();
+        
+        m_iconNames.Clear();
+        m_iconSizeCache.Clear();
     }
 
-    public ImFontPtr AddFontBase(string fileName, float sizePixels)
+    public void RegisterFontIcon(string baseFontFile, float sizePixels, (ushort, ushort) range)
     {
-        byte[] bytes = GetEmbeddedResourceBytes($"{fileName}");
-        unsafe
-        {
-            fixed (byte* p = bytes)
-            {
-                return ImGuiNET.ImGui.GetIO().Fonts.AddFontFromMemoryTTF(
-                    (IntPtr)p,
-                    bytes.Length,
-                    sizePixels,
-                    m_baseCfg,
-                    ImGuiNET.ImGui.GetIO().Fonts.GetGlyphRangesDefault());
-            }
-        }
+        LoadEmbeddedFontTTF(baseFontFile, out _);
+        m_iconNames.Add(baseFontFile);
+        m_iconSizeCache[baseFontFile] = (sizePixels, range);
     }
 
-    public ImFontPtr AddFontIconMerged(string fileName, float sizePixels, ushort rangeMin, ushort rangeMax)
+    public ImFontPtr AddIcons()
     {
-        byte[] bytes = GetEmbeddedResourceBytes($"{fileName}");
+        var io = ImGuiNET.ImGui.GetIO();
+        ImFontPtr iconFont = new ImFontPtr();
 
-        // Build range array [min, max, 0]
+        bool first = true;
+        foreach (var iconName in m_iconNames)
+        {
+            var fontCache = m_fontCache[iconName];
+            var sizeCache = m_iconSizeCache[iconName];
+            var rangePtr = GetOrCreateIconRangePtr(iconName, sizeCache.Item2);
+
+            if (first)
+            {
+                iconFont = io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_baseCfg, rangePtr);
+                first = false;
+            }
+            else
+            {
+                io.Fonts.AddFontFromMemoryTTF(fontCache.Item1, fontCache.Item2, sizeCache.Item1, m_mergeCfg, rangePtr);
+            }
+            
+        }
+        
+        return iconFont;
+    }
+
+    public ImFontPtr AddFontBase(string baseFontFile, float sizePixels)
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        var basePtr = LoadEmbeddedFontTTF(baseFontFile, out var baseLen);
+        var baseFont = io.Fonts.AddFontFromMemoryTTF(basePtr, baseLen, sizePixels, m_baseCfg);
+
+        return baseFont;
+    }
+    
+    private IntPtr LoadEmbeddedFontTTF(string shortName, out int length)
+    {
+        if (m_fontCache.TryGetValue(shortName, out var cached))
+        {
+            length = cached.Item2;
+            return cached.Item1;
+        }
+
+        var resources = m_assembly.GetManifestResourceNames();
+        var match = resources.FirstOrDefault(r => r.EndsWith(shortName, StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+            throw new FileNotFoundException($"Embedded resource '{shortName}' not found.");
+
+        byte[] fontData;
+        using (var s = m_assembly.GetManifestResourceStream(match)!)
+        using (var ms = new MemoryStream())
+        {
+            s.CopyTo(ms);
+            fontData = ms.ToArray();
+        }
+
+        var ptr = Marshal.AllocHGlobal(fontData.Length);
+        Marshal.Copy(fontData, 0, ptr, fontData.Length);
+
+        m_fontCache[shortName] = (ptr, fontData.Length);
+
+        length = fontData.Length;
+        return ptr;
+    }
+    
+    private IntPtr GetOrCreateIconRangePtr(string iconName, (ushort start, ushort end) range)
+    {
+        string key = $"{iconName}:{range.start:X4}-{range.end:X4}";
+        if (m_rangePtrCache.TryGetValue(key, out var p) && p != IntPtr.Zero)
+            return p;
+
+        IntPtr mem = Marshal.AllocHGlobal(sizeof(ushort) * 3);
+
         unsafe
         {
-            ushort* range = stackalloc ushort[3];
-            range[0] = rangeMin;
-            range[1] = rangeMax;
-            range[2] = 0;
-
-            fixed (byte* p = bytes)
-            {
-                return ImGuiNET.ImGui.GetIO().Fonts.AddFontFromMemoryTTF(
-                    (IntPtr)p,
-                    bytes.Length,
-                    sizePixels,
-                    m_mergeCfg,
-                    (IntPtr)range);
-            }
+            ushort* u = (ushort*)mem;
+            u[0] = range.start;
+            u[1] = range.end;
+            u[2] = 0;
         }
+
+        m_rangePtrCache[key] = mem;
+        return mem;
     }
 
     public void RebuildFontTexture()
@@ -234,7 +300,7 @@ internal sealed class ImGuiController : IDisposable
         // Projection uniform
         m_projBuffer = m_graphicsDevice.CreateUniformBuffer("Projection", typeof(Matrix));
 
-        // Sampler
+        // Sampler (for textures)
         m_fontSampler = m_graphicsDevice.CreateSampler(new SamplerDescription
         {
             filter = SamplerFilter.Linear,
@@ -252,10 +318,15 @@ internal sealed class ImGuiController : IDisposable
             new ShaderDescription
             {
                 stage = ShaderStage.Fragment,
-                sourceBytes = LoadEmbeddedShaderCode( "imgui-frag", ShaderStage.Fragment, m_colorSpaceHandling)
+                sourceBytes = LoadEmbeddedShaderCode("imgui-frag", ShaderStage.Fragment, m_colorSpaceHandling)
             });
+
         m_vertexShader = vs;
         m_fragmentShader = fs;
+
+        // IMPORTANT:
+        // Create font texture BEFORE pipeline, so we can define set=1 layout with 1 texture.
+        RecreateFontDeviceTexture();
 
         // Pipeline
         m_pipeline = m_graphicsDevice.CreatePipelineState(new PipelineStateDescription
@@ -271,6 +342,7 @@ internal sealed class ImGuiController : IDisposable
             // set = 0 and set = 1
             resourceLayoutSpecifiers =
             [
+                // set 0: projection + sampler
                 new ResourceSetBinding
                 {
                     shaderStages = ShaderStage.Vertex | ShaderStage.Fragment,
@@ -278,11 +350,13 @@ internal sealed class ImGuiController : IDisposable
                     textures = [],
                     samplers = [m_fontSampler]
                 },
+
+                // set 1: ONE texture (ImGui draw command binds texture id here)
                 new ResourceSetBinding
                 {
                     shaderStages = ShaderStage.Fragment,
                     uniformBuffers = [],
-                    textures = [],
+                    textures = [m_fontTexture!],   // <- 關鍵：讓 layout 期望 1 個 texture
                     samplers = []
                 }
             ]
@@ -296,9 +370,8 @@ internal sealed class ImGuiController : IDisposable
             textures = [],
             samplers = [m_fontSampler]
         });
-
-        RecreateFontDeviceTexture();
     }
+
 
     private void RecreateFontDeviceTexture()
     {
@@ -502,24 +575,36 @@ internal sealed class ImGuiController : IDisposable
 
     private void RenderImDrawData(ImDrawDataPtr drawData, ICommandList cl, IFrameBuffer fb)
     {
+        var io = ImGuiNET.ImGui.GetIO();
+
+        // HiDPI / Retina fix: make ImGui aware of framebuffer scaling.
+        {
+            float winW = MathF.Max(1.0f, m_windowFactory.mainWindow.width);
+            float winH = MathF.Max(1.0f, m_windowFactory.mainWindow.height);
+
+            // DisplaySize is in "logical" units (window coords)
+            io.DisplaySize = new Vector2(winW, winH);
+
+            // FramebufferScale is "framebuffer pixels per logical pixel"
+            io.DisplayFramebufferScale = new Vector2(fb.width / winW, fb.height / winH);
+        }
+        
         if (m_pipeline == null || m_vertexBuffer == null || m_indexBuffer == null || m_projBuffer == null || m_set0 == null || m_fontTextureSet == null)
             return;
 
         if (drawData.CmdListsCount == 0)
             return;
 
-        // Build orthographic projection matrix (ImGui uses top-left origin)
-        var io = ImGuiNET.ImGui.GetIO();
         float L = drawData.DisplayPos.X;
         float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
         float T = drawData.DisplayPos.Y;
         float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
-
-        var proj = new Matrix(
+        
+        Matrix proj = new Matrix(
             2.0f / (R - L), 0.0f, 0.0f, 0.0f,
-            0.0f, 2.0f / (T - B), 0.0f, 0.0f,
+            0.0f, 2.0f / (B - T), 0.0f, 0.0f,
             0.0f, 0.0f, -1.0f, 0.0f,
-            (R + L) / (L - R), (T + B) / (B - T), 0.0f, 1.0f);
+            (R + L) / (L - R), (T + B) / (T - B), 0.0f, 1.0f);
         m_projBuffer.Set(ref proj);
 
         // Upload vertices/indices into managed arrays and send to GPU
