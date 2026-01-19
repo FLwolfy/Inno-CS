@@ -29,7 +29,7 @@ public abstract class EngineCore
     private readonly EventSnapshot m_eventSnapshot;
     private readonly FileLogSink m_fileSink;
     
-    protected EngineCore(bool imGui = true)
+    protected EngineCore()
     {
         // Initialize platforms
         m_mainWindow = PlatformAPI.CreateWindow(new WindowInfo()
@@ -40,7 +40,9 @@ public abstract class EngineCore
         }, WindowBackend.Veldrid_Sdl2);
         m_mainWindow.resizable = DEFAULT_WINDOW_RESIZABLE;
         m_graphicsDevice = PlatformAPI.CreateGraphicsDevice(m_mainWindow, GraphicsBackend.Metal);
-        if (imGui) PlatformAPI.SetupImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
+        
+        // TODO: Move this inside EDITOR part
+        PlatformAPI.SetupImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
         
         // Initialize lifecycle
         m_gameShell = new Shell();
@@ -110,11 +112,6 @@ public abstract class EngineCore
     {
         // Layer Render
         m_layerStack.OnRender();
-        
-        // Layer ImGui
-        IImGui.BeginLayout(Time.renderDeltaTime);
-        m_layerStack.OnImGui();
-        IImGui.EndLayout();
         
         // Swap Buffers
         m_graphicsDevice.SwapBuffers();

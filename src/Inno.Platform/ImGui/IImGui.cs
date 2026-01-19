@@ -66,7 +66,7 @@ public readonly struct ImGuiAlias(ImGuiFontStyle style, float size)
 public interface IImGui : IDisposable
 {
     internal const ImGuiFontSize C_DEFAULT_FONT_SIZE = ImGuiFontSize.Medium;
-    internal static IImGui impl { get; set; } = new ImGuiNoOp();
+    internal static IImGui impl { get; set; } = null!;
     
     
     /// <summary>
@@ -153,6 +153,5 @@ public interface IImGui : IDisposable
     static void DisposeImpl()
     {
         impl.Dispose();
-        impl = new ImGuiNoOp();
     }
 }

@@ -2,6 +2,7 @@ using ImGuiNET;
 using Inno.Core.Events;
 using Inno.Core.Layers;
 using Inno.Core.Math;
+using Inno.Core.Utility;
 using Inno.Editor.GUI;
 using Inno.Editor.Panel;
 using Inno.Platform.ImGui;
@@ -58,8 +59,11 @@ public class EditorLayer() : Layer("EditorLayer")
         }
     }
 
-    public override void OnImGui()
+    public override void OnRender()
     {
+        // Begin ImGui Layout
+        IImGui.BeginLayout(Time.renderDeltaTime);
+        
         // DockSpace
         ImGui.DockSpaceOverViewport(ImGui.GetMainViewport().ID);
 
@@ -70,6 +74,9 @@ public class EditorLayer() : Layer("EditorLayer")
         EditorGUILayout.BeginFrame();
         EditorManager.DrawPanels();
         EditorGUILayout.EndFrame();
+        
+        // End ImGui Layout
+        IImGui.EndLayout();
     }
 
     public override void OnUpdate()

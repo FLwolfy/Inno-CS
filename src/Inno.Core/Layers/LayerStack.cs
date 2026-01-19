@@ -54,14 +54,6 @@ public class LayerStack
         }
     }
 
-    public void OnImGui()
-    {
-        foreach (var layer in m_layers)
-        {
-            layer.OnImGui();
-        }
-    }
-
     public void OnEvent(EventSnapshot snapshot)
     {
         for (int i = m_layers.Count - 1; i >= 0; i--)
