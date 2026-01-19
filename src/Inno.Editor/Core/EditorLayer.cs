@@ -36,26 +36,23 @@ public class EditorLayer() : Layer("EditorLayer")
         EditorManager.RegisterPanel(new InspectorPanel());
     }
 
-    public override void OnEvent(EventSnapshot snapshot)
+    public override void OnEvent(Event e)
     {
-        foreach (var e in snapshot.GetEvents(EventType.KeyPressed))
+        var keyEvent = e as KeyPressedEvent;
+        if (keyEvent == null) return;
+        
+        if (keyEvent.key == Input.KeyCode.Plus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
         {
-            var keyEvent = e as KeyPressedEvent;
-            if (keyEvent == null) continue;
-            
-            if (keyEvent.key == Input.KeyCode.Plus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
-            {
-                m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate + ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
-                IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
-                IImGui.Zoom(m_currentZoomRate);
-            }
-            
-            if (keyEvent.key == Input.KeyCode.Minus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
-            {
-                m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate - ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
-                IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
-                IImGui.Zoom(m_currentZoomRate);
-            }
+            m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate + ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
+            IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
+            IImGui.Zoom(m_currentZoomRate);
+        }
+        
+        if (keyEvent.key == Input.KeyCode.Minus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
+        {
+            m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate - ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
+            IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
+            IImGui.Zoom(m_currentZoomRate);
         }
     }
 

@@ -102,12 +102,12 @@ public abstract class EngineCore
     private void OnEvent(EventDispatcher dispatcher)
     {
         m_mainWindow.PumpEvents(dispatcher);
-        m_layerStack.OnEvent(m_mainWindow.GetPumpedEvents());
         
         // TODO: Remove Snapshot and dispatch real events
         var shouldCloseWindow = false;
         dispatcher.Dispatch(e =>
         {
+            m_layerStack.OnEvent(e);
             if (e.type == EventType.WindowClose) shouldCloseWindow = true;
         });
         if (shouldCloseWindow) End();

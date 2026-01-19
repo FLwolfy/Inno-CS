@@ -54,11 +54,11 @@ public class LayerStack
         }
     }
 
-    public void OnEvent(EventSnapshot snapshot)
+    public void OnEvent(Event e)
     {
         for (int i = m_layers.Count - 1; i >= 0; i--)
         {
-            m_layers[i].OnEvent(snapshot);
+            m_layers[i].OnEvent(e);
         }
     }
 }
