@@ -57,5 +57,6 @@ public interface IWindow : IDisposable
     event Action<Vector2> Moved;
     event Action FocusGained;
 
-    EventSnapshot PumpEvents(EventDispatcher? dispatcher);
+    void PumpEvents(EventDispatcher dispatcher);
+    EventSnapshot GetPumpedEvents();
 }

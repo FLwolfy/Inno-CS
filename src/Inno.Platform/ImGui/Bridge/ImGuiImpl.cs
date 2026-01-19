@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 
 using ImGuiNET;
-
+using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
@@ -82,12 +82,7 @@ internal sealed class ImGuiImpl : IImGui
 
     public void BeginLayoutImpl(float deltaTime)
     {
-        // Poll events here (best-effort) to avoid adding new engine-facing API.
-        // The engine may already pump events elsewhere; this remains deterministic because
-        // the adapter operates on the snapshot, not raw device state.
-        var snapshot = m_mainWindow.PumpEvents(null);
-
-        m_controller.Update(deltaTime, snapshot);
+        m_controller.Update(deltaTime, m_mainWindow.GetPumpedEvents());
 
         // Default font
         UseFontImpl(ImGuiFontStyle.Regular, (float)IImGui.C_DEFAULT_FONT_SIZE);

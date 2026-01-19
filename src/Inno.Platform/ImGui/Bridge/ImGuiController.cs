@@ -11,7 +11,6 @@ using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
-using Vector2 = Inno.Core.Math.Vector2;
 
 namespace Inno.Platform.ImGui.Bridge;
 
@@ -56,7 +55,7 @@ internal sealed class ImGuiController : IDisposable
     private readonly Dictionary<ITexture, IntPtr> m_idsByTexture = new();
     private readonly Dictionary<IntPtr, (ITexture tex, IResourceSet set1)> m_bindingById = new();
     private int m_lastAssignedId = 100;
-    private readonly IntPtr m_fontAtlasId = (IntPtr)1;
+    private readonly IntPtr m_fontAtlasId = 1;
 
     // Fonts
     private readonly ImFontConfigPtr m_baseCfg;
@@ -232,7 +231,7 @@ internal sealed class ImGuiController : IDisposable
         if (m_idsByTexture.TryGetValue(texture, out var id))
             return id;
 
-        id = (IntPtr)(++m_lastAssignedId);
+        id = ++m_lastAssignedId;
 
         var set1 = m_graphicsDevice.CreateResourceSet(new ResourceSetBinding
         {
@@ -249,10 +248,8 @@ internal sealed class ImGuiController : IDisposable
 
     public void UnbindTexture(ITexture texture)
     {
-        if (texture == null) return;
-        if (!m_idsByTexture.TryGetValue(texture, out var id)) return;
+        if (!m_idsByTexture.Remove(texture, out var id)) return;
 
-        m_idsByTexture.Remove(texture);
         if (m_bindingById.TryGetValue(id, out var entry))
         {
             entry.set1.Dispose();
@@ -268,7 +265,7 @@ internal sealed class ImGuiController : IDisposable
     {
         if (m_frameBegun)
             throw new InvalidOperationException("ImGuiController.Update called while a frame is active.");
-
+        
         SetPerFrameImGuiData(deltaSeconds);
         UpdateImGuiInput(snapshot);
         ImGuiNET.ImGui.NewFrame();
@@ -431,6 +428,12 @@ internal sealed class ImGuiController : IDisposable
     private void UpdateImGuiInput(EventSnapshot snapshot)
     {
         var io = ImGuiNET.ImGui.GetIO();
+        
+        // Input chars
+        foreach (var c in snapshot.GetInputChars())
+        {
+            io.AddInputCharacter(c);
+        }
 
         // Mouse move
         foreach (var e in snapshot.GetEvents(EventType.MouseMoved))
@@ -464,7 +467,9 @@ internal sealed class ImGuiController : IDisposable
             if (e is KeyPressedEvent kp)
             {
                 if (TryMapKey(kp.key, out var imguiKey))
+                {
                     io.AddKeyEvent(imguiKey, true);
+                }
 
                 UpdateModifiers(io, kp.modifiers);
             }
@@ -741,8 +746,6 @@ internal sealed class ImGuiController : IDisposable
         ShaderStage stage,
         ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        Console.WriteLine($"Loading {colorSpaceHandling}...");
-        
         return GetEmbeddedResourceBytes($"{name}{(stage == ShaderStage.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy ? "-legacy" : "")}.spv");
     }
 

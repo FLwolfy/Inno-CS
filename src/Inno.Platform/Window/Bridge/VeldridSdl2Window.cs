@@ -76,7 +76,7 @@ internal class VeldridSdl2Window : IWindow
     public event Action<Vector2>? Moved;
     public event Action? FocusGained;
 
-    public EventSnapshot PumpEvents(EventDispatcher? dispatcher)
+    public void PumpEvents(EventDispatcher dispatcher)
     {
         // Input Events
         inputSnapshot = inner.PumpEvents();
@@ -84,19 +84,30 @@ internal class VeldridSdl2Window : IWindow
         VeldridSdl2InputAdapter.AdaptInputEvents(inputSnapshot, e =>
         {
             m_eventSnapshot.AddEvent(e);
-            dispatcher?.PushEvent(e);
+            dispatcher.PushEvent(e);
         });
+        foreach (var c in inputSnapshot.KeyCharPresses)
+        {
+            m_eventSnapshot.AddInputChar(c);
+        }
         
         // Application Events
         if (m_isWindowSizeDirty)
         {
-            dispatcher?.PushEvent(new WindowResizeEvent(width, height));
+            var resizeEvent = new WindowResizeEvent(width, height);
+            m_eventSnapshot.AddEvent(resizeEvent);
+            dispatcher.PushEvent(resizeEvent);
+            
             m_isWindowSizeDirty = false;
         }
-        if (!exists) dispatcher?.PushEvent(new WindowCloseEvent());
-        
-        return m_eventSnapshot;
+        if (!exists)
+        {
+            m_eventSnapshot.AddEvent(new WindowCloseEvent());
+            dispatcher.PushEvent(new WindowCloseEvent());
+        }
     }
+    
+    public EventSnapshot GetPumpedEvents() => m_eventSnapshot;
 
     public void Dispose()
     {

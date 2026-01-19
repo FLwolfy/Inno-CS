@@ -78,10 +78,10 @@ internal class ImGuiWindow : IDisposable
         vp.PlatformUserData = (IntPtr)m_gcHandle;
     }
 
-    public EventSnapshot PumpEvents()
-    {
-        return m_window.PumpEvents(null);
-    }
+    // public EventSnapshot PumpEvents()
+    // {
+    //     return m_window.PumpEvents(null);
+    // }
 
     public void Dispose()
     {

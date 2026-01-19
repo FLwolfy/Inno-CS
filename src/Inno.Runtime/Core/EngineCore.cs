@@ -27,7 +27,6 @@ public abstract class EngineCore
     
     private readonly Shell m_gameShell;
     private readonly LayerStack m_layerStack;
-    private readonly EventSnapshot m_eventSnapshot;
     private readonly FileLogSink m_fileSink;
     
     protected EngineCore()
@@ -41,7 +40,7 @@ public abstract class EngineCore
                 y = 0,
                 width = DEFAULT_WINDOW_WIDTH,
                 height = DEFAULT_WINDOW_HEIGHT,
-                flags = WindowCreateFlags.AllowHighDpi | WindowCreateFlags.Resizable
+                flags = WindowCreateFlags.AllowHighDpi | WindowCreateFlags.Resizable | WindowCreateFlags.Decorated
             }, 
             WindowBackend.Veldrid_Sdl2,
             GraphicsBackend.Metal);
@@ -55,7 +54,6 @@ public abstract class EngineCore
         // Initialize lifecycle
         m_gameShell = new Shell();
         m_layerStack = new LayerStack();
-        m_eventSnapshot = new EventSnapshot();
         
         // Initialize Asset
         AssetManager.Initialize(
@@ -104,17 +102,14 @@ public abstract class EngineCore
     private void OnEvent(EventDispatcher dispatcher)
     {
         m_mainWindow.PumpEvents(dispatcher);
-        
-        var shouldCloseWindow = false;
+        m_layerStack.OnEvent(m_mainWindow.GetPumpedEvents());
         
         // TODO: Remove Snapshot and dispatch real events
-        m_eventSnapshot.Clear(); 
+        var shouldCloseWindow = false;
         dispatcher.Dispatch(e =>
         {
-            m_eventSnapshot.AddEvent(e);
             if (e.type == EventType.WindowClose) shouldCloseWindow = true;
         });
-        m_layerStack.OnEvent(m_eventSnapshot);
         if (shouldCloseWindow) End();
     }
 
