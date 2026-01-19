@@ -38,11 +38,6 @@ internal class ImGuiNoOp : IImGui
     {
         return default;
     }
-
-    public void ZoomImpl(float zoomRate)
-    {
-        // Do nothing
-    }
     
     public void SetStorageDataImpl(string key, object? value)
     {
