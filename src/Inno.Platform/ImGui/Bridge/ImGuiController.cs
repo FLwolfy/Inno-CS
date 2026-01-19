@@ -356,7 +356,7 @@ internal sealed class ImGuiController : IDisposable
                 {
                     shaderStages = ShaderStage.Fragment,
                     uniformBuffers = [],
-                    textures = [m_fontTexture!],   // <- 關鍵：讓 layout 期望 1 個 texture
+                    textures = [m_fontTexture!],
                     samplers = []
                 }
             ]
@@ -599,12 +599,12 @@ internal sealed class ImGuiController : IDisposable
         float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
         float T = drawData.DisplayPos.Y;
         float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
-        
-        Matrix proj = new Matrix(
+
+        var proj = new Matrix(
             2.0f / (R - L), 0.0f, 0.0f, 0.0f,
-            0.0f, 2.0f / (B - T), 0.0f, 0.0f,
+            0.0f, 2.0f / (T - B), 0.0f, 0.0f,
             0.0f, 0.0f, -1.0f, 0.0f,
-            (R + L) / (L - R), (T + B) / (T - B), 0.0f, 1.0f);
+            (R + L) / (L - R), (T + B) / (B - T), 0.0f, 1.0f);
         m_projBuffer.Set(ref proj);
 
         // Upload vertices/indices into managed arrays and send to GPU
@@ -741,19 +741,9 @@ internal sealed class ImGuiController : IDisposable
         ShaderStage stage,
         ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        return GetEmbeddedResourceBytes($"{name}.spv");
-
-        // Match the existing asset naming in Inno.Platform/ImGui/Assets/Shaders
-        // EmbeddedResource uses LogicalName = %(RecursiveDir)%(Filename)%(Extension)
-        // return backendType switch
-        // {
-        //     GraphicsBackend.Direct3D11 => GetEmbeddedResourceBytes($"{name}{(stage == ShaderStage.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy ? "-legacy" : "")}.hlsl.bytes"),
-        //     GraphicsBackend.OpenGL => GetEmbeddedResourceBytes($"{name}{(stage == ShaderStage.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy ? "-legacy" : "")}.glsl"),
-        //     GraphicsBackend.OpenGLES => GetEmbeddedResourceBytes($"{name}{(stage == ShaderStage.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy ? "-legacy" : "")}.glsles"),
-        //     GraphicsBackend.Vulkan => GetEmbeddedResourceBytes($"{name}.spv"),
-        //     GraphicsBackend.Metal => GetEmbeddedResourceBytes($"{name}.metallib"),
-        //     _ => throw new NotSupportedException($"Unsupported backend: {backendType}")
-        // };
+        Console.WriteLine($"Loading {colorSpaceHandling}...");
+        
+        return GetEmbeddedResourceBytes($"{name}{(stage == ShaderStage.Vertex && colorSpaceHandling == ImGuiColorSpaceHandling.Legacy ? "-legacy" : "")}.spv");
     }
 
     private byte[] GetEmbeddedResourceBytes(string shortName)
