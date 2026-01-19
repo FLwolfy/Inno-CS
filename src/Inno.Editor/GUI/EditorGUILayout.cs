@@ -529,11 +529,12 @@ public static class EditorGUILayout
             BeginColumns();
             
             changed |= DrawAxisDrag("X", ref x, ImGui.GetColumnWidth(), new Color(0.75f, 0.20f, 0.20f)); // Red
+            SplitColumns();
             changed |= DrawAxisDrag("Z", ref z, ImGui.GetColumnWidth(), new Color(0.25f, 0.35f, 0.80f)); // Blue
             SplitColumns();
             changed |= DrawAxisDrag("Y", ref y, ImGui.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f)); // Green
-            changed |= DrawAxisDrag("W", ref w, ImGui.GetColumnWidth(), new Color(0.65f, 0.65f, 0.65f)); // Gray
             SplitColumns();
+            changed |= DrawAxisDrag("W", ref w, ImGui.GetColumnWidth(), new Color(0.65f, 0.65f, 0.65f)); // Gray
             
             EndColumns();
 

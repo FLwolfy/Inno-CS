@@ -3,6 +3,7 @@ using Inno.Assets.AssetType;
 using Inno.Core.ECS;
 using Inno.Core.Layers;
 using Inno.Core.Math;
+using Inno.Core.Serialization;
 using Inno.Core.Utility;
 using Inno.Editor.Core;
 using Inno.Graphics.Decoder;
@@ -93,10 +94,12 @@ public class EditorTest
     private class TestComponent : GameBehavior
     {
         public override ComponentTag orderTag => ComponentTag.Behavior;
+
+        [SerializableProperty] public float rotationSpeed = 100f;
         
         public override void Update()
         {
-            transform.localRotationZ += Time.deltaTime * 100f;
+            transform.localRotationZ += Time.deltaTime * rotationSpeed;
         }
     }
 }
