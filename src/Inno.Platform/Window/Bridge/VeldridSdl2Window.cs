@@ -1,7 +1,10 @@
+using System;
+
 using Inno.Core.Events;
+using Inno.Core.Math;
+
 using Veldrid;
 using Veldrid.Sdl2;
-using Veldrid.StartupUtilities;
 
 namespace Inno.Platform.Window.Bridge;
 
@@ -11,6 +14,7 @@ internal class VeldridSdl2Window : IWindow
     internal InputSnapshot inputSnapshot { get; private set; }
     
     private bool m_isWindowSizeDirty = false;
+    private readonly EventSnapshot m_eventSnapshot = new EventSnapshot();
 
     public bool exists => inner.Exists;
     public int width
@@ -41,9 +45,8 @@ internal class VeldridSdl2Window : IWindow
 
     public VeldridSdl2Window(WindowInfo info)
     {
-        // IMPORTANT (macOS / HiDPI):
-        // Use SDL_WINDOW_ALLOW_HIGHDPI, otherwise the OS will upscale a 1x backbuffer -> blurry ImGui text.
-        SDL_WindowFlags flags = SDL_WindowFlags.AllowHighDpi;
+        var flags = MapToSdlFlags(info.flags);
+        flags |= SDL_WindowFlags.AllowHighDpi; // TODO: Move this outside
         flags |= SDL_WindowFlags.Resizable;
 
         inner = new Sdl2Window(
@@ -54,27 +57,91 @@ internal class VeldridSdl2Window : IWindow
             flags,
             false);
 
-        inner.Resized += () => m_isWindowSizeDirty = true;
+        Resized += () => m_isWindowSizeDirty = true;
+        inner.Resized += Resized;
+        inner.Moved += p => Moved?.Invoke(new Vector2(p.X, p.Y));
+        inner.Closed += Closed;
+        inner.FocusGained += FocusGained;
+        
         inputSnapshot = inner.PumpEvents();
     }
-
 
     public void Show() => inner.Visible = true;
     public void Hide() => inner.Visible = false;
     public void Close() => inner.Close();
+    
+    // Actions
+    public event Action? Resized;
+    public event Action? Closed;
+    public event Action<Vector2>? Moved;
+    public event Action? FocusGained;
 
-    public void PumpEvents(EventDispatcher dispatcher)
+    public EventSnapshot PumpEvents(EventDispatcher? dispatcher)
     {
         // Input Events
         inputSnapshot = inner.PumpEvents();
-        VeldridSdl2InputAdapter.AdaptInputEvents(inputSnapshot, dispatcher.PushEvent);
+        m_eventSnapshot.Clear();
+        VeldridSdl2InputAdapter.AdaptInputEvents(inputSnapshot, e =>
+        {
+            m_eventSnapshot.AddEvent(e);
+            dispatcher?.PushEvent(e);
+        });
         
         // Application Events
         if (m_isWindowSizeDirty)
         {
-            dispatcher.PushEvent(new WindowResizeEvent(width, height));
+            dispatcher?.PushEvent(new WindowResizeEvent(width, height));
             m_isWindowSizeDirty = false;
         }
-        if (!exists) dispatcher.PushEvent(new WindowCloseEvent());
+        if (!exists) dispatcher?.PushEvent(new WindowCloseEvent());
+        
+        return m_eventSnapshot;
+    }
+
+    public void Dispose()
+    {
+        inner.Close();
+    }
+      
+    private static SDL_WindowFlags MapToSdlFlags(WindowCreateFlags flags)
+    {
+        SDL_WindowFlags sdl = 0;
+
+        // Visibility
+        if (flags.HasFlag(WindowCreateFlags.Hidden))
+            sdl |= SDL_WindowFlags.Hidden;
+        else
+            sdl |= SDL_WindowFlags.Shown;
+
+        // Decorated / Resize
+        if (flags.HasFlag(WindowCreateFlags.Resizable))
+            sdl |= SDL_WindowFlags.Resizable;
+
+        if (!flags.HasFlag(WindowCreateFlags.Decorated))
+            sdl |= SDL_WindowFlags.Borderless;
+
+        // DPI
+        if (flags.HasFlag(WindowCreateFlags.AllowHighDpi))
+            sdl |= SDL_WindowFlags.AllowHighDpi;
+
+        // Z-order / taskbar
+        if (flags.HasFlag(WindowCreateFlags.AlwaysOnTop))
+            sdl |= SDL_WindowFlags.AlwaysOnTop;
+
+        if (flags.HasFlag(WindowCreateFlags.SkipTaskbar))
+            sdl |= SDL_WindowFlags.SkipTaskbar;
+
+        // Window type semantics
+        if (flags.HasFlag(WindowCreateFlags.ToolWindow))
+            sdl |= SDL_WindowFlags.Utility;
+
+        if (flags.HasFlag(WindowCreateFlags.Popup))
+            sdl |= SDL_WindowFlags.PopupMenu;
+
+        // Fullscreen
+        if (flags.HasFlag(WindowCreateFlags.Fullscreen))
+            sdl |= SDL_WindowFlags.FullScreenDesktop;
+
+        return sdl;
     }
 }

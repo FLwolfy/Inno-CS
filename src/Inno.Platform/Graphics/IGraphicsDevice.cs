@@ -1,4 +1,5 @@
 using System;
+using Inno.Platform.Window;
 
 namespace Inno.Platform.Graphics;
 
@@ -32,5 +33,4 @@ public interface IGraphicsDevice : IDisposable
     ICommandList CreateCommandList();
     
     void Submit(ICommandList commandList);
-    void SwapBuffers();
 }

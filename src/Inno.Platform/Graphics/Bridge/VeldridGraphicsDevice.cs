@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Inno.Platform.Window;
 using Inno.Platform.Window.Bridge;
 using Veldrid;
 using Veldrid.StartupUtilities;
@@ -125,11 +126,6 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
             m_graphicsDevice.SubmitCommands(veldridCmd.inner);
             m_graphicsDevice.WaitForIdle();  
         }
-    }
-
-    public void SwapBuffers()
-    {
-        m_graphicsDevice.SwapBuffers();
     }
 
     public void Dispose()

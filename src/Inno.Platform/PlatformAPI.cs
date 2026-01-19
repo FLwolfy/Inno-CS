@@ -10,30 +10,25 @@ namespace Inno.Platform;
 
 public static class PlatformAPI
 {
-    public static IWindow CreateWindow(WindowInfo info, WindowBackend backend)
+    public static IWindowFactory CreateWindowFactory(
+        WindowInfo mainWindowInfo, 
+        WindowBackend windowBackend,
+        GraphicsBackend graphicsBackend)
     {
-        if (backend == WindowBackend.Veldrid_Sdl2)
-            return new VeldridSdl2Window(info);
+        if (windowBackend == WindowBackend.Veldrid_Sdl2)
+            return new VeldridSdl2WindowFactory(mainWindowInfo, graphicsBackend);
 
-        throw new NotSupportedException($"Window backend {backend} is not supported.");
-    }
-
-    public static IGraphicsDevice CreateGraphicsDevice(IWindow window, GraphicsBackend backend)
-    {
-        if (window is VeldridSdl2Window vsw)
-            return new VeldridGraphicsDevice(vsw, backend);
-        
-        throw new NotSupportedException($"GraphicsDevice for window {window.GetType()} is not supported.");
+        throw new NotSupportedException($"Window backend {windowBackend} is not supported.");
     }
     
-    public static void SetupImGuiImpl(IWindow window, IGraphicsDevice graphicsDevice, ImGuiColorSpaceHandling colorSpaceHandling)
+    public static void SetupImGuiImpl(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        if (window is VeldridSdl2Window vsw && graphicsDevice is VeldridGraphicsDevice vgd)
+        if (windowFactory is VeldridSdl2WindowFactory vwf)
         {
-            IImGui.impl = new ImGuiNETVeldrid(vgd, vsw, colorSpaceHandling);
+            IImGui.impl = new ImGuiImpl(vwf, colorSpaceHandling);
             return;
         }
 
-        throw new NotSupportedException($"ImGuiRenderer for graphicsDevice {graphicsDevice.GetType()} or window {window.GetType()} is not supported.");
+        throw new NotSupportedException($"ImGuiRenderer for window factory {windowFactory.GetType()} is not supported.");
     }
 }

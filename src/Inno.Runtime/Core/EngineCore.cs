@@ -21,6 +21,7 @@ public abstract class EngineCore
     private static readonly int DEFAULT_WINDOW_HEIGHT = 1080;
     private static readonly bool DEFAULT_WINDOW_RESIZABLE = false;
     
+    private readonly IWindowFactory m_windowFactory;
     private readonly IWindow m_mainWindow;
     private readonly IGraphicsDevice m_graphicsDevice;
     
@@ -32,17 +33,24 @@ public abstract class EngineCore
     protected EngineCore()
     {
         // Initialize platforms
-        m_mainWindow = PlatformAPI.CreateWindow(new WindowInfo()
-        {
-            name = "Main Window",
-            width = DEFAULT_WINDOW_WIDTH,
-            height = DEFAULT_WINDOW_HEIGHT
-        }, WindowBackend.Veldrid_Sdl2);
-        m_mainWindow.resizable = DEFAULT_WINDOW_RESIZABLE;
-        m_graphicsDevice = PlatformAPI.CreateGraphicsDevice(m_mainWindow, GraphicsBackend.Metal);
+        m_windowFactory = PlatformAPI.CreateWindowFactory(
+            new WindowInfo
+            {
+                name = "Main Window",
+                x = 0,
+                y = 0,
+                width = DEFAULT_WINDOW_WIDTH,
+                height = DEFAULT_WINDOW_HEIGHT,
+                flags = WindowCreateFlags.AllowHighDpi | WindowCreateFlags.Resizable
+            }, 
+            WindowBackend.Veldrid_Sdl2,
+            GraphicsBackend.Metal);
+
+        m_mainWindow = m_windowFactory.mainWindow;
+        m_graphicsDevice = m_windowFactory.graphicsDevice;
         
         // TODO: Move this inside EDITOR part
-        PlatformAPI.SetupImGuiImpl(m_mainWindow, m_graphicsDevice, ImGuiColorSpaceHandling.Legacy);
+        PlatformAPI.SetupImGuiImpl(m_windowFactory, ImGuiColorSpaceHandling.Legacy);
         
         // Initialize lifecycle
         m_gameShell = new Shell();
@@ -98,7 +106,9 @@ public abstract class EngineCore
         m_mainWindow.PumpEvents(dispatcher);
         
         var shouldCloseWindow = false;
-        m_eventSnapshot.Clear();
+        
+        // TODO: Remove Snapshot and dispatch real events
+        m_eventSnapshot.Clear(); 
         dispatcher.Dispatch(e =>
         {
             m_eventSnapshot.AddEvent(e);
@@ -114,7 +124,7 @@ public abstract class EngineCore
         m_layerStack.OnRender();
         
         // Swap Buffers
-        m_graphicsDevice.SwapBuffers();
+        m_windowFactory.SwapWindowBuffers(m_mainWindow);
     }
 
     private void OnClose()
