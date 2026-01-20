@@ -264,10 +264,17 @@ internal sealed class ImGuiController : IDisposable
     public void Update(float deltaSeconds, EventSnapshot snapshot)
     {
         if (m_frameBegun)
+        {
             throw new InvalidOperationException("ImGuiController.Update called while a frame is active.");
+        }
         
         SetPerFrameImGuiData(deltaSeconds);
+        
+        // Inputs
         UpdateImGuiInput(snapshot);
+        UpdateMouseCursor();
+        
+        // Begins
         ImGuiNET.ImGui.NewFrame();
         m_frameBegun = true;
     }
@@ -492,6 +499,36 @@ internal sealed class ImGuiController : IDisposable
         io.AddKeyEvent(ImGuiKey.ModShift, (mods & Input.KeyModifier.Shift) != 0);
         io.AddKeyEvent(ImGuiKey.ModAlt, (mods & Input.KeyModifier.Alt) != 0);
         io.AddKeyEvent(ImGuiKey.ModSuper, (mods & Input.KeyModifier.Super) != 0);
+    }
+    
+    private void UpdateMouseCursor()
+    {
+        var io = ImGuiNET.ImGui.GetIO();
+        if (io.MouseDrawCursor) return;
+
+        ImGuiMouseCursor cursor = ImGuiNET.ImGui.GetMouseCursor();
+        if (cursor == ImGuiMouseCursor.None)
+        {
+            m_windowFactory.ShowCursor(false);
+        }
+        else
+        {
+            m_windowFactory.ShowCursor(true);
+            Input.MouseCursor windowCursor = cursor switch
+            {
+                ImGuiMouseCursor.Arrow => Input.MouseCursor.Arrow,
+                ImGuiMouseCursor.TextInput => Input.MouseCursor.TextInput,
+                ImGuiMouseCursor.ResizeAll => Input.MouseCursor.ResizeAll,
+                ImGuiMouseCursor.ResizeNS => Input.MouseCursor.ResizeNS,
+                ImGuiMouseCursor.ResizeEW => Input.MouseCursor.ResizeEW,
+                ImGuiMouseCursor.ResizeNESW => Input.MouseCursor.ResizeNESW,
+                ImGuiMouseCursor.ResizeNWSE => Input.MouseCursor.ResizeNWSE,
+                ImGuiMouseCursor.Hand => Input.MouseCursor.Hand,
+                _ => Input.MouseCursor.Arrow
+            };
+            
+            m_windowFactory.SetCursor(windowCursor);
+        }
     }
 
     private static int ToMouseButton(Input.MouseButton b)

@@ -1,9 +1,11 @@
 using System.Collections.Generic;
+using Inno.Core.Events;
 using Inno.Platform.Graphics;
 using Inno.Platform.Graphics.Bridge;
 using InnoGraphicsBackend = Inno.Platform.Graphics.GraphicsBackend;
 
 using Veldrid;
+using Veldrid.Sdl2;
 using Veldrid.StartupUtilities;
 
 namespace Inno.Platform.Window.Bridge;
@@ -14,6 +16,7 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
     public IGraphicsDevice graphicsDevice { get; }
     
     private readonly Dictionary<IWindow, Swapchain> m_windowSwapchains;
+    private readonly Dictionary<Input.MouseCursor, SDL_Cursor> m_cursorMap;
 
     internal VeldridSdl2WindowFactory(in WindowInfo mainWindowInfo, in InnoGraphicsBackend graphicsBackend)
     {
@@ -25,6 +28,25 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
         m_windowSwapchains = new Dictionary<IWindow, Swapchain>
         {
             [mainWindow] = gdInner.inner.MainSwapchain
+        };
+        m_cursorMap = new Dictionary<Input.MouseCursor, SDL_Cursor>
+        {
+            [Input.MouseCursor.Arrow] = 
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.Arrow),
+            [Input.MouseCursor.TextInput] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.IBeam),
+            [Input.MouseCursor.ResizeAll] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.SizeAll),
+            [Input.MouseCursor.ResizeNS] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.SizeNS),
+            [Input.MouseCursor.ResizeEW] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.SizeWE),
+            [Input.MouseCursor.ResizeNESW] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.SizeNESW),
+            [Input.MouseCursor.ResizeNWSE] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.SizeNWSE),
+            [Input.MouseCursor.Hand] =
+                Sdl2Native.SDL_CreateSystemCursor(SDL_SystemCursor.Hand),
         };
     }
     
@@ -64,6 +86,23 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
         window.Dispose();
     }
     
+    public void SwapWindowBuffers(IWindow window)
+    {
+        (graphicsDevice as VeldridGraphicsDevice)!.inner.SwapBuffers(m_windowSwapchains[window]);
+    }
+    
+    public void ShowCursor(bool show)
+    {
+        Sdl2Native.SDL_ShowCursor(show ? 1 : 0);
+    }
+
+    public void SetCursor(Input.MouseCursor cursor)
+    {
+        Sdl2Native.SDL_SetCursor(m_cursorMap.TryGetValue(cursor, out var sdlCursor)
+            ? sdlCursor
+            : m_cursorMap[Input.MouseCursor.Arrow]);
+    }
+    
     public void Dispose()
     {
         mainWindow.Dispose();
@@ -76,8 +115,4 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
         m_windowSwapchains.Clear();
     }
 
-    public void SwapWindowBuffers(IWindow window)
-    {
-        (graphicsDevice as VeldridGraphicsDevice)!.inner.SwapBuffers(m_windowSwapchains[window]);
-    }
 }
