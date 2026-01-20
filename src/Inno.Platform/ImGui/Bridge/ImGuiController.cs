@@ -103,7 +103,7 @@ internal sealed class ImGuiController : IDisposable
             m_mergeCfg.FontDataOwnedByAtlas = false;
             m_mergeCfg.PixelSnapH = true;
         }
-        io.Fonts.AddFontDefault();
+        io.Fonts.AddFontDefault(); // In case of no other fonts
         io.Fonts.Flags |= ImFontAtlasFlags.NoBakedLines;
 
         CreateDeviceResources();
@@ -278,8 +278,8 @@ internal sealed class ImGuiController : IDisposable
         UpdateMouseCursor();
         
         // Begins
-        ImGuiNET.ImGui.NewFrame();
         m_frameBegun = true;
+        ImGuiNET.ImGui.NewFrame();
     }
 
     public void Render(ICommandList commandList, IFrameBuffer targetFrameBuffer)
@@ -633,18 +633,16 @@ internal sealed class ImGuiController : IDisposable
 
         if (drawData.CmdListsCount == 0)
             return;
-
-        float left = drawData.DisplayPos.X;
-        float right = drawData.DisplayPos.X + drawData.DisplaySize.X;
-        float top = drawData.DisplayPos.Y;
-        float bottom = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
-
-        var proj = new Matrix(
-            2.0f / (right - left), 0.0f, 0.0f, 0.0f,
-            0.0f, 2.0f / (top - bottom), 0.0f, 0.0f,
-            0.0f, 0.0f, -1.0f, 0.0f,
-            (right + left) / (left - right), (top + bottom) / (bottom - top), 0.0f, 1.0f);
-        m_projBuffer.Set(ref proj);
+        
+        var pos = drawData.DisplayPos;
+        var mvpSys = System.Numerics.Matrix4x4.CreateOrthographicOffCenter(
+            pos.X,
+            pos.X + drawData.DisplaySize.X,
+            pos.Y + drawData.DisplaySize.Y,
+            pos.Y,
+            -1.0f,
+            1.0f);
+        m_projBuffer.Set(ref mvpSys);
 
         // Upload vertices/indices into managed arrays and send to GPU
         int totalVtx = drawData.TotalVtxCount;

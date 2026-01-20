@@ -40,6 +40,7 @@ public enum ImGuiFontStyle
 public enum ImGuiFontSize
 {
     // Tips
+    Micro   = 4,
     Tiny    = 8,
     Small   = 12,
 

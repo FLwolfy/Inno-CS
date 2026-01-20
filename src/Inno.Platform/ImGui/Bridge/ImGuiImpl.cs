@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-using ImGuiNET;
-using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
+
+using ImGuiNET;
 
 namespace Inno.Platform.ImGui.Bridge;
 
@@ -15,21 +15,21 @@ namespace Inno.Platform.ImGui.Bridge;
 /// </summary>
 internal sealed class ImGuiImpl : IImGui
 {
+	// Window Graphics
     private readonly IWindowFactory m_windowFactory;
-    private readonly IGraphicsDevice m_graphicsDevice;
-    private readonly IWindow m_mainWindow;
-
+    
+    // Resource
     private readonly ICommandList m_commandList;
     private readonly ImGuiController m_controller;
 
-    // Contexts (your editor expects two pointers; at the platform level we keep them identical for now)
+    // Contexts 
     public IntPtr mainMainContextPtrImpl { get; }
     public IntPtr virtualContextPtrImpl { get; }
 
     // Fonts
-    private float m_zoomRate = 1f;
+    private float m_zoomRate;
     private ImGuiAlias m_currentFont;
-    private readonly float m_dpiScale = 1f; // intentionally fixed until a Veldrid-free DPI API exists
+    private readonly float m_dpiScale;
 
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontRegular = new();
     private readonly Dictionary<ImGuiFontSize, ImFontPtr> m_fontBold = new();
@@ -44,11 +44,12 @@ internal sealed class ImGuiImpl : IImGui
     public ImGuiImpl(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         m_windowFactory = windowFactory;
-        m_graphicsDevice = windowFactory.graphicsDevice;
-        m_mainWindow = windowFactory.mainWindow;
-
-        m_commandList = m_graphicsDevice.CreateCommandList();
+        m_commandList = windowFactory.graphicsDevice.CreateCommandList();
         m_controller = new ImGuiController(windowFactory, colorSpaceHandling);
+        
+        // DPI
+        var dpiScale = m_windowFactory.mainWindow.GetFrameBufferScale();
+        m_dpiScale = MathF.Max(dpiScale.x, dpiScale.y);
 
         // Fonts: caller/editor owns the policy; platform ships sane defaults.
         m_controller.ClearAllFonts();
@@ -56,33 +57,54 @@ internal sealed class ImGuiImpl : IImGui
         SetupIcons(m_dpiScale);
         m_controller.RebuildFontTexture();
 
+        // Main Context
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
-        virtualContextPtrImpl = mainMainContextPtrImpl;
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
-        // ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
-
         SetupImGuiStyle();
+        
+		// Main IO
+		m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
+		ImGuiNET.ImGui.LoadIniSettingsFromDisk(m_iniPath);
+		ImGuiIniDataFile.LoadAndEnsure(m_iniPath);
+		m_lastIniWriteUtc = File.Exists(m_iniPath) ? File.GetLastWriteTimeUtc(m_iniPath) : DateTime.MinValue;
 
-        // Ini / persistent storage
-        m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
-        if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
-        {
-            ImGuiNET.ImGui.LoadIniSettingsFromDisk(m_iniPath);
-            ImGuiIniDataFile.LoadAndEnsure(m_iniPath);
-            m_lastIniWriteUtc = File.GetLastWriteTimeUtc(m_iniPath);
-        }
-        else
-        {
-            m_lastIniWriteUtc = DateTime.MinValue;
-        }
+		// Virtual Context
+		unsafe
+		{
+			virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
+			ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+			ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
+			SetupImGuiStyle();
+		}
+		
+		// Virtual IO: Ensure virtual context never saves ini (avoid main/virtual competing)
+		unsafe
+		{
+			var vio = ImGuiNET.ImGui.GetIO();
+			vio.WantSaveIniSettings = false;
+			vio.NativePtr->IniFilename = null;
+		}
 
-        m_currentFont = new ImGuiAlias(ImGuiFontStyle.Regular, (float)IImGui.C_DEFAULT_FONT_SIZE);
+		ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
     }
 
     public void BeginLayoutImpl(float deltaTime)
     {
-        m_controller.Update(deltaTime, m_mainWindow.GetPumpedEvents());
+	    // Begin Render
+	    m_commandList.Begin();
+	    m_commandList.SetFrameBuffer(m_windowFactory.graphicsDevice.swapchainFrameBuffer);
+	    
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowFactory.mainWindow.width, m_windowFactory.mainWindow.height);
+	    ImGuiNET.ImGui.NewFrame();
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
+
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    m_controller.Update(deltaTime, m_windowFactory.mainWindow.GetPumpedEvents());
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
 
         // Default font
         UseFontImpl(ImGuiFontStyle.Regular, (float)IImGui.C_DEFAULT_FONT_SIZE);
@@ -90,10 +112,17 @@ internal sealed class ImGuiImpl : IImGui
 
     public void EndLayoutImpl()
     {
-        m_commandList.Begin();
-        m_commandList.SetFrameBuffer(m_graphicsDevice.swapchainFrameBuffer);
-
-        m_controller.Render(m_commandList, m_graphicsDevice.swapchainFrameBuffer);
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.EndFrame();
+	    
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    
+		// Render
+	    m_controller.Render(m_commandList, m_windowFactory.graphicsDevice.swapchainFrameBuffer);
 
         // Ini self-heal
         if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
@@ -107,7 +136,7 @@ internal sealed class ImGuiImpl : IImGui
         }
 
         m_commandList.End();
-        m_graphicsDevice.Submit(m_commandList);
+        m_windowFactory.graphicsDevice.Submit(m_commandList);
     }
 
     public IntPtr GetOrBindTextureImpl(ITexture texture) => m_controller.GetOrBindTexture(texture);
@@ -116,49 +145,62 @@ internal sealed class ImGuiImpl : IImGui
 
     public void UseFontImpl(ImGuiFontStyle style, float? size)
     {
-        // m_currentFont = size == null
-        //     ? new ImGuiAlias(style, m_currentFont.size)
-        //     : new ImGuiAlias(style, (float)size);
-        //
-        // var requested = m_currentFont.size * m_zoomRate;
-        // var family = style switch
-        // {
-        //     ImGuiFontStyle.Bold => m_fontBold,
-        //     ImGuiFontStyle.Italic => m_fontItalic,
-        //     ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
-        //     ImGuiFontStyle.Icon => m_icon,
-        //     _ => m_fontRegular
-        // };
-        //
-        // ImGuiFontSize nearest = default;
-        // float nearestDist = float.MaxValue;
-        // bool exact = false;
-        //
-        // foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
-        // {
-        //     float v = (float)s;
-        //     float dist = MathF.Abs(requested - v);
-        //     if (MathHelper.AlmostEquals(requested, v))
-        //     {
-        //         nearest = s;
-        //         exact = true;
-        //         break;
-        //     }
-        //     if (dist < nearestDist)
-        //     {
-        //         nearestDist = dist;
-        //         nearest = s;
-        //     }
-        // }
-        //
-        // float scale = exact ? 1f : requested / (float)nearest;
-        // var font = family[nearest];
-        //
-        // ImGuiNET.ImGui.PopFont();
-        // ImGuiNET.ImGui.PushFont(font);
-        // ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
-    }
+	    m_currentFont = size == null ? new ImGuiAlias(style, m_currentFont.size) : new ImGuiAlias(style, (float)size);
+	    var sizeInFloat = m_currentFont.size * m_zoomRate;
+	    
+	    // 1. Select font family by style
+	    var family = style switch
+	    {
+		    ImGuiFontStyle.Bold       => m_fontBold,
+		    ImGuiFontStyle.Italic     => m_fontItalic,
+		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
+		    
+		    ImGuiFontStyle.Icon		  => m_icon,
+		    _                         => m_fontRegular
+	    };
 
+	    // 3. Iterate enum to find exact or nearest
+	    ImGuiFontSize nearest = default;
+	    float nearestDist = float.MaxValue;
+	    bool exactMatch = false;
+
+	    foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
+	    {
+		    float enumSize = (float)s;
+		    float dist = MathF.Abs(sizeInFloat - enumSize);
+
+		    // exact hit (with tolerance)
+		    if (MathHelper.AlmostEquals(sizeInFloat, enumSize))
+		    {
+			    nearest = s;
+			    exactMatch = true;
+			    break;
+		    }
+
+		    // nearest
+		    if (dist < nearestDist)
+		    {
+			    nearestDist = dist;
+			    nearest = s;
+		    }
+	    }
+
+	    float scale = exactMatch ? 1f : sizeInFloat / (float)nearest;
+	    var font = family[nearest];
+
+	    // 4. Apply to virtual context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+	    ImGuiNET.ImGui.PushFont(font);
+
+	    // 5. Apply to main context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+	    ImGuiNET.ImGui.PushFont(font);
+    }
+    
     public ImGuiAlias GetCurrentFontImpl() => m_currentFont;
 
     public void ZoomImpl(float zoomRate) => m_zoomRate = zoomRate;

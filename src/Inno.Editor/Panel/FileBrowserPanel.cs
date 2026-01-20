@@ -424,7 +424,7 @@ public sealed class FileBrowserPanel : EditorPanel
         foreach (var e in entries)
         {
             ImGui.TableSetColumnIndex(col);
-            DrawGridItem(e, iconSize, 2.75f);
+            DrawGridItem(e, iconSize, 15f);
 
             col++;
             if (col >= cols)
@@ -442,46 +442,42 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGui.BeginGroup();
         ImGui.PushID(e.fullPath);
 
-        var drawList = ImGui.GetWindowDrawList();
-        bool selected = IsSelected(e.fullPath);
-        string icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
-
+        // Hoverable
         Vector2 p0 = ImGui.GetCursorScreenPos();
         Vector2 size = new Vector2(itemSize, itemSize);
-
+        
         ImGui.InvisibleButton("##grid_item_btn", size);
-
+        
+        bool selected = IsSelected(e.fullPath);
         bool hovered = ImGui.IsItemHovered();
         bool clicked = ImGui.IsItemClicked(ImGuiMouseButton.Left);
-
         if (hovered || selected)
         {
             var col = ImGui.GetColorU32(selected ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered);
             uint a = (uint)(hovered && !selected ? 80 : 110);
             uint bg = (col & 0x00FFFFFFu) | (a << 24);
             float rounding = 10f;
-            drawList.AddRectFilled(p0, p0 + size, bg, rounding);
+            ImGui.GetWindowDrawList().AddRectFilled(p0, p0 + size, bg, rounding);
         }
 
+        // Icon
+        var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
         var currentFont = IImGui.GetCurrentFont();
-        var gridScale = itemSize / C_GRID_ICON_SIZE;
-        float fontSize = iconScale * gridScale * currentFont.size;
+        IImGui.UseFont(ImGuiFontStyle.Icon, itemSize * iconScale / ImGui.GetFontSize());
+        
+        Vector2 winPos = ImGui.GetWindowPos();
+        Vector2 p0Screen = p0;
+        Vector2 p0Local = p0Screen - winPos;
+        Vector2 iconTextSize = ImGui.CalcTextSize(icon);
+        float iconX = MathF.Floor(p0Local.x + (itemSize - iconTextSize.x) * 0.5f);
+        float iconY = MathF.Floor(p0Local.y + (itemSize - iconTextSize.y) * 0.5f);
 
-        IImGui.UseFont(ImGuiFontStyle.Icon, fontSize);
-        ImFontPtr font = ImGui.GetFont();
+        ImGui.SetCursorPos(new Vector2(iconX, iconY));
+        ImGui.TextUnformatted(icon);
+        IImGui.UseFont(currentFont);
+        ImGui.SetCursorPos(new Vector2(p0Local.x, p0Local.y + itemSize));
 
-        uint iconCol = ImGui.GetColorU32(ImGuiCol.Text);
-        float scale = fontSize / ImGui.GetFontSize();
-        Vector2 textSize = ImGui.CalcTextSize(icon);
-        Vector2 scaledTextSize = textSize * scale;
-        Vector2 iconPos = new Vector2(
-            p0.x + (size.x - scaledTextSize.x) * 0.5f,
-            p0.y + (size.y - scaledTextSize.y) * 0.5f
-        );
-
-        drawList.AddText(font, fontSize, iconPos, iconCol, icon);
-        IImGui.UseFont(currentFont); // This is to be used for the drawList
-
+        // Click event
         if (clicked)
         {
             if (e.isDir) SelectFolder(e.fullPath);
