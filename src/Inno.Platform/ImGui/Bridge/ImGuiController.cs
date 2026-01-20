@@ -75,13 +75,17 @@ internal sealed class ImGuiController : IDisposable
         var ctx = ImGuiNET.ImGui.CreateContext();
         ImGuiNET.ImGui.SetCurrentContext(ctx);
 
+        // IO
         var io = ImGuiNET.ImGui.GetIO();
         io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
 
+        // Config Flags
+        // TODO: Support Viewports
         // IMPORTANT: disable multi-viewports until the platform exposes per-window swapchains/framebuffers.
         io.ConfigFlags &= ~ImGuiConfigFlags.ViewportsEnable;
 
+        // Backend Flags
         io.BackendFlags |= ImGuiBackendFlags.HasMouseCursors;
         io.BackendFlags |= ImGuiBackendFlags.HasSetMousePos;
 
@@ -99,12 +103,11 @@ internal sealed class ImGuiController : IDisposable
             m_mergeCfg.FontDataOwnedByAtlas = false;
             m_mergeCfg.PixelSnapH = true;
         }
-
-        // Default font (caller typically clears & re-adds their own)
         io.Fonts.AddFontDefault();
         io.Fonts.Flags |= ImFontAtlasFlags.NoBakedLines;
 
         CreateDeviceResources();
+        SetPerFrameImGuiData(1f / 60f);
     }
 
     // ============================================================
@@ -428,8 +431,16 @@ internal sealed class ImGuiController : IDisposable
     private void SetPerFrameImGuiData(float deltaSeconds)
     {
         var io = ImGuiNET.ImGui.GetIO();
-        io.DeltaTime = deltaSeconds <= 0 ? 1f / 60f : deltaSeconds;
-        io.DisplaySize = new Vector2(m_windowFactory.mainWindow.width, m_windowFactory.mainWindow.height);
+        var mainWindow = m_windowFactory.mainWindow;
+        
+        // DisplaySize
+        io.DisplaySize = new Vector2(mainWindow.width, mainWindow.height);
+        io.DeltaTime = deltaSeconds;
+        
+        // Framebuffer
+        io.DisplayFramebufferScale = mainWindow.GetFrameBufferScale();
+        // ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new Vector2(mainWindow.x, mainWindow.y);
+        // ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new Vector2(mainWindow.width, mainWindow.height);
     }
 
     private void UpdateImGuiInput(EventSnapshot snapshot)
@@ -617,36 +628,22 @@ internal sealed class ImGuiController : IDisposable
 
     private void RenderImDrawData(ImDrawDataPtr drawData, ICommandList cl, IFrameBuffer fb)
     {
-        var io = ImGuiNET.ImGui.GetIO();
-
-        // HiDPI / Retina fix: make ImGui aware of framebuffer scaling.
-        {
-            float winW = MathF.Max(1.0f, m_windowFactory.mainWindow.width);
-            float winH = MathF.Max(1.0f, m_windowFactory.mainWindow.height);
-
-            // DisplaySize is in "logical" units (window coords)
-            io.DisplaySize = new Vector2(winW, winH);
-
-            // FramebufferScale is "framebuffer pixels per logical pixel"
-            io.DisplayFramebufferScale = new Vector2(fb.width / winW, fb.height / winH);
-        }
-        
         if (m_pipeline == null || m_vertexBuffer == null || m_indexBuffer == null || m_projBuffer == null || m_set0 == null || m_fontTextureSet == null)
             return;
 
         if (drawData.CmdListsCount == 0)
             return;
 
-        float L = drawData.DisplayPos.X;
-        float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
-        float T = drawData.DisplayPos.Y;
-        float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
+        float left = drawData.DisplayPos.X;
+        float right = drawData.DisplayPos.X + drawData.DisplaySize.X;
+        float top = drawData.DisplayPos.Y;
+        float bottom = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
 
         var proj = new Matrix(
-            2.0f / (R - L), 0.0f, 0.0f, 0.0f,
-            0.0f, 2.0f / (T - B), 0.0f, 0.0f,
+            2.0f / (right - left), 0.0f, 0.0f, 0.0f,
+            0.0f, 2.0f / (top - bottom), 0.0f, 0.0f,
             0.0f, 0.0f, -1.0f, 0.0f,
-            (R + L) / (L - R), (T + B) / (B - T), 0.0f, 1.0f);
+            (right + left) / (left - right), (top + bottom) / (bottom - top), 0.0f, 1.0f);
         m_projBuffer.Set(ref proj);
 
         // Upload vertices/indices into managed arrays and send to GPU
@@ -662,32 +659,29 @@ internal sealed class ImGuiController : IDisposable
         for (int n = 0; n < drawData.CmdListsCount; n++)
         {
             var cmdList = drawData.CmdLists[n];
-
-            unsafe
+            
+            for (int i = 0; i < cmdList.VtxBuffer.Size; i++)
             {
-                for (int i = 0; i < cmdList.VtxBuffer.Size; i++)
-                {
-                    ImDrawVertPtr dv = cmdList.VtxBuffer[i];
-                    uint c = dv.col;
-                    byte r = (byte)(c & 0xFF);
-                    byte g = (byte)((c >> 8) & 0xFF);
-                    byte b = (byte)((c >> 16) & 0xFF);
-                    byte a = (byte)((c >> 24) & 0xFF);
+                ImDrawVertPtr dv = cmdList.VtxBuffer[i];
+                uint c = dv.col;
+                byte r = (byte)(c & 0xFF);
+                byte g = (byte)((c >> 8) & 0xFF);
+                byte b = (byte)((c >> 16) & 0xFF);
+                byte a = (byte)((c >> 24) & 0xFF);
 
-                    vtx[vtxOffset + i] = new ImGuiVertex
-                    {
-                        pos = dv.pos,
-                        uv = dv.uv,
-                        color = Color.FromBytes(r, g, b, a)
-                    };
-                }
-
-                // ImGui index buffer is ushort by default in ImGui.NET.
-                // Expand to uint to match platform index format (VeldridCommandList uses UInt32).
-                for (int i = 0; i < cmdList.IdxBuffer.Size; i++)
+                vtx[vtxOffset + i] = new ImGuiVertex
                 {
-                    idx[idxOffset + i] = cmdList.IdxBuffer[i];
-                }
+                    pos = dv.pos,
+                    uv = dv.uv,
+                    color = Color.FromBytes(r, g, b, a)
+                };
+            }
+
+            // ImGui index buffer is ushort by default in ImGui.NET.
+            // Expand to uint to match platform index format (VeldridCommandList uses UInt32).
+            for (int i = 0; i < cmdList.IdxBuffer.Size; i++)
+            {
+                idx[idxOffset + i] = cmdList.IdxBuffer[i];
             }
 
             vtxOffset += cmdList.VtxBuffer.Size;
@@ -752,7 +746,7 @@ internal sealed class ImGuiController : IDisposable
                 cl.SetScissorRect(0, new Rect(scX, scY, scW, scH));
 
                 cl.DrawIndexed(
-                    (uint)pcmd.ElemCount,
+                    pcmd.ElemCount,
                     (uint)(pcmd.IdxOffset + globalIdxOffset),
                     (int)(pcmd.VtxOffset + globalVtxOffset));
             }

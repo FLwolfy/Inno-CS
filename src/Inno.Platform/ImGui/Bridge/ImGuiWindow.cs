@@ -22,11 +22,21 @@ internal class ImGuiWindow : IDisposable
 
     public static ImGuiWindow? currentWindow;
 
-    public ImGuiWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp)
+    public ImGuiWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp, bool isMainWindow)
     {
         m_gcHandle = GCHandle.Alloc(this);
         m_windowFactory = windowFactory;
         m_viewportPtr = vp;
+        vp.PlatformUserData = (IntPtr)m_gcHandle;
+        
+        if (isMainWindow)
+        {
+            m_window = windowFactory.mainWindow;
+            m_isMainWindow = true;
+
+            return;
+        }
+
         m_isMainWindow = false;
 
         var flags = WindowCreateFlags.Hidden | WindowCreateFlags.AllowHighDpi;
@@ -64,18 +74,6 @@ internal class ImGuiWindow : IDisposable
         m_window.Closed += () => m_viewportPtr.PlatformRequestClose = true;
         m_window.Moved += _ => m_viewportPtr.PlatformRequestMove = true;
         m_window.FocusGained += () => currentWindow = this;
-        
-        vp.PlatformUserData = (IntPtr)m_gcHandle;
-    }
-
-    public ImGuiWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp, IWindow mainWindow)
-    {
-        m_gcHandle = GCHandle.Alloc(this);
-        m_viewportPtr = vp;
-        m_windowFactory = windowFactory;
-        m_window = mainWindow;
-        m_isMainWindow = true;
-        vp.PlatformUserData = (IntPtr)m_gcHandle;
     }
 
     // public EventSnapshot PumpEvents()

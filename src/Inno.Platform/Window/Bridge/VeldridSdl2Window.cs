@@ -17,6 +17,16 @@ internal class VeldridSdl2Window : IWindow
     private readonly EventSnapshot m_eventSnapshot = new EventSnapshot();
 
     public bool exists => inner.Exists;
+    public int x
+    {
+        get => inner.X;
+        set => inner.X = value;
+    }
+    public int y
+    {
+        get => inner.Y;
+        set => inner.Y = value;
+    }
     public int width
     {
         get => inner.Width;
@@ -108,6 +118,9 @@ internal class VeldridSdl2Window : IWindow
     }
     
     public EventSnapshot GetPumpedEvents() => m_eventSnapshot;
+
+    public Vector2Int GetFrameBufferSize() => VeldridSdl2HiDpi.GetFramebufferSize(inner);
+    public Vector2 GetFrameBufferScale() => VeldridSdl2HiDpi.GetFramebufferScale(inner);
 
     public void Dispose()
     {

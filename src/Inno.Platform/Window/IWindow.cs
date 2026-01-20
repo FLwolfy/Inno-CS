@@ -42,6 +42,8 @@ public interface IWindow : IDisposable
 {
     bool exists { get; }
     
+    int x { get; set; }
+    int y { get; set; }
     int width { get; set; }
     int height { get; set; }
     bool resizable { get; set; }
@@ -59,4 +61,7 @@ public interface IWindow : IDisposable
 
     void PumpEvents(EventDispatcher dispatcher);
     EventSnapshot GetPumpedEvents();
+
+    Vector2Int GetFrameBufferSize();
+    Vector2 GetFrameBufferScale();
 }

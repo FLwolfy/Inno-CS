@@ -54,24 +54,24 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
     {
         var window = new VeldridSdl2Window(info);
         var vgd = (graphicsDevice as VeldridGraphicsDevice)!.inner;
-        var (fbW, fbH) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+        var size = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
         
         SwapchainSource scSource = VeldridStartup.GetSwapchainSource(window.inner);
         SwapchainDescription scDesc = new SwapchainDescription(
             scSource, 
-            (uint)fbW, 
-            (uint)fbH, 
+            (uint)size.x, 
+            (uint)size.y, 
             vgd.SwapchainFramebuffer.OutputDescription.DepthAttachment?.Format,
             true, 
             false
         );
         
         var swapchain = vgd.ResourceFactory.CreateSwapchain(scDesc);
-        swapchain.Resize((uint)fbW, (uint)fbH);
+        swapchain.Resize((uint)size.x, (uint)size.y);
         window.Resized += () =>
         {
-            var (nw, nh) = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
-            swapchain.Resize((uint)nw, (uint)nh);
+            var s = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
+            swapchain.Resize((uint)s.x, (uint)s.y);
         };
         m_windowSwapchains[window] = swapchain;
         
