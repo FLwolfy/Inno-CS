@@ -5,14 +5,14 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-using ImGuiNET;
-
 using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
 
-namespace Inno.Platform.ImGui.Bridge;
+using ImGuiNET;
+
+namespace Inno.ImGui.Backend;
 
 /// <summary>
 /// Renderer/controller which bridges ImGui.NET to Inno.Platform.Graphics interfaces.
@@ -27,7 +27,7 @@ namespace Inno.Platform.ImGui.Bridge;
 ///   abstractions currently expose only a single swapchain framebuffer, so rendering secondary viewports
 ///   would require additional API surface (per-window framebuffers / swapchains).
 /// </summary>
-internal sealed class ImGuiController : IDisposable
+internal sealed class ImGuiNETController : IDisposable
 {
     private readonly IWindowFactory m_windowFactory;
     private readonly IGraphicsDevice m_graphicsDevice;
@@ -65,12 +65,12 @@ internal sealed class ImGuiController : IDisposable
     private readonly Dictionary<string, (float, (ushort, ushort))> m_iconSizeCache = new();
     private readonly Dictionary<string, IntPtr> m_rangePtrCache = new();
 
-    public ImGuiController(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
+    public ImGuiNETController(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         m_windowFactory = windowFactory;
         m_graphicsDevice = windowFactory.graphicsDevice;
         m_colorSpaceHandling = colorSpaceHandling;
-        m_assembly = typeof(ImGuiController).GetTypeInfo().Assembly;
+        m_assembly = typeof(ImGuiNETController).GetTypeInfo().Assembly;
 
         var ctx = ImGuiNET.ImGui.CreateContext();
         ImGuiNET.ImGui.SetCurrentContext(ctx);

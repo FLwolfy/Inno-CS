@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
-using ImGuiNET;
+
 using Inno.Editor.Utility;
+
+using ImGuiNET;
+using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
 
@@ -42,9 +45,9 @@ public static class EditorManager
         {
             if (!panel.isOpen) continue;
 
-            ImGui.Begin(panel.title, ImGuiWindowFlags.NoCollapse);
+            ImGuiNet.Begin(panel.title, ImGuiWindowFlags.NoCollapse);
             panel.OnGUI();
-            ImGui.End();
+            ImGuiNet.End();
         }
     }
 }

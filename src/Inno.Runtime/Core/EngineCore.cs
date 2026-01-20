@@ -3,24 +3,16 @@ using Inno.Core.Application;
 using Inno.Core.Events;
 using Inno.Core.Layers;
 using Inno.Core.Logging;
-using Inno.Core.Utility;
 using Inno.Graphics;
 using Inno.Graphics.Renderer;
-using Inno.Graphics.Resources.GpuResources.Cache;
-using Inno.Graphics.Targets;
 using Inno.Platform;
 using Inno.Platform.Graphics;
-using Inno.Platform.ImGui;
 using Inno.Platform.Window;
 
 namespace Inno.Runtime.Core;
 
 public abstract class EngineCore
 {
-    private static readonly int DEFAULT_WINDOW_WIDTH = 1920;
-    private static readonly int DEFAULT_WINDOW_HEIGHT = 1080;
-    private static readonly bool DEFAULT_WINDOW_RESIZABLE = false;
-    
     private readonly IWindowFactory m_windowFactory;
     private readonly IWindow m_mainWindow;
     private readonly IGraphicsDevice m_graphicsDevice;
@@ -38,8 +30,8 @@ public abstract class EngineCore
                 name = "Main Window",
                 x = 0,
                 y = 0,
-                width = DEFAULT_WINDOW_WIDTH,
-                height = DEFAULT_WINDOW_HEIGHT,
+                width = 2180,
+                height = 1080,
                 flags = WindowCreateFlags.AllowHighDpi | WindowCreateFlags.Resizable | WindowCreateFlags.Decorated
             }, 
             WindowBackend.Veldrid_Sdl2,
@@ -47,9 +39,6 @@ public abstract class EngineCore
 
         m_mainWindow = m_windowFactory.mainWindow;
         m_graphicsDevice = m_windowFactory.graphicsDevice;
-        
-        // TODO: Move this inside EDITOR part
-        PlatformAPI.SetupImGuiImpl(m_windowFactory, ImGuiColorSpaceHandling.Legacy);
         
         // Initialize lifecycle
         m_gameShell = new Shell();
@@ -128,13 +117,17 @@ public abstract class EngineCore
         RenderGraphics.Clear();
         
         // Dispose Resources
-        IImGui.DisposeImpl();
         m_fileSink.Dispose();
         m_graphicsDevice.Dispose();
         
         // Assets
         AssetManager.Shutdown();
     }
+    
+    /// <summary>
+    /// Get the windowFactory of this engine core.
+    /// </summary>
+    public IWindowFactory GetWindowFactory() => m_windowFactory;
     
     /// <summary>
     /// Starts the main loop of the engine.

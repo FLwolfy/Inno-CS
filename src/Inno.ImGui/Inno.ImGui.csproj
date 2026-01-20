@@ -3,12 +3,15 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Inno.Assets\Inno.Assets.csproj"/>
-    <ProjectReference Include="..\Inno.Core\Inno.Core.csproj"/>
-    <ProjectReference Include="..\Inno.Graphics\Inno.Graphics.csproj"/>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Inno.Platform\Inno.Platform.csproj" />
   </ItemGroup>
 
   <ItemGroup>

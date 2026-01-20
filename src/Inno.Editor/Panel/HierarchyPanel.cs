@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ImGuiNET;
 
 using Inno.Core.ECS;
 using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.GUI;
-using Inno.Runtime.Component;
+
+using ImGuiNET;
+using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Panel;
 
@@ -24,7 +25,7 @@ public class HierarchyPanel : EditorPanel
     internal override void OnGUI()
     {
         // Scrollable area for the whole hierarchy
-        ImGui.BeginChild(
+        ImGuiNet.BeginChild(
             "##HierarchyScroll",
             new Vector2(0,0),
             ImGuiChildFlags.None,
@@ -49,21 +50,21 @@ public class HierarchyPanel : EditorPanel
             m_pendingGuiUpdateAction.Dequeue().Invoke();
         }
 
-        ImGui.EndChild();
+        ImGuiNet.EndChild();
     }
 
     private void HandleMenu()
     {
-        if (!ImGui.IsAnyItemHovered() && ImGui.IsWindowHovered() && ImGui.GetIO().MouseClicked[(int)Input.MouseButton.Right])
+        if (!ImGuiNet.IsAnyItemHovered() && ImGuiNet.IsWindowHovered() && ImGuiNet.GetIO().MouseClicked[(int)Input.MouseButton.Right])
         {
-            ImGui.OpenPopup("HierarchyContextMenu");
+            ImGuiNet.OpenPopup("HierarchyContextMenu");
         }
 
-        if (ImGui.BeginPopup("HierarchyContextMenu"))
+        if (ImGuiNet.BeginPopup("HierarchyContextMenu"))
         {
-            if (ImGui.BeginMenu("Create"))
+            if (ImGuiNet.BeginMenu("Create"))
             {
-                if (ImGui.MenuItem("GameObject"))
+                if (ImGuiNet.MenuItem("GameObject"))
                 {
                     m_pendingGuiUpdateAction.Enqueue(() =>
                     {
@@ -71,17 +72,17 @@ public class HierarchyPanel : EditorPanel
                         EditorManager.selection.Select(go);
                     });
                 }
-                ImGui.EndMenu();
+                ImGuiNet.EndMenu();
             }
-            ImGui.EndPopup();
+            ImGuiNet.EndPopup();
         }
     }
 
     private void DrawSceneObjectRoot()
     {
         // Draw "Scene Root" as non-selectable, non-draggable
-        ImGui.Text("[ Scene Root ]");
-        if (ImGui.BeginDragDropTarget())
+        ImGuiNet.Text("[ Scene Root ]");
+        if (ImGuiNet.BeginDragDropTarget())
         {
             var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null)
@@ -89,7 +90,7 @@ public class HierarchyPanel : EditorPanel
                 var obj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
                 m_pendingGuiUpdateAction.Enqueue(() => obj?.transform.SetParent(null));
             }
-            ImGui.EndDragDropTarget();
+            ImGuiNet.EndDragDropTarget();
         }
     }
 
@@ -108,12 +109,12 @@ public class HierarchyPanel : EditorPanel
         }
 
         ////////////// Begin Tree Node //////////////
-        bool isOpenTree = ImGui.TreeNodeEx($"###{obj.id}", flags);
+        bool isOpenTree = ImGuiNet.TreeNodeEx($"###{obj.id}", flags);
         
         // Handle Right Click menu
-        if (ImGui.BeginPopupContextItem($"Popup_{obj.id}"))
+        if (ImGuiNet.BeginPopupContextItem($"Popup_{obj.id}"))
         {
-            if (ImGui.MenuItem("Delete"))
+            if (ImGuiNet.MenuItem("Delete"))
             {
                 m_pendingGuiUpdateAction.Enqueue(() =>
                 {
@@ -121,25 +122,25 @@ public class HierarchyPanel : EditorPanel
                 });
             }
 
-            ImGui.EndPopup();
+            ImGuiNet.EndPopup();
         }
         
         // Handle click selection
-        if (ImGui.IsItemClicked((int)Input.MouseButton.Left))
+        if (ImGuiNet.IsItemClicked((int)Input.MouseButton.Left))
         {
             selection.Select(obj);
         }
 
         // Drag Source
-        if (ImGui.BeginDragDropSource())
+        if (ImGuiNet.BeginDragDropSource())
         {
             EditorImGuiEx.SetDragPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
-            ImGui.Text($"Dragging {obj.name}");
-            ImGui.EndDragDropSource();
+            ImGuiNet.Text($"Dragging {obj.name}");
+            ImGuiNet.EndDragDropSource();
         }
 
         // Drag Target
-        if (ImGui.BeginDragDropTarget())
+        if (ImGuiNet.BeginDragDropTarget())
         {
             var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
             if (payload != null && payload != obj.id)
@@ -147,12 +148,12 @@ public class HierarchyPanel : EditorPanel
                 var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
                 m_pendingGuiUpdateAction.Enqueue(() => payloadObj?.transform.SetParent(obj.transform));
             }
-            ImGui.EndDragDropTarget();
+            ImGuiNet.EndDragDropTarget();
         }
         
         // Tree Node Text
         var isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
-        ImGui.SameLine();
+        ImGuiNet.SameLine();
         EditorImGuiEx.DrawIconAndText(isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube, obj.name);
 
         // Draw Children
@@ -164,7 +165,7 @@ public class HierarchyPanel : EditorPanel
         ////////////// End Tree Node //////////////
         if (isOpenTree)
         {
-            ImGui.TreePop();
+            ImGuiNet.TreePop();
         }
     }
 }

@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ImGuiNET;
+
 using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Editor.Core;
-using Inno.Platform.ImGui;
+
+using ImGuiNET;
+using Inno.ImGui;
+using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Panel;
 
@@ -57,18 +60,18 @@ public class LogPanel : EditorPanel, ILogSink
         // -------------------
         // Top Options
         // -------------------
-        ImGui.BeginChild("LogChild", new Vector2(0, 0));
+        ImGuiNet.BeginChild("LogChild", new Vector2(0, 0));
         
         bool oldCollapse = m_collapse;
-        ImGui.Checkbox("Collapse", ref m_collapse);
-        ImGui.SameLine();
+        ImGuiNet.Checkbox("Collapse", ref m_collapse);
+        ImGuiNet.SameLine();
 
-        if (ImGui.BeginCombo("##LogFilter", "Filter", ImGuiComboFlags.WidthFitPreview))
+        if (ImGuiNet.BeginCombo("##LogFilter", "Filter", ImGuiComboFlags.WidthFitPreview))
         {
             foreach (var level in m_levels)
             {
                 bool selected = m_filterLevels.Contains(level);
-                if (ImGui.Checkbox(level.ToString(), ref selected))
+                if (ImGuiNet.Checkbox(level.ToString(), ref selected))
                 {
                     if (selected)
                         m_filterLevels.Add(level);
@@ -76,22 +79,22 @@ public class LogPanel : EditorPanel, ILogSink
                         m_filterLevels.Remove(level);
                 }
             }
-            ImGui.EndCombo();
+            ImGuiNet.EndCombo();
         }
 
-        ImGui.SameLine();
-        if (ImGui.Button("Clear"))
+        ImGuiNet.SameLine();
+        if (ImGuiNet.Button("Clear"))
         {
             m_entries.Clear();
         }
 
-        ImGui.Separator();
+        ImGuiNet.Separator();
 
         // -------------------
         // Scrollable log region
         // -------------------
-        ImGui.BeginChild("LogRegion", new Vector2(0, 0));
-        bool scrollAtBottom = ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 1.0f;
+        ImGuiNet.BeginChild("LogRegion", new Vector2(0, 0));
+        bool scrollAtBottom = ImGuiNet.GetScrollY() >= ImGuiNet.GetScrollMaxY() - 1.0f;
 
         LogEntry? collapsedEntry = null;
         int repeatCount = 0;
@@ -113,7 +116,7 @@ public class LogPanel : EditorPanel, ILogSink
 
             if (collapsedEntry != null)
             {
-                if (oldCollapse && !m_collapse) ImGui.SetNextItemOpen(false);
+                if (oldCollapse && !m_collapse) ImGuiNet.SetNextItemOpen(false);
                 DrawLogEntry(collapsedEntry.Value, repeatCount);
             }
 
@@ -129,11 +132,11 @@ public class LogPanel : EditorPanel, ILogSink
 
         if (scrollAtBottom)
         {
-            ImGui.SetScrollHereY(1.0f);
+            ImGuiNet.SetScrollHereY(1.0f);
         }
 
-        ImGui.EndChild();
-        ImGui.EndChild();
+        ImGuiNet.EndChild();
+        ImGuiNet.EndChild();
     }
 
     private void DrawLogEntry(LogEntry entry, int repeatCount)
@@ -148,35 +151,35 @@ public class LogPanel : EditorPanel, ILogSink
             _              => Vector4.ONE
         };
 
-        ImGui.PushID(entry.time.GetHashCode());
+        ImGuiNet.PushID(entry.time.GetHashCode());
 
-        bool open = ImGui.CollapsingHeader("");
+        bool open = ImGuiNet.CollapsingHeader("");
 
-        IImGui.UseFont(ImGuiFontStyle.Bold);
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
-        ImGui.SameLine();
-        ImGui.Text($"[{entry.level}]");
-        ImGui.PopStyleColor();
-        IImGui.UseFont(ImGuiFontStyle.Regular);
+        ImGuiHost.UseFont(ImGuiFontStyle.Bold);
+        ImGuiNet.PushStyleColor(ImGuiCol.Text, color);
+        ImGuiNet.SameLine();
+        ImGuiNet.Text($"[{entry.level}]");
+        ImGuiNet.PopStyleColor();
+        ImGuiHost.UseFont(ImGuiFontStyle.Regular);
 
-        ImGui.SameLine();
-        ImGui.Text(entry.message);
+        ImGuiNet.SameLine();
+        ImGuiNet.Text(entry.message);
 
         if (repeatCount > 1)
         {
-            ImGui.SameLine();
-            ImGui.TextDisabled($"(x{repeatCount})");
+            ImGuiNet.SameLine();
+            ImGuiNet.TextDisabled($"(x{repeatCount})");
         }
 
         if (open)
         {
-            ImGui.TextWrapped($"Time: {entry.time:HH:mm:ss}");
-            ImGui.TextWrapped($"Source: {entry.source}");
-            ImGui.TextWrapped($"File: {entry.file}");
-            ImGui.TextWrapped($"Line: {entry.line}");
-            ImGui.Dummy(new Vector2(0, 8));
+            ImGuiNet.TextWrapped($"Time: {entry.time:HH:mm:ss}");
+            ImGuiNet.TextWrapped($"Source: {entry.source}");
+            ImGuiNet.TextWrapped($"File: {entry.file}");
+            ImGuiNet.TextWrapped($"Line: {entry.line}");
+            ImGuiNet.Dummy(new Vector2(0, 8));
         }
 
-        ImGui.PopID();
+        ImGuiNet.PopID();
     }
 }

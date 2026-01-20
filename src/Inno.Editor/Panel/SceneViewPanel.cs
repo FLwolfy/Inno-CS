@@ -1,5 +1,5 @@
 using System;
-using ImGuiNET;
+
 using Inno.Core.Events;
 using Inno.Core.Math;
 using Inno.Editor.Core;
@@ -9,8 +9,10 @@ using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Targets;
 using Inno.Platform.Graphics;
-using Inno.Platform.ImGui;
 using Inno.Runtime.RenderPasses;
+
+using Inno.ImGui;
+using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Panel;
 
@@ -104,7 +106,7 @@ public class SceneViewPanel : EditorPanel
     private void CheckRegionChange()
     {
         // Get Available region
-        Vector2 available = ImGui.GetContentRegionAvail();
+        Vector2 available = ImGuiNet.GetContentRegionAvail();
         int newWidth = (int)Math.Max(available.x, 1);
         int newHeight = (int)Math.Max(available.y, 1);
         
@@ -135,20 +137,20 @@ public class SceneViewPanel : EditorPanel
     private void HandlePanZoom()
     {
         Vector2 panDelta = Vector2.ZERO;
-        var io = ImGui.GetIO();
+        var io = ImGuiNet.GetIO();
         
         float zoomDelta = io.MouseWheel;
-        Vector2 localMousePos = io.MousePos - ImGui.GetCursorScreenPos();
+        Vector2 localMousePos = io.MousePos - ImGuiNet.GetCursorScreenPos();
 
-        bool isMouseInContent = localMousePos.y > 0 && ImGui.IsWindowHovered();
+        bool isMouseInContent = localMousePos.y > 0 && ImGuiNet.IsWindowHovered();
         bool isPanning = io.MouseDown[(int)MOUSE_BUTTON_PAN] || zoomDelta != 0.0f;
         if (isMouseInContent && isPanning)
         {
-            if (ImGui.IsWindowFocused()) { panDelta = io.MouseDelta; }
-            else { ImGui.SetWindowFocus(); }
+            if (ImGuiNet.IsWindowFocused()) { panDelta = io.MouseDelta; }
+            else { ImGuiNet.SetWindowFocus(); }
         }
 
-        if (ImGui.IsWindowFocused())
+        if (ImGuiNet.IsWindowFocused())
         {
             m_editorCamera2D.Update(panDelta, zoomDelta, localMousePos);
         }
@@ -159,14 +161,14 @@ public class SceneViewPanel : EditorPanel
         var targetTexture = RenderGraphics.targetPool.Get("scene")?.GetColorAttachment(0);
         if (targetTexture != null)
         {
-            var newTextureHandle = IImGui.GetOrBindTexture(targetTexture);
+            var newTextureHandle = ImGuiHost.GetOrBindTexture(targetTexture);
             if (m_currentTexture != targetTexture)
             {
-                IImGui.UnbindTexture(m_currentTexture);
+                ImGuiHost.UnbindTexture(m_currentTexture);
                 m_currentTexture = targetTexture;
             }
             
-            ImGui.Image(newTextureHandle, new Vector2(m_width, m_height));
+            ImGuiNet.Image(newTextureHandle, new Vector2(m_width, m_height));
         }
     }
     
@@ -193,7 +195,7 @@ public class SceneViewPanel : EditorPanel
         Vector2 offsetWorld = new Vector2(offsetXWorld, offsetYWorld);
         Vector2 offset = Vector2.Transform(offsetWorld, m_editorCamera2D.GetWorldToScreenMatrix());
         
-        m_gridGizmo.startPos = ImGui.GetWindowPos() + ImGui.GetCursorStartPos();
+        m_gridGizmo.startPos = ImGuiNet.GetWindowPos() + ImGuiNet.GetCursorStartPos();
         m_gridGizmo.size = new Vector2(m_width, m_height);
         m_gridGizmo.offset = offset;
         m_gridGizmo.spacing = spacing;

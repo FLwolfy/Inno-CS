@@ -4,11 +4,10 @@ using System.Runtime.InteropServices;
 using Inno.Platform.Window;
 
 using ImGuiNET;
-using Inno.Core.Events;
 
-namespace Inno.Platform.ImGui.Bridge;
+namespace Inno.ImGui.Backend;
 
-internal class ImGuiWindow : IDisposable
+internal class ImGuiNETWindow : IDisposable
 {
     private GCHandle m_gcHandle;
     
@@ -20,9 +19,9 @@ internal class ImGuiWindow : IDisposable
     public IWindow window => m_window;
     public ImGuiViewportPtr viewportPtr => m_viewportPtr;
 
-    public static ImGuiWindow? currentWindow;
+    public static ImGuiNETWindow? currentWindow;
 
-    public ImGuiWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp, bool isMainWindow)
+    public ImGuiNETWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp, bool isMainWindow)
     {
         m_gcHandle = GCHandle.Alloc(this);
         m_windowFactory = windowFactory;

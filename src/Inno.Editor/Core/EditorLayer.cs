@@ -1,28 +1,33 @@
-using ImGuiNET;
 using Inno.Core.Events;
 using Inno.Core.Layers;
 using Inno.Core.Math;
 using Inno.Core.Utility;
 using Inno.Editor.GUI;
 using Inno.Editor.Panel;
-using Inno.Platform.ImGui;
+
+using Inno.ImGui;
+using Inno.Platform.Window;
+using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
 
-public class EditorLayer() : Layer("EditorLayer")
+public class EditorLayer(IWindowFactory windowFactory) : Layer("EditorLayer")
 {
     private static readonly float MIN_ZOOM_RATE = 0.2f;
     private static readonly float MAX_ZOOM_RATE = 4.0f;
     private static readonly float ZOOM_RATE_STEP = 0.1f;
     private static readonly float DEFAULT_ZOOM_RATE = 1.0f;
-    
+
     private float m_currentZoomRate;
 
     public override void OnAttach()
     {
-        // GUI Initialization
-        m_currentZoomRate = IImGui.GetStorageData("Editor.ZoomRate", DEFAULT_ZOOM_RATE);
-        IImGui.Zoom(m_currentZoomRate);
+        // ImGui Initialization
+        ImGuiHost.Initialize(windowFactory, ImGuiBackend.ImGui_DOTNET, ImGuiColorSpaceHandling.Legacy);
+        
+        // Zoom
+        m_currentZoomRate = ImGuiHost.GetStorageData("Editor.ZoomRate", DEFAULT_ZOOM_RATE);
+        ImGuiHost.Zoom(m_currentZoomRate);
         
         // MenuBar Setup
         // TODO: Setup MenuBar
@@ -44,25 +49,25 @@ public class EditorLayer() : Layer("EditorLayer")
         if (keyEvent.key == Input.KeyCode.Plus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
         {
             m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate + ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
-            IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
-            IImGui.Zoom(m_currentZoomRate);
+            ImGuiHost.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
+            ImGuiHost.Zoom(m_currentZoomRate);
         }
         
         if (keyEvent.key == Input.KeyCode.Minus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
         {
             m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate - ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);
-            IImGui.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
-            IImGui.Zoom(m_currentZoomRate);
+            ImGuiHost.SetStorageData("Editor.ZoomRate", m_currentZoomRate);
+            ImGuiHost.Zoom(m_currentZoomRate);
         }
     }
 
     public override void OnRender()
     {
         // Begin ImGui Layout
-        IImGui.BeginLayout(Time.renderDeltaTime);
+        ImGuiHost.BeginLayout(Time.renderDeltaTime);
         
         // DockSpace
-        ImGui.DockSpaceOverViewport(ImGui.GetMainViewport().ID);
+        ImGuiNet.DockSpaceOverViewport(ImGuiNet.GetMainViewport().ID);
 
         // Play/Pause/Stop overlay
         EditorPlayBar.Draw();
@@ -73,7 +78,7 @@ public class EditorLayer() : Layer("EditorLayer")
         EditorGUILayout.EndFrame();
         
         // End ImGui Layout
-        IImGui.EndLayout();
+        ImGuiHost.EndLayout();
     }
 
     public override void OnUpdate()

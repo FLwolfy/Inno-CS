@@ -8,19 +8,19 @@ using Inno.Platform.Window;
 
 using ImGuiNET;
 
-namespace Inno.Platform.ImGui.Bridge;
+namespace Inno.ImGui.Backend;
 
 /// <summary>
 /// Platform-level ImGui implementation which relies only on Inno.Platform interfaces.
 /// </summary>
-internal sealed class ImGuiImpl : IImGui
+internal sealed class ImGuiNETBackend : IImGuiBackend
 {
 	// Window Graphics
     private readonly IWindowFactory m_windowFactory;
     
     // Resource
     private readonly ICommandList m_commandList;
-    private readonly ImGuiController m_controller;
+    private readonly ImGuiNETController m_controller;
 
     // Contexts 
     public IntPtr mainMainContextPtrImpl { get; }
@@ -41,11 +41,11 @@ internal sealed class ImGuiImpl : IImGui
     private readonly string m_iniPath;
     private DateTime m_lastIniWriteUtc;
 
-    public ImGuiImpl(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
+    public ImGuiNETBackend(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
         m_windowFactory = windowFactory;
         m_commandList = windowFactory.graphicsDevice.CreateCommandList();
-        m_controller = new ImGuiController(windowFactory, colorSpaceHandling);
+        m_controller = new ImGuiNETController(windowFactory, colorSpaceHandling);
         
         // DPI
         var dpiScale = m_windowFactory.mainWindow.GetFrameBufferScale();
@@ -99,15 +99,15 @@ internal sealed class ImGuiImpl : IImGui
 	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
 	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowFactory.mainWindow.width, m_windowFactory.mainWindow.height);
 	    ImGuiNET.ImGui.NewFrame();
-	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
 	    // Main Context
 	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
 	    m_controller.Update(deltaTime, m_windowFactory.mainWindow.GetPumpedEvents());
-	    ImGuiNET.ImGui.PushFont(m_fontRegular[IImGui.C_DEFAULT_FONT_SIZE]);
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
         // Default font
-        UseFontImpl(ImGuiFontStyle.Regular, (float)IImGui.C_DEFAULT_FONT_SIZE);
+        UseFontImpl(ImGuiFontStyle.Regular, (float)ImGuiHost.C_DEFAULT_FONT_SIZE);
     }
 
     public void EndLayoutImpl()
