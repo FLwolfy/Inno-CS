@@ -605,8 +605,8 @@ internal sealed class ImGuiNETController : IDisposable
         
         // Framebuffer
         io.DisplayFramebufferScale = mainWindow.GetFrameBufferScale();
-        // ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new Vector2(mainWindow.x, mainWindow.y);
-        // ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new Vector2(mainWindow.width, mainWindow.height);
+        ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Pos = new Vector2(mainWindow.position.x, mainWindow.position.y);
+        ImGuiNET.ImGui.GetPlatformIO().Viewports[0].Size = new Vector2(mainWindow.size.x, mainWindow.size.y);
     }
 
     private EventSnapshot[] PumpExtraWindowEvents()
@@ -687,7 +687,6 @@ internal sealed class ImGuiNETController : IDisposable
         
         // MVP uniform
         var pos = drawData.DisplayPos;
-        
         var mvpSys = System.Numerics.Matrix4x4.CreateOrthographicOffCenter(
             pos.X,
             pos.X + drawData.DisplaySize.X,
@@ -695,6 +694,7 @@ internal sealed class ImGuiNETController : IDisposable
             pos.Y,
             -1.0f,
             1.0f);
+        
         cl.UpdateUniform(m_projBuffer, ref mvpSys);
         
         // Apply window

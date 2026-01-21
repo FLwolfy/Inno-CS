@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 using Inno.Core.Events;
@@ -16,7 +15,7 @@ namespace Inno.Platform.Window.Bridge;
 
 internal class VeldridSdl2WindowFactory : IWindowFactory
 {
-    // Grahpics
+    // Graphics
     private readonly Dictionary<IWindow, Swapchain> m_windowSwapchains;
     public IWindow mainWindow { get; }
     public IGraphicsDevice graphicsDevice { get; }

@@ -93,7 +93,14 @@ internal class ImGuiNETWindow : IDisposable
     {
         // Framebuffer
         commandList.SetFrameBuffer(window.frameBuffer);
-        commandList.SetViewPort(0, new Rect(0, 0, window.frameBuffer.width, window.frameBuffer.height));
+        
+        // Viewport
+        Vector2 fbScale = drawData.FramebufferScale;
+        int fbW = (int)(drawData.DisplaySize.X * fbScale.x);
+        int fbH = (int)(drawData.DisplaySize.Y * fbScale.y);
+        if (fbW <= 0) fbW = window.frameBuffer.width;
+        if (fbH <= 0) fbH = window.frameBuffer.height;
+        commandList.SetViewPort(0, new Rect(0, 0, fbW, fbH));
         
         // Clear color
         var color = ImGuiNET.ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg];
