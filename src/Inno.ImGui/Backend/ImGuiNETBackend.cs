@@ -208,6 +208,12 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
 	    ImGuiNET.ImGui.PushFont(font);
+	    
+	    // 6. Apply to default font
+	    unsafe
+	    {
+		    ImGuiNET.ImGui.GetIO().NativePtr->FontDefault = font;
+	    }
     }
     
     public ImGuiAlias GetCurrentFontImpl() => m_currentFont;
