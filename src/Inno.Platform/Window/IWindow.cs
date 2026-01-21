@@ -1,6 +1,7 @@
 using System;
 using Inno.Core.Events;
 using Inno.Core.Math;
+using Inno.Platform.Graphics;
 
 namespace Inno.Platform.Window;
 
@@ -42,16 +43,20 @@ public interface IWindow : IDisposable
 {
     bool exists { get; }
     
-    int x { get; set; }
-    int y { get; set; }
-    int width { get; set; }
-    int height { get; set; }
+    IFrameBuffer frameBuffer { get; }
+    Vector2Int position { get; set; }
+    Vector2Int size { get; set; }
+    Rect bounds { get; }
+    
+    bool focused { get; }
+    bool minimized { get; }
     bool resizable { get; set; }
     bool decorated { get; set; }
     string title { get; set; }
 
     void Show();
     void Hide();
+    void Focus();
     void Close();
 
     event Action Resized;
@@ -59,7 +64,7 @@ public interface IWindow : IDisposable
     event Action<Vector2> Moved;
     event Action FocusGained;
 
-    void PumpEvents(EventDispatcher dispatcher);
+    void PumpEvents(EventDispatcher? dispatcher);
     EventSnapshot GetPumpedEvents();
 
     Vector2Int GetFrameBufferSize();

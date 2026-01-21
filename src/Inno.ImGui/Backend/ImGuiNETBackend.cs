@@ -43,13 +43,14 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 
     public ImGuiNETBackend(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        m_windowFactory = windowFactory;
+	    // Window
+	    m_windowFactory = windowFactory;
+	    var dpiScaleVec2 = m_windowFactory.mainWindow.GetFrameBufferScale();
+	    m_dpiScale = MathF.Max(dpiScaleVec2.x, dpiScaleVec2.y);
+	    
+	    // ImGui Renderer
         m_commandList = windowFactory.graphicsDevice.CreateCommandList();
-        m_controller = new ImGuiNETController(windowFactory, colorSpaceHandling);
-        
-        // DPI
-        var dpiScale = m_windowFactory.mainWindow.GetFrameBufferScale();
-        m_dpiScale = MathF.Max(dpiScale.x, dpiScale.y);
+        m_controller = new ImGuiNETController(windowFactory, colorSpaceHandling, m_dpiScale);
 
         // Fonts: caller/editor owns the policy; platform ships sane defaults.
         m_controller.ClearAllFonts();
@@ -97,7 +98,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    
 	    // Virtual Context
 	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowFactory.mainWindow.width, m_windowFactory.mainWindow.height);
+	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowFactory.mainWindow.size.x, m_windowFactory.mainWindow.size.y);
 	    ImGuiNET.ImGui.NewFrame();
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
@@ -122,7 +123,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    ImGuiNET.ImGui.PopFont();
 	    
 		// Render
-	    m_controller.Render(m_commandList, m_windowFactory.graphicsDevice.swapchainFrameBuffer);
+	    m_controller.Render(m_commandList);
 
         // Ini self-heal
         if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
@@ -137,6 +138,11 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 
         m_commandList.End();
         m_windowFactory.graphicsDevice.Submit(m_commandList);
+
+        foreach (var imguiViewportWindows in m_controller.GetViewportWindows())
+        {
+	        m_windowFactory.SwapWindowBuffers(imguiViewportWindows.window);
+        }
     }
 
     public IntPtr GetOrBindTextureImpl(ITexture texture) => m_controller.GetOrBindTexture(texture);

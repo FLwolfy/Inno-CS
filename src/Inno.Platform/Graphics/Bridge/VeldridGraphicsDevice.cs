@@ -35,7 +35,7 @@ internal class VeldridGraphicsDevice : IGraphicsDevice
         // Ensure swapchain/backbuffer matches drawable pixel size on HiDPI displays.
         {
             var size = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
-            if (size.x != window.width || size.y != window.height)
+            if (size != window.size)
             {
                 swapchainFrameBuffer.Resize(size.x, size.y);
             }

@@ -150,8 +150,7 @@ public abstract class EngineCore
     /// </summary>
     protected void SetWindowSize(int width, int height)
     {
-        m_mainWindow.width = width;
-        m_mainWindow.height = height;
+        m_mainWindow.size = new(width, height);
     }
     
     /// <summary>
