@@ -276,7 +276,7 @@ internal sealed class ImGuiNETController : IDisposable
         ImGuiNETWindow? window = (ImGuiNETWindow?) GCHandle.FromIntPtr(vp.PlatformUserData).Target;
         if (window != null)
         {
-            window.window.position = new((int)pos.X, (int)pos.Y);
+            window.window.position = new Vector2Int((int)pos.X, (int)pos.Y);
         }
     }
 
@@ -285,7 +285,7 @@ internal sealed class ImGuiNETController : IDisposable
         ImGuiNETWindow? window = (ImGuiNETWindow?) GCHandle.FromIntPtr(vp.PlatformUserData).Target;
         if (window != null)
         {
-            window.window.size = new((int)size.X, (int)size.Y);
+            window.window.size = new Vector2Int((int)size.X, (int)size.Y);
         }
     }
 
@@ -295,7 +295,7 @@ internal sealed class ImGuiNETController : IDisposable
         if (window != null)
         {
             var size = window.window.size;
-            *outSize = new(size.x, size.y);
+            *outSize = new System.Numerics.Vector2(size.x, size.y);
         }
     }
 
