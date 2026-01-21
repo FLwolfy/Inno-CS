@@ -2,19 +2,11 @@ using System;
 using System.Collections.Generic;
 using Inno.Core.Events;
 using Inno.Core.Math;
-using Inno.Platform.Graphics;
 
-namespace Inno.Platform.Window;
+namespace Inno.Platform.Display;
 
-public interface IWindowFactory : IDisposable
+public interface IDisplaySystem : IDisposable
 {
-    IWindow mainWindow { get; }
-    IGraphicsDevice graphicsDevice { get; }
-
-    IWindow CreateWindow(in WindowInfo info);
-    void DestroyWindow(IWindow window);
-    void SwapWindowBuffers(IWindow window);
-    
     int GetDisplayNumber();
     Rect GetDisplayBounds(int displayIndex);
     Rect GetUsableDisplayBounds(int displayIndex);

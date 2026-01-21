@@ -13,10 +13,7 @@ namespace Inno.Runtime.Core;
 
 public abstract class EngineCore
 {
-    private readonly IWindowFactory m_windowFactory;
-    private readonly IWindow m_mainWindow;
-    private readonly IGraphicsDevice m_graphicsDevice;
-    
+    private readonly PlatformAPI m_platform;
     private readonly Shell m_gameShell;
     private readonly LayerStack m_layerStack;
     private readonly FileLogSink m_fileSink;
@@ -24,7 +21,8 @@ public abstract class EngineCore
     protected EngineCore()
     {
         // Initialize platforms
-        m_windowFactory = PlatformAPI.CreateWindowFactory(
+        m_platform = new PlatformAPI
+        (
             new WindowInfo
             {
                 name = "Main Window",
@@ -32,14 +30,12 @@ public abstract class EngineCore
                 y = 0,
                 width = 2180,
                 height = 1080,
-                flags = WindowCreateFlags.AllowHighDpi | WindowCreateFlags.Resizable | WindowCreateFlags.Decorated
+                flags = WindowFlags.AllowHighDpi | WindowFlags.Resizable | WindowFlags.Decorated
             }, 
-            WindowBackend.Veldrid_Sdl2,
-            GraphicsBackend.Metal);
+            PlatformBackend.Veldrid_Sdl2,
+            GraphicsBackend.Metal
+        );
 
-        m_mainWindow = m_windowFactory.mainWindow;
-        m_graphicsDevice = m_windowFactory.graphicsDevice;
-        
         // Initialize lifecycle
         m_gameShell = new Shell();
         m_layerStack = new LayerStack();
@@ -56,7 +52,7 @@ public abstract class EngineCore
         LogManager.RegisterSink(m_fileSink);
         
         // Initialize Render
-        RenderGraphics.Initialize(m_graphicsDevice);
+        RenderGraphics.Initialize(m_platform.graphicsDevice);
         
         // Initialization Callbacks
         m_gameShell.SetOnLoad(OnLoad);
@@ -90,9 +86,8 @@ public abstract class EngineCore
 
     private void OnEvent(EventDispatcher dispatcher)
     {
-        m_mainWindow.PumpEvents(dispatcher);
+        m_platform.windowSystem.mainWindow.PumpEvents(dispatcher);
         
-        // TODO: Remove Snapshot and dispatch real events
         var shouldCloseWindow = false;
         dispatcher.Dispatch(e =>
         {
@@ -108,7 +103,11 @@ public abstract class EngineCore
         m_layerStack.OnRender();
         
         // Swap Buffers
-        m_windowFactory.SwapWindowBuffers(m_mainWindow);
+        m_platform.windowSystem.SwapWindowBuffers(m_platform.windowSystem.mainWindow);
+        foreach (var extraWindow in m_platform.windowSystem.extraWindows)
+        {
+            m_platform.windowSystem.SwapWindowBuffers(extraWindow);
+        }
     }
 
     private void OnClose()
@@ -118,16 +117,15 @@ public abstract class EngineCore
         
         // Dispose Resources
         m_fileSink.Dispose();
-        m_graphicsDevice.Dispose();
         
         // Assets
         AssetManager.Shutdown();
     }
     
     /// <summary>
-    /// Get the windowFactory of this engine core.
+    /// Get the platform implemented for this engine core.
     /// </summary>
-    public IWindowFactory GetWindowFactory() => m_windowFactory;
+    public PlatformAPI GetImplementedPlatform() => m_platform;
     
     /// <summary>
     /// Starts the main loop of the engine.
@@ -143,22 +141,6 @@ public abstract class EngineCore
     public void End()
     {
         m_gameShell.Terminate();
-    }
-
-    /// <summary>
-    /// Resizes the main window of the engine.
-    /// </summary>
-    protected void SetWindowSize(int width, int height)
-    {
-        m_mainWindow.size = new(width, height);
-    }
-    
-    /// <summary>
-    /// Sets whether the main window is resizable.
-    /// </summary>
-    protected void SetWindowResizable(bool resizable)
-    {
-        m_mainWindow.resizable = resizable;
     }
 
     /// <summary>

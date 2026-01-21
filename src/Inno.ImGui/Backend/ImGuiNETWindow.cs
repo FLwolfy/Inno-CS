@@ -16,7 +16,7 @@ internal class ImGuiNETWindow : IDisposable
     private GCHandle m_gcHandle;
     
     // Window
-    private readonly IWindowFactory m_windowFactory;
+    private readonly IWindowSystem m_windowSystem;
     private readonly bool m_isMainWindow;
     
     // Graphics
@@ -32,38 +32,42 @@ internal class ImGuiNETWindow : IDisposable
     
     public IWindow window { get; }
 
-    public ImGuiNETWindow(IWindowFactory windowFactory, ImGuiViewportPtr vp, bool isMainWindow)
+    public ImGuiNETWindow(
+        IWindowSystem windowSystem, 
+        IGraphicsDevice graphicsDevice,
+        ImGuiViewportPtr vp, 
+        bool isMainWindow)
     {
         // Handle
         m_gcHandle = GCHandle.Alloc(this);
         vp.PlatformUserData = (IntPtr)m_gcHandle;
 
-        m_windowFactory = windowFactory;
+        m_windowSystem = windowSystem;
         m_isMainWindow = isMainWindow;
 
         if (isMainWindow)
         {
-            window = windowFactory.mainWindow;
+            window = windowSystem.mainWindow;
         }
         else
         {
             // Create window inner
-            var flags = WindowCreateFlags.Hidden | WindowCreateFlags.AllowHighDpi;
+            var flags = WindowFlags.Hidden | WindowFlags.AllowHighDpi;
             if ((vp.Flags & ImGuiViewportFlags.NoTaskBarIcon) != 0)
             {
-                flags |= WindowCreateFlags.SkipTaskbar;
+                flags |= WindowFlags.SkipTaskbar;
             }
             if ((vp.Flags & ImGuiViewportFlags.NoDecoration) == 0)
             {
-                flags |= WindowCreateFlags.Decorated;
+                flags |= WindowFlags.Decorated;
             }
             else
             {
-                flags |= WindowCreateFlags.Resizable;
+                flags |= WindowFlags.Resizable;
             }
             if ((vp.Flags & ImGuiViewportFlags.TopMost) != 0)
             {
-                flags |= WindowCreateFlags.AlwaysOnTop;
+                flags |= WindowFlags.AlwaysOnTop;
             }
         
             var info = new WindowInfo
@@ -76,12 +80,12 @@ internal class ImGuiNETWindow : IDisposable
                 flags = flags,
             };
             
-            window = windowFactory.CreateWindow(info);
+            window = windowSystem.CreateWindow(info);
         }
         
         // Buffers
-        m_vertexBuffer = windowFactory.graphicsDevice.CreateVertexBuffer(1024 * 1024);
-        m_indexBuffer = windowFactory.graphicsDevice.CreateIndexBuffer(512 * 1024);
+        m_vertexBuffer = graphicsDevice.CreateVertexBuffer(1024 * 1024);
+        m_indexBuffer = graphicsDevice.CreateIndexBuffer(512 * 1024);
         
         // Events
         window.Resized += () => vp.PlatformRequestResize = true;
@@ -162,7 +166,7 @@ internal class ImGuiNETWindow : IDisposable
         
         if (!m_isMainWindow)
         {
-            m_windowFactory.DestroyWindow(window);
+            m_windowSystem.DestroyWindow(window);
         }
         
         m_vertexBuffer.Dispose();

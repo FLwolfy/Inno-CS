@@ -5,27 +5,22 @@ using Inno.Platform.Graphics;
 
 namespace Inno.Platform.Window;
 
-public enum WindowBackend
-{
-    Veldrid_Sdl2
-}
-
 [Flags]
-public enum WindowCreateFlags
+public enum WindowFlags
 {
     None         = 0,
 
     Hidden       = 1 << 0,
     Resizable    = 1 << 1,
-    Decorated   = 1 << 2,   // true = bordered
-    AlwaysOnTop = 1 << 3,
-    SkipTaskbar = 1 << 4,
-
-    ToolWindow  = 1 << 5,   // utility / inspector / palette
-    Popup       = 1 << 6,   // popup / menu / tooltip
-
-    AllowHighDpi= 1 << 7,
-    Fullscreen  = 1 << 8,
+    Decorated    = 1 << 2,   // true = bordered
+    AlwaysOnTop  = 1 << 3,
+    SkipTaskbar  = 1 << 4,
+ 
+    ToolWindow   = 1 << 5,   // utility / inspector / palette
+    Popup        = 1 << 6,   // popup / menu / tooltip
+ 
+    AllowHighDpi = 1 << 7,
+    Fullscreen   = 1 << 8,
 }
 
 
@@ -36,7 +31,7 @@ public struct WindowInfo
     public int y;
     public int width;
     public int height;
-    public WindowCreateFlags flags;
+    public WindowFlags flags;
 }
 
 public interface IWindow : IDisposable

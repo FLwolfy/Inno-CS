@@ -7,6 +7,7 @@ using Inno.Platform.Graphics;
 using Inno.Platform.Window;
 
 using ImGuiNET;
+using Inno.Platform.Display;
 
 namespace Inno.ImGui.Backend;
 
@@ -15,8 +16,9 @@ namespace Inno.ImGui.Backend;
 /// </summary>
 internal sealed class ImGuiNETBackend : IImGuiBackend
 {
-	// Window Graphics
-    private readonly IWindowFactory m_windowFactory;
+	// Platform Systems
+    private readonly IWindowSystem m_windowSystem;
+    private readonly IGraphicsDevice m_graphicsDevice;
     
     // Resource
     private readonly ICommandList m_commandList;
@@ -41,16 +43,22 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
     private readonly string m_iniPath;
     private DateTime m_lastIniWriteUtc;
 
-    public ImGuiNETBackend(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling)
+    public ImGuiNETBackend(
+	    IWindowSystem windowSystem, 
+	    IDisplaySystem displaySystem, 
+	    IGraphicsDevice graphicsDevice,
+	    ImGuiColorSpaceHandling colorSpaceHandling)
     {
+	    m_windowSystem = windowSystem;
+	    m_graphicsDevice = graphicsDevice;
+	    
 	    // Window
-	    m_windowFactory = windowFactory;
-	    var dpiScaleVec2 = m_windowFactory.mainWindow.GetFrameBufferScale();
+	    var dpiScaleVec2 = m_windowSystem.mainWindow.GetFrameBufferScale();
 	    m_dpiScale = MathF.Max(dpiScaleVec2.x, dpiScaleVec2.y);
 	    
 	    // ImGui Renderer
-        m_commandList = windowFactory.graphicsDevice.CreateCommandList();
-        m_controller = new ImGuiNETController(windowFactory, colorSpaceHandling, m_dpiScale);
+        m_commandList = graphicsDevice.CreateCommandList();
+        m_controller = new ImGuiNETController(windowSystem, displaySystem, graphicsDevice, colorSpaceHandling);
 
         // Fonts: caller/editor owns the policy; platform ships sane defaults.
         m_controller.ClearAllFonts();
@@ -62,7 +70,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
         mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
         ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
-        SetupImGuiStyle();
+        SetupStyle();
         
 		// Main IO
 		m_iniPath = ImGuiNET.ImGui.GetIO().IniFilename;
@@ -76,7 +84,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 			virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
 			ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
 			ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
-			SetupImGuiStyle();
+			SetupStyle();
 		}
 		
 		// Virtual IO: Ensure virtual context never saves ini (avoid main/virtual competing)
@@ -94,17 +102,17 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
     {
 	    // Begin Render
 	    m_commandList.Begin();
-	    m_commandList.SetFrameBuffer(m_windowFactory.graphicsDevice.swapchainFrameBuffer);
+	    m_commandList.SetFrameBuffer(m_graphicsDevice.swapchainFrameBuffer);
 	    
 	    // Virtual Context
 	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowFactory.mainWindow.size.x, m_windowFactory.mainWindow.size.y);
+	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowSystem.mainWindow.size.x, m_windowSystem.mainWindow.size.y);
 	    ImGuiNET.ImGui.NewFrame();
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
 	    // Main Context
 	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    m_controller.Update(deltaTime, m_windowFactory.mainWindow.GetPumpedEvents());
+	    m_controller.Update(deltaTime, m_windowSystem.mainWindow.GetPumpedEvents());
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
         // Default font
@@ -137,12 +145,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
         }
 
         m_commandList.End();
-        m_windowFactory.graphicsDevice.Submit(m_commandList);
-
-        foreach (var imguiViewportWindows in m_controller.GetViewportWindows())
-        {
-	        m_windowFactory.SwapWindowBuffers(imguiViewportWindows.window);
-        }
+        m_graphicsDevice.Submit(m_commandList);
     }
 
     public IntPtr GetOrBindTextureImpl(ITexture texture) => m_controller.GetOrBindTexture(texture);
@@ -252,7 +255,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
         }
     }
 
-    private void SetupImGuiStyle()
+    private void SetupStyle()
 	{
 	    var style = ImGuiNET.ImGui.GetStyle();
 

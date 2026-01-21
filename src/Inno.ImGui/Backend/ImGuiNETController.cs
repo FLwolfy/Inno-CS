@@ -12,6 +12,7 @@ using Inno.Platform.Graphics;
 using Inno.Platform.Window;
 
 using ImGuiNET;
+using Inno.Platform.Display;
 using Color = Inno.Core.Math.Color;
 
 namespace Inno.ImGui.Backend;
@@ -22,7 +23,8 @@ namespace Inno.ImGui.Backend;
 /// </summary>
 internal sealed class ImGuiNETController : IDisposable
 {
-    private readonly IWindowFactory m_windowFactory;
+    private readonly IWindowSystem m_windowSystem;
+    private readonly IDisplaySystem m_displaySystem;
     private readonly IGraphicsDevice m_graphicsDevice;
     private readonly Assembly m_assembly;
     private readonly ImGuiColorSpaceHandling m_colorSpaceHandling;
@@ -30,7 +32,6 @@ internal sealed class ImGuiNETController : IDisposable
     
     // Window Info
     private readonly ImGuiNETWindow m_mainImGuiWindow;
-    private readonly float m_dpiScale;
     
     // Window Holder
     private readonly Dictionary<uint, ImGuiNETWindow> m_windowHolders = new();
@@ -74,13 +75,17 @@ internal sealed class ImGuiNETController : IDisposable
 
     #region Init Resources
     
-    public ImGuiNETController(IWindowFactory windowFactory, ImGuiColorSpaceHandling colorSpaceHandling, float dpiScale)
+    public ImGuiNETController(
+        IWindowSystem windowSystem,
+        IDisplaySystem displaySystem,
+        IGraphicsDevice graphicsDevice,
+        ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        m_windowFactory = windowFactory;
-        m_graphicsDevice = windowFactory.graphicsDevice;
+        m_windowSystem = windowSystem;
+        m_displaySystem = displaySystem;
+        m_graphicsDevice = graphicsDevice;
         m_colorSpaceHandling = colorSpaceHandling;
         m_assembly = typeof(ImGuiNETController).GetTypeInfo().Assembly;
-        m_dpiScale = dpiScale;
 
         var ctx = ImGuiNET.ImGui.CreateContext();
         ImGuiNET.ImGui.SetCurrentContext(ctx);
@@ -102,7 +107,7 @@ internal sealed class ImGuiNETController : IDisposable
         // Window Platform Interface
         ImGuiPlatformIOPtr platformIo = ImGuiNET.ImGui.GetPlatformIO();
         ImGuiViewportPtr mainViewport = platformIo.Viewports[0];
-        m_mainImGuiWindow = new ImGuiNETWindow(windowFactory, mainViewport, true);
+        m_mainImGuiWindow = new ImGuiNETWindow(windowSystem, graphicsDevice, mainViewport, true);
         SetupPlatformIO(platformIo);
 
         // Font configs
@@ -235,7 +240,7 @@ internal sealed class ImGuiNETController : IDisposable
     
     private void CreateWindow(ImGuiViewportPtr vp)
     {
-        m_windowHolders[vp.ID] = new ImGuiNETWindow(m_windowFactory, vp, false);
+        m_windowHolders[vp.ID] = new ImGuiNETWindow(m_windowSystem, m_graphicsDevice, vp, false);
     }
 
     private void DestroyWindow(ImGuiViewportPtr vp)
@@ -597,7 +602,7 @@ internal sealed class ImGuiNETController : IDisposable
     private void SetPerFrameImGuiData(float deltaSeconds)
     {
         var io = ImGuiNET.ImGui.GetIO();
-        var mainWindow = m_windowFactory.mainWindow;
+        var mainWindow = m_windowSystem.mainWindow;
         
         // DisplaySize
         io.DisplaySize = new Vector2(mainWindow.size.x, mainWindow.size.y);
@@ -632,15 +637,15 @@ internal sealed class ImGuiNETController : IDisposable
     {
         ImGuiPlatformIOPtr platformIo = ImGuiNET.ImGui.GetPlatformIO();
         Marshal.FreeHGlobal(platformIo.NativePtr->Monitors.Data);
-        int numMonitors = m_windowFactory.GetDisplayNumber();
+        int numMonitors = m_displaySystem.GetDisplayNumber();
         IntPtr data = Marshal.AllocHGlobal(Unsafe.SizeOf<ImGuiPlatformMonitor>() * numMonitors);
         platformIo.NativePtr->Monitors = new ImVector(numMonitors, numMonitors, data);
         for (int i = 0; i < numMonitors; i++)
         {
-            Rect displayRect = m_windowFactory.GetDisplayBounds(i);
-            Rect usableRect = m_windowFactory.GetUsableDisplayBounds(i);
+            Rect displayRect = m_displaySystem.GetDisplayBounds(i);
+            Rect usableRect = m_displaySystem.GetUsableDisplayBounds(i);
             ImGuiPlatformMonitorPtr monitor = platformIo.Monitors[i];
-            monitor.DpiScale = m_dpiScale;            
+            monitor.DpiScale = 1;
             monitor.MainPos = new Vector2(displayRect.x, displayRect.y);
             monitor.MainSize = new Vector2(displayRect.width, displayRect.height);
             monitor.WorkPos = new Vector2(usableRect.x, usableRect.y);
@@ -776,14 +781,14 @@ internal sealed class ImGuiNETController : IDisposable
     {
         // Mouse Pos
         ImGuiIOPtr io = ImGuiNET.ImGui.GetIO();
-        Vector2Int globalMousePos = m_windowFactory.GetGlobalMousePos();
+        Vector2Int globalMousePos = m_displaySystem.GetGlobalMousePos();
         io.MousePos = new Vector2(globalMousePos.x, globalMousePos.y);
         
         // Mouse Button
         io.MouseDown[0] = false;
         io.MouseDown[1] = false;
         io.MouseDown[2] = false;
-        foreach (Input.MouseButton button in m_windowFactory.GetGlobalMouseButton())
+        foreach (Input.MouseButton button in m_displaySystem.GetGlobalMouseButton())
         {
             switch (button)
             {
@@ -914,11 +919,11 @@ internal sealed class ImGuiNETController : IDisposable
         ImGuiMouseCursor cursor = ImGuiNET.ImGui.GetMouseCursor();
         if (cursor == ImGuiMouseCursor.None)
         {
-            m_windowFactory.ShowCursor(false);
+            m_displaySystem.ShowCursor(false);
         }
         else
         {
-            m_windowFactory.ShowCursor(true);
+            m_displaySystem.ShowCursor(true);
             Input.MouseCursor windowCursor = cursor switch
             {
                 ImGuiMouseCursor.Arrow => Input.MouseCursor.Arrow,
@@ -932,7 +937,7 @@ internal sealed class ImGuiNETController : IDisposable
                 _ => Input.MouseCursor.Arrow
             };
             
-            m_windowFactory.SetCursor(windowCursor);
+            m_displaySystem.SetCursor(windowCursor);
         }
     }
     

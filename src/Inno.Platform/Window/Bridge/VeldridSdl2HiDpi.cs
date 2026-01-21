@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
+
 using Inno.Core.Math;
+
 using Veldrid.Sdl2;
 
 namespace Inno.Platform.Window.Bridge;

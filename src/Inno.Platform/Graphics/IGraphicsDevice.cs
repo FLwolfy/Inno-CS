@@ -1,5 +1,4 @@
 using System;
-using Inno.Platform.Window;
 
 namespace Inno.Platform.Graphics;
 

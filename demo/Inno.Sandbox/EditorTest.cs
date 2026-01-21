@@ -9,6 +9,7 @@ using Inno.Editor.Core;
 using Inno.Graphics.Decoder;
 using Inno.Graphics.Resources;
 using Inno.Graphics.Resources.CpuResources;
+using Inno.Platform;
 using Inno.Platform.Window;
 using Inno.Runtime.Component;
 using Inno.Runtime.Core;
@@ -29,10 +30,7 @@ public class EditorTest
         
         protected override void Setup()
         {
-            m_editorLayer = new TestEditorLayer(GetWindowFactory());
-            
-            SetWindowSize(1200, 720);
-            SetWindowResizable(true);
+            m_editorLayer = new TestEditorLayer(GetImplementedPlatform());
         }
         protected override void RegisterLayers(LayerStack layerStack)
         {
@@ -40,7 +38,7 @@ public class EditorTest
         }
     }
     
-    private class TestEditorLayer(IWindowFactory windowFactory) : EditorLayer(windowFactory)
+    private class TestEditorLayer(PlatformAPI platform) : EditorLayer(platform)
     {
         public override void OnAttach()
         {

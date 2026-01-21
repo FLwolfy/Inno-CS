@@ -2,24 +2,14 @@ using System.Collections.Generic;
 
 using Inno.Core.Events;
 using Inno.Core.Math;
-using Inno.Platform.Graphics;
-using Inno.Platform.Graphics.Bridge;
-
-using InnoGraphicsBackend = Inno.Platform.Graphics.GraphicsBackend;
 
 using Veldrid;
 using Veldrid.Sdl2;
-using Veldrid.StartupUtilities;
 
-namespace Inno.Platform.Window.Bridge;
+namespace Inno.Platform.Display.Bridge;
 
-internal class VeldridSdl2WindowFactory : IWindowFactory
+internal class VeldridSdl2DisplaySystem : IDisplaySystem
 {
-    // Graphics
-    private readonly Dictionary<IWindow, Swapchain> m_windowSwapchains;
-    public IWindow mainWindow { get; }
-    public IGraphicsDevice graphicsDevice { get; }
-    
     // Cursor
     private static readonly Dictionary<Input.MouseCursor, SDL_Cursor> CURSOR_MAP = new()
     {
@@ -43,69 +33,16 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
     
     // SDL native window delegate
     private unsafe delegate uint SdlGetGlobalMouseStateT(int* x, int* y);
-    private readonly SdlGetGlobalMouseStateT? m_pSdlGetGlobalMouseState;
+    private SdlGetGlobalMouseStateT? m_pSdlGetGlobalMouseState;
     private unsafe delegate int SdlGetDisplayUsableBoundsT(int displayIndex, Rectangle* rect);
-    private static SdlGetDisplayUsableBoundsT? m_pSdlGetDisplayUsableBounds;
+    private SdlGetDisplayUsableBoundsT? m_pSdlGetDisplayUsableBounds;
 
-    internal VeldridSdl2WindowFactory(in WindowInfo mainWindowInfo, in InnoGraphicsBackend graphicsBackend)
+    internal VeldridSdl2DisplaySystem()
     {
-        var mwInner = new VeldridSdl2Window(mainWindowInfo);
-        var gdInner = new VeldridGraphicsDevice(mwInner, graphicsBackend);
-        mwInner.frameBuffer = gdInner.swapchainFrameBuffer;
-
-        mainWindow = mwInner;
-        graphicsDevice = gdInner;
-        m_windowSwapchains = new Dictionary<IWindow, Swapchain>
-        {
-            [mainWindow] = gdInner.inner.MainSwapchain
-        };
-        
         m_pSdlGetGlobalMouseState ??= Sdl2Native.LoadFunction<SdlGetGlobalMouseStateT>("SDL_GetGlobalMouseState");
         m_pSdlGetDisplayUsableBounds ??= Sdl2Native.LoadFunction<SdlGetDisplayUsableBoundsT>("SDL_GetDisplayUsableBounds");
     }
     
-    public IWindow CreateWindow(in WindowInfo info)
-    {
-        var window = new VeldridSdl2Window(info);
-        var vgd = (graphicsDevice as VeldridGraphicsDevice)!.inner;
-        var size = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
-        
-        SwapchainSource scSource = VeldridStartup.GetSwapchainSource(window.inner);
-        SwapchainDescription scDesc = new SwapchainDescription(
-            scSource, 
-            (uint)size.x, 
-            (uint)size.y, 
-            vgd.SwapchainFramebuffer.OutputDescription.DepthAttachment?.Format,
-            true, 
-            false
-        );
-        
-        var swapchain = vgd.ResourceFactory.CreateSwapchain(scDesc);
-        swapchain.Resize((uint)size.x, (uint)size.y);
-        window.Resized += () =>
-        {
-            var s = VeldridSdl2HiDpi.GetFramebufferSize(window.inner);
-            swapchain.Resize((uint)s.x, (uint)s.y);
-        };
-        m_windowSwapchains[window] = swapchain;
-        window.frameBuffer = new VeldridFrameBuffer(((VeldridGraphicsDevice)graphicsDevice).inner, swapchain.Framebuffer);
-        
-        return window;
-    }
-
-    public void DestroyWindow(IWindow window)
-    {
-        var swapchain = m_windowSwapchains[window];
-        swapchain.Dispose();
-        m_windowSwapchains.Remove(window);
-        window.Dispose();
-    }
-    
-    public void SwapWindowBuffers(IWindow window)
-    {
-        (graphicsDevice as VeldridGraphicsDevice)!.inner.SwapBuffers(m_windowSwapchains[window]);
-    }
-
     public int GetDisplayNumber()
     {
         return Sdl2Native.SDL_GetNumVideoDisplays();
@@ -120,7 +57,7 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
             Sdl2Native.SDL_GetDisplayBounds(displayIndex, &rect);
         }
         
-        return new(rect.X, rect.Y, rect.Width, rect.Height);
+        return new Rect(rect.X, rect.Y, rect.Width, rect.Height);
     }
 
     public Rect GetUsableDisplayBounds(int displayIndex)
@@ -181,17 +118,10 @@ internal class VeldridSdl2WindowFactory : IWindowFactory
         
         return mouseButtons;
     }
-    
+
     public void Dispose()
     {
-        mainWindow.Dispose();
-        graphicsDevice.Dispose();
-
-        foreach (var windowSwapchain in m_windowSwapchains.Values)
-        {
-            windowSwapchain.Dispose();
-        }
-        m_windowSwapchains.Clear();
+        m_pSdlGetGlobalMouseState = null;
+        m_pSdlGetDisplayUsableBounds = null;
     }
-
 }

@@ -2,6 +2,7 @@ using System;
 
 using Inno.Core.Events;
 using Inno.Core.Math;
+
 using Inno.Platform.Graphics;
 
 using Veldrid;
@@ -164,43 +165,43 @@ internal class VeldridSdl2Window : IWindow
         inner.Close();
     }
       
-    private static SDL_WindowFlags MapToSdlFlags(WindowCreateFlags flags)
+    private static SDL_WindowFlags MapToSdlFlags(WindowFlags flags)
     {
         SDL_WindowFlags sdl = 0;
 
         // Visibility
-        if (flags.HasFlag(WindowCreateFlags.Hidden))
+        if (flags.HasFlag(WindowFlags.Hidden))
             sdl |= SDL_WindowFlags.Hidden;
         else
             sdl |= SDL_WindowFlags.Shown;
 
         // Decorated / Resize
-        if (flags.HasFlag(WindowCreateFlags.Resizable))
+        if (flags.HasFlag(WindowFlags.Resizable))
             sdl |= SDL_WindowFlags.Resizable;
 
-        if (!flags.HasFlag(WindowCreateFlags.Decorated))
+        if (!flags.HasFlag(WindowFlags.Decorated))
             sdl |= SDL_WindowFlags.Borderless;
 
         // DPI
-        if (flags.HasFlag(WindowCreateFlags.AllowHighDpi))
+        if (flags.HasFlag(WindowFlags.AllowHighDpi))
             sdl |= SDL_WindowFlags.AllowHighDpi;
 
         // Z-order / taskbar
-        if (flags.HasFlag(WindowCreateFlags.AlwaysOnTop))
+        if (flags.HasFlag(WindowFlags.AlwaysOnTop))
             sdl |= SDL_WindowFlags.AlwaysOnTop;
 
-        if (flags.HasFlag(WindowCreateFlags.SkipTaskbar))
+        if (flags.HasFlag(WindowFlags.SkipTaskbar))
             sdl |= SDL_WindowFlags.SkipTaskbar;
 
         // Window type semantics
-        if (flags.HasFlag(WindowCreateFlags.ToolWindow))
+        if (flags.HasFlag(WindowFlags.ToolWindow))
             sdl |= SDL_WindowFlags.Utility;
 
-        if (flags.HasFlag(WindowCreateFlags.Popup))
+        if (flags.HasFlag(WindowFlags.Popup))
             sdl |= SDL_WindowFlags.PopupMenu;
 
         // Fullscreen
-        if (flags.HasFlag(WindowCreateFlags.Fullscreen))
+        if (flags.HasFlag(WindowFlags.Fullscreen))
             sdl |= SDL_WindowFlags.FullScreenDesktop;
 
         return sdl;

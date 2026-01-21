@@ -6,12 +6,13 @@ using Inno.Editor.GUI;
 using Inno.Editor.Panel;
 
 using Inno.ImGui;
+using Inno.Platform;
 using Inno.Platform.Window;
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
 
-public class EditorLayer(IWindowFactory windowFactory) : Layer("EditorLayer")
+public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
 {
     private static readonly float MIN_ZOOM_RATE = 0.2f;
     private static readonly float MAX_ZOOM_RATE = 4.0f;
@@ -23,7 +24,14 @@ public class EditorLayer(IWindowFactory windowFactory) : Layer("EditorLayer")
     public override void OnAttach()
     {
         // ImGui Initialization
-        ImGuiHost.Initialize(windowFactory, ImGuiBackend.ImGui_DOTNET, ImGuiColorSpaceHandling.Legacy);
+        ImGuiHost.Initialize
+        (
+            platform.windowSystem, 
+            platform.displaySystem,
+            platform.graphicsDevice,
+            ImGuiBackend.ImGui_DotNET, 
+            ImGuiColorSpaceHandling.Legacy
+        );
         
         // Zoom
         m_currentZoomRate = ImGuiHost.GetStorageData("Editor.ZoomRate", DEFAULT_ZOOM_RATE);

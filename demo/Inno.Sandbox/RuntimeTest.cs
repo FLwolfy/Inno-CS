@@ -24,9 +24,6 @@ public class RuntimeTest
         protected override void Setup()
         {
             m_gameLayer = new TestGameLayer();
-            
-            SetWindowSize(900, 900);
-            SetWindowResizable(true);
         }
         protected override void RegisterLayers(LayerStack layerStack)
         {

@@ -1,6 +1,7 @@
 using System;
 
 using Inno.ImGui.Backend;
+using Inno.Platform.Display;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
 
@@ -8,7 +9,7 @@ namespace Inno.ImGui;
 
 public enum ImGuiBackend
 {
-    ImGui_DOTNET
+    ImGui_DotNET
 }
 
 /// <summary>
@@ -39,17 +40,26 @@ public static class ImGuiHost
     private static ImGuiNETBackend impl { get; set; } = null!;
     
     /// <summary>
-    /// Create the imgui backend with given windowFactory and specified imguiBackend
+    /// Create the imGui backend with given windowFactory and specified imguiBackend
     /// </summary>
-    public static void Initialize(IWindowFactory windowFactory, ImGuiBackend imGuiBackend, ImGuiColorSpaceHandling colorSpaceHandling)
+    public static void Initialize(
+        IWindowSystem windowSystem, 
+        IDisplaySystem displaySystem, 
+        IGraphicsDevice graphicsDevice,
+        ImGuiBackend imGuiBackend, 
+        ImGuiColorSpaceHandling colorSpaceHandling)
     {
-        if (imGuiBackend == ImGuiBackend.ImGui_DOTNET)
+        switch (imGuiBackend)
         {
-            impl = new ImGuiNETBackend(windowFactory, colorSpaceHandling);
-            return;
+            case ImGuiBackend.ImGui_DotNET:
+            {
+                impl = new ImGuiNETBackend(windowSystem, displaySystem, graphicsDevice, colorSpaceHandling);
+                return;
+            }
+            
+            default: throw new NotSupportedException($"ImGui backend {imGuiBackend} is not supported.");
         }
 
-        throw new NotSupportedException($"ImGui backend {imGuiBackend} is not supported.");
     }
     
     /// <summary>
