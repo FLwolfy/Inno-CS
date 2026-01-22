@@ -7,7 +7,7 @@ using Inno.Editor.Panel;
 
 using Inno.ImGui;
 using Inno.Platform;
-using Inno.Platform.Window;
+
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
@@ -54,6 +54,11 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         var keyEvent = e as KeyPressedEvent;
         if (keyEvent == null) return;
         
+        HandleZoom(keyEvent);
+    }
+
+    private void HandleZoom(KeyPressedEvent keyEvent)
+    {
         if (keyEvent.key == Input.KeyCode.Plus && keyEvent.modifiers == Input.KeyModifier.Control && !keyEvent.repeat)
         {
             m_currentZoomRate = MathHelper.Clamp(m_currentZoomRate + ZOOM_RATE_STEP, MIN_ZOOM_RATE, MAX_ZOOM_RATE);

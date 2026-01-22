@@ -16,7 +16,7 @@ internal class VeldridSdl2WindowSystem : IWindowSystem
 {
     // Graphics
     private readonly Dictionary<IWindow, Swapchain> m_windowSwapchains;
-    private readonly IGraphicsDevice m_graphicsDevice; // This will be disposed outside.
+    private readonly IGraphicsDevice m_graphicsDevice; // This should be disposed outside.
 
     // Window Properties
     public IWindow mainWindow { get; }
