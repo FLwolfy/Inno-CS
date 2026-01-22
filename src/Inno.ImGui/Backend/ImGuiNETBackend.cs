@@ -291,7 +291,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    style.ItemInnerSpacing = new Vector2(4.0f, 4.0f);
 	    style.CellPadding = new Vector2(3.0f, 2.0f);
 
-	    style.IndentSpacing = 12.0f;
+	    style.IndentSpacing = 20.0f;
 	    style.ColumnsMinSpacing = 4.0f;
 
 	    // --- Scrollbar / Grab ---
