@@ -55,6 +55,7 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         if (keyEvent == null) return;
         
         HandleZoom(keyEvent);
+        HandleSceneSave(keyEvent);
     }
 
     private void HandleZoom(KeyPressedEvent keyEvent)
@@ -73,6 +74,25 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
             ImGuiHost.Zoom(m_currentZoomRate);
         }
     }
+    
+    private void HandleSceneSave(KeyPressedEvent keyEvent)
+    {
+        if (keyEvent.repeat) return;
+
+        // Ctrl+S: Save
+        // Ctrl+Shift+S: Save As (Assets/Scenes)
+        if (keyEvent.key != Input.KeyCode.S) return;
+
+        bool ctrl = (keyEvent.modifiers & Input.KeyModifier.Control) != 0;
+        if (!ctrl) return;
+
+        bool shift = (keyEvent.modifiers & Input.KeyModifier.Shift) != 0;
+        if (shift)
+            EditorSceneAssetIO.SaveActiveSceneAsDefaultFolder();
+        else
+            EditorSceneAssetIO.SaveActiveScene();
+    }
+
 
     public override void OnRender()
     {

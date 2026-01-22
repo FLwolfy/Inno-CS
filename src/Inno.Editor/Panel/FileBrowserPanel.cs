@@ -335,8 +335,17 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGuiNet.TreeNodeEx($"##tree_file_{full}", flags);
 
+        // Click
         if (ImGuiNet.IsItemClicked(ImGuiMouseButton.Left))
+        {
             SelectFile(full);
+        }
+            
+        // Double Click
+        if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+        {
+            TryOpenFile(full);
+        }
 
         ImGuiNet.SameLine();
         EditorImGuiEx.DrawIconAndText(FileIcon(type), name);
@@ -468,9 +477,17 @@ public sealed class FileBrowserPanel : EditorPanel
             else SelectFile(e.fullPath);
         }
 
+        // Double click
         if (hovered && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
-            if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+            if (e.isDir)
+            {
+                NavigateTo(e.fullPath, pushHistory: true);
+            }
+            else
+            {
+                TryOpenFile(e.fullPath);
+            }
         }
 
         if (ImGuiNet.BeginPopupContextItem("##item_ctx"))
@@ -592,15 +609,24 @@ public sealed class FileBrowserPanel : EditorPanel
             bool selected = IsSelected(e.fullPath);
             string selId = $"##name_{e.fullPath}";
 
+            // Click
             if (ImGuiNet.Selectable(selId, selected, ImGuiSelectableFlags.SpanAllColumns, new Vector2(0, rowH)))
             {
                 if (e.isDir) SelectFolder(e.fullPath);
                 else SelectFile(e.fullPath);
             }
 
+            // Double Click
             if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
             {
-                if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+                if (e.isDir)
+                {
+                    NavigateTo(e.fullPath, pushHistory: true);
+                }
+                else
+                {
+                    TryOpenFile(e.fullPath);
+                }
             }
 
             if (ImGuiNet.BeginPopupContextItem($"##list_ctx_{e.fullPath}"))
@@ -1368,8 +1394,24 @@ public sealed class FileBrowserPanel : EditorPanel
         return type switch
         {
             "PNG" => ImGuiIcon.Image,
+            "SCENE" => ImGuiIcon.ObjectGroup,
             _ => ImGuiIcon.File
         };
+    }
+
+    private static void TryOpenFile(string fullPathNormalized)
+    {
+        var ext = Path.GetExtension(fullPathNormalized);
+        if (!ext.Equals(".scene", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        // Convert normalized path (/) back into a native path so Path APIs behave.
+        string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
+        string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
+        if (rel.StartsWith("..", StringComparison.Ordinal))
+            return;
+
+        EditorSceneAssetIO.OpenScene(rel);
     }
 
     private static void RevealInSystem(string path)
