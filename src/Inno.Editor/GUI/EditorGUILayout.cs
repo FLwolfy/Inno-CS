@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Inno.Core.Math;
 
 using ImGuiNET;
+using Inno.Core.Logging;
 using Inno.ImGui;
 using ImGuiNet = ImGuiNET.ImGui;
 
@@ -26,6 +27,7 @@ public static class EditorGUILayout
     private static readonly Dictionary<int, int> COLUMN_COUNT_MAP = new();
     private static readonly Dictionary<int, float> COLUMN_TOTAL_WEIGHT_MAP = new();
     private static readonly Dictionary<int, List<float>> COLUMN_WEIGHT_MAP = new();
+    private static readonly Stack<bool> COLUMN_PAD_STACK = new();
 
     private static int m_columnDepth = 0;
     private static float m_nextIndentWidth = 0;
@@ -91,17 +93,27 @@ public static class EditorGUILayout
         bool dirty = !COLUMN_COUNT_MAP.ContainsKey(layoutKey);
         COLUMN_DIRTY_STACK.Push(dirty);
 
+        // Track whether we push style var for this table instance
+        bool pushedPad = false;
+
         if (!dirty)
         {
+            // If this is a nested table (e.g. Vector2/3/4 fields inside a property row),
+            // remove vertical cell padding so the row height matches normal widgets.
+            if (m_columnDepth > 1)
+            {
+                var style = ImGuiNet.GetStyle();
+                ImGuiNet.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(style.CellPadding.X, 0f));
+                pushedPad = true;
+            }
+
             int columnCount = COLUMN_COUNT_MAP[layoutKey];
 
             ImGuiNet.BeginTable($"EditorLayout##{layoutKey}", columnCount, flags);
 
             var weights = COLUMN_WEIGHT_MAP[layoutKey];
             for (int i = 0; i < columnCount; i++)
-            {
                 ImGuiNet.TableSetupColumn($"Column {i}", ImGuiTableColumnFlags.None, weights[i]);
-            }
 
             float rowH = ImGuiNet.GetFrameHeight();
             ImGuiNet.TableNextRow(ImGuiTableRowFlags.None, rowH);
@@ -113,7 +125,10 @@ public static class EditorGUILayout
             COLUMN_TOTAL_WEIGHT_MAP[layoutKey] = firstColumnWeight;
             COLUMN_WEIGHT_MAP[layoutKey] = new List<float> { firstColumnWeight };
         }
+
+        COLUMN_PAD_STACK.Push(pushedPad);
     }
+
 
     /// <summary>
     /// Ends the current column layout.
@@ -126,9 +141,15 @@ public static class EditorGUILayout
         bool dirty = COLUMN_DIRTY_STACK.Pop();
         int layoutKey = COLUMN_KEY_STACK.Pop();
 
+        // Must pop style var even if dirty (we always pushed a marker)
+        bool pushedPad = COLUMN_PAD_STACK.Pop();
+
         if (!dirty)
         {
             ImGuiNet.EndTable();
+
+            if (pushedPad)
+                ImGuiNet.PopStyleVar();
         }
         else
         {
@@ -144,6 +165,7 @@ public static class EditorGUILayout
 
         m_columnDepth--;
     }
+
 
     /// <summary>
     /// Adds the next column in the current layout.
@@ -388,21 +410,26 @@ public static class EditorGUILayout
     /// </summary>
     public static void Label(string text, bool enabled = true)
     {
+        // Keep using frame height so each property row aligns to standard widgets.
         float rowH = ImGuiNet.GetFrameHeight();
 
         Vector2 p0 = ImGuiNet.GetCursorScreenPos();
         float availW = ImGuiNet.GetContentRegionAvail().X;
 
+        // Reserve the full row height in the layout
         ImGuiNet.Dummy(new Vector2(1, rowH));
 
-        float textW = ImGuiNet.CalcTextSize(text).X;
-        float offsetX = GetAlignedOffsetX(textW, availW);
+        // Horizontal alignment (your existing alignment stack)
+        Vector2 textSize = ImGuiNet.CalcTextSize(text);
+        float offsetX = GetAlignedOffsetX(textSize.x, availW);
 
-        Vector2 pad = ImGuiNet.GetStyle().FramePadding;
+        // Vertical center inside the reserved row height
+        float textY = p0.y + (rowH - textSize.y) * 0.5f;
+
         uint col = ImGuiNet.GetColorU32(enabled ? ImGuiCol.Text : ImGuiCol.TextDisabled);
 
         ImGuiNet.GetWindowDrawList().AddText(
-            new Vector2(p0.x + offsetX, p0.y + pad.y),
+            new Vector2(p0.x + offsetX, textY),
             col,
             text);
     }
