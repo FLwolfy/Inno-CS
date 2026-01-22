@@ -461,23 +461,6 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.GetWindowDrawList().AddRectFilled(p0, p0 + size, bg, rounding);
         }
 
-        // Icon
-        var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
-        var currentFont = ImGuiHost.GetCurrentFont();
-        ImGuiHost.UseFont(ImGuiFontStyle.Icon, itemSize * iconScale / ImGuiNet.GetFontSize());
-        
-        Vector2 winPos = ImGuiNet.GetWindowPos();
-        Vector2 p0Screen = p0;
-        Vector2 p0Local = p0Screen - winPos;
-        Vector2 iconTextSize = ImGuiNet.CalcTextSize(icon);
-        float iconX = MathF.Floor(p0Local.x + (itemSize - iconTextSize.x) * 0.5f);
-        float iconY = MathF.Floor(p0Local.y + (itemSize - iconTextSize.y) * 0.5f);
-
-        ImGuiNet.SetCursorPos(new Vector2(iconX, iconY));
-        ImGuiNet.TextUnformatted(icon);
-        ImGuiHost.UseFont(currentFont);
-        ImGuiNet.SetCursorPos(new Vector2(p0Local.x, p0Local.y + itemSize));
-
         // Click event
         if (clicked)
         {
@@ -504,7 +487,25 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.Text($"Dragging {relativePath}");
             ImGuiNet.EndDragDropSource();
         }
+        
+        // Icon
+        var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
+        var currentFont = ImGuiHost.GetCurrentFont();
+        ImGuiHost.UseFont(ImGuiFontStyle.Icon, itemSize * iconScale / ImGuiNet.GetFontSize());
+        
+        Vector2 winPos = ImGuiNet.GetWindowPos();
+        Vector2 p0Screen = p0;
+        Vector2 p0Local = p0Screen - winPos;
+        Vector2 iconTextSize = ImGuiNet.CalcTextSize(icon);
+        float iconX = MathF.Floor(p0Local.x + (itemSize - iconTextSize.x) * 0.5f);
+        float iconY = MathF.Floor(p0Local.y + (itemSize - iconTextSize.y) * 0.5f);
 
+        ImGuiNet.SetCursorPos(new Vector2(iconX, iconY));
+        ImGuiNet.TextUnformatted(icon);
+        ImGuiHost.UseFont(currentFont);
+        ImGuiNet.SetCursorPos(new Vector2(p0Local.x, p0Local.y + itemSize));
+
+        // Text
         ImGuiNet.PushTextWrapPos(ImGuiNet.GetCursorPosX() + itemSize);
         var textWidth = ImGuiNet.CalcTextSize(e.name).X;
         var currentCursorX = ImGuiNet.GetCursorPosX();
