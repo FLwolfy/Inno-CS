@@ -136,25 +136,32 @@ public class SceneViewPanel : EditorPanel
     
     private void HandlePanZoom()
     {
-        Vector2 panDelta = Vector2.ZERO;
         var io = ImGuiNet.GetIO();
-        
+
         float zoomDelta = io.MouseWheel;
         Vector2 localMousePos = io.MousePos - ImGuiNet.GetCursorScreenPos();
 
         bool isMouseInContent = localMousePos.y > 0 && ImGuiNet.IsWindowHovered();
-        bool isPanning = io.MouseDown[(int)MOUSE_BUTTON_PAN] || zoomDelta != 0.0f;
-        if (isMouseInContent && isPanning)
-        {
-            if (ImGuiNet.IsWindowFocused()) { panDelta = io.MouseDelta; }
-            else { ImGuiNet.SetWindowFocus(); }
-        }
+        bool wantZoom = zoomDelta != 0.0f;
+        bool wantPan = io.MouseDown[(int)MOUSE_BUTTON_PAN];
 
-        if (ImGuiNet.IsWindowFocused())
+        Vector2 panDelta = Vector2.ZERO;
+
+        // Only react when hovered (content)
+        if (isMouseInContent && (wantPan || wantZoom))
         {
+            // If you want: steal focus when interacting
+            if (!ImGuiNet.IsWindowFocused())
+                ImGuiNet.SetWindowFocus();
+
+            if (wantPan)
+                panDelta = io.MouseDelta;
+
+            // Apply update only when hovered
             m_editorCamera2D.Update(panDelta, zoomDelta, localMousePos);
         }
     }
+
 
     private void DrawScene()
     {
