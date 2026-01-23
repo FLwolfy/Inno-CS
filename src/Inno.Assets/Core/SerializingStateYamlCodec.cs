@@ -286,7 +286,7 @@ internal static class SerializingStateYamlCodec
                 if (!m.TryGetValue(K_ITEMS, out var itemsObj) || itemsObj is not List<object?> items)
                     throw new InvalidOperationException("dict node missing $items.");
 
-                var dict = new Dictionary<object, object?>(items.Count);
+                var dict = new Dictionary<object?, object?>(items.Count);
 
                 for (int i = 0; i < items.Count; i++)
                 {
@@ -302,7 +302,10 @@ internal static class SerializingStateYamlCodec
                     var k = DecodeNode(kObj);
                     var v = DecodeNode(vObj);
 
-                    if (k != null) dict[k] = v;
+                    if (k == null)
+                        throw new InvalidOperationException("dict item $k decoded to null; dictionary keys cannot be null.");
+
+                    dict[k] = v;
                 }
 
                 return dict;
