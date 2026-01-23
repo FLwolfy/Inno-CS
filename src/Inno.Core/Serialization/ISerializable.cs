@@ -20,7 +20,8 @@ public sealed class OnSerializableRestored : Attribute;
 /// 2) enum
 /// 3) struct: public instance fields + public settable properties (with SerializableProperty overrides)
 /// 4) ISerializable: only [SerializableProperty] members
-/// 5) Containers: T[] / List (and compatible interfaces), where T is allowed (recursive)
+/// 5) Containers: T[] / List / Dictionary (and compatible interfaces),
+///
 ///
 /// Visibility rules (applies to BOTH structs and ISerializable):
 /// - Show: participate in serialize + deserialize
@@ -292,10 +293,11 @@ public interface ISerializable
             return;
         }
 
-        if (IsDictionaryLike(t))
+        if (TryGetDictionaryTypes(t, out var kType, out var vType))
         {
-            throw new InvalidOperationException(
-                $"{where} contains dictionary type '{t.FullName}', but Dictionary is forbidden in Serializable graph.");
+            ValidateAllowedTypeGraphRec(kType, $"{where}<K>", visited, forbidISerializable);
+            ValidateAllowedTypeGraphRec(vType, $"{where}<V>", visited, forbidISerializable);
+            return;
         }
 
         if (typeof(ISerializable).IsAssignableFrom(t))
@@ -381,6 +383,41 @@ public interface ISerializable
 
         return false;
     }
+    
+    private static bool TryGetDictionaryTypes(Type t, out Type keyType, out Type valueType)
+    {
+        keyType = null!;
+        valueType = null!;
+
+        if (t.IsGenericType)
+        {
+            var def = t.GetGenericTypeDefinition();
+            if (def == typeof(Dictionary<,>) || def == typeof(IDictionary<,>) || def == typeof(IReadOnlyDictionary<,>))
+            {
+                var args = t.GetGenericArguments();
+                keyType = args[0];
+                valueType = args[1];
+                return true;
+            }
+        }
+
+        // Scan interfaces for IDictionary<,> / IReadOnlyDictionary<,>
+        foreach (var i in t.GetInterfaces())
+        {
+            if (!i.IsGenericType) continue;
+            var def = i.GetGenericTypeDefinition();
+            if (def == typeof(IDictionary<,>) || def == typeof(IReadOnlyDictionary<,>))
+            {
+                var args = i.GetGenericArguments();
+                keyType = args[0];
+                valueType = args[1];
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     private static bool IsDictionaryLike(Type t)
     {
@@ -471,8 +508,25 @@ public interface ISerializable
             return result;
         }
 
-        if (value is IDictionary || IsDictionaryLike(t))
-            throw new InvalidOperationException($"CaptureValue: Dictionary is forbidden. Got type: {t.FullName}");
+        // Dictionary support
+        if (value is IDictionary dict)
+        {
+            var node = new Dictionary<object?, object?>(dict.Count);
+            foreach (DictionaryEntry e in dict)
+            {
+                var k = CaptureValue(e.Key, e.Key?.GetType() ?? typeof(object));
+                var v = CaptureValue(e.Value, e.Value?.GetType() ?? typeof(object));
+                node[k] = v;
+            }
+            return node;
+        }
+
+        // If declared type is dictionary-like but runtime isn't IDictionary, it's an error.
+        if (TryGetDictionaryTypes(t, out _, out _))
+        {
+            throw new InvalidOperationException(
+                $"CaptureValue: Declared type is dictionary-like ('{t.FullName}') but runtime value is not IDictionary ('{value.GetType().FullName}').");
+        }
 
         // NOTE: Polymorphic ISerializable wrapper uses dictionary in-memory.
         // If you want *strictly no* IDictionary-shaped nodes anywhere, replace this with a dedicated node type.
@@ -557,8 +611,23 @@ public interface ISerializable
             return concrete;
         }
 
-        if (raw is IDictionary || IsDictionaryLike(t))
-            throw new InvalidOperationException($"RestoreValue: Dictionary is forbidden. Declared type: {t.FullName}");
+        if (TryGetDictionaryTypes(t, out var keyType, out var valueType))
+        {
+            if (raw is not IDictionary rawDict)
+                throw new InvalidOperationException($"Dictionary node must be IDictionary. Got: {raw.GetType().FullName}");
+
+            var concreteType = typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
+            var concrete = (IDictionary)Activator.CreateInstance(concreteType)!;
+
+            foreach (DictionaryEntry e in rawDict)
+            {
+                var rk = RestoreValue(e.Key, keyType);
+                var rv = RestoreValue(e.Value, valueType);
+                concrete.Add(rk!, rv);
+            }
+
+            return concrete;
+        }
 
         if (typeof(ISerializable).IsAssignableFrom(t))
         {
@@ -613,6 +682,7 @@ public interface ISerializable
 
         Array = 10,
         List = 11,
+        Dict = 12,
 
         State = 20,
         Serializable = 21,
@@ -678,8 +748,33 @@ public interface ISerializable
             return;
         }
 
-        if (value is IDictionary || IsDictionaryLike(t))
-            throw new InvalidDataException($"Dictionary is forbidden in binary graph: {t.FullName}");
+        if (value is IDictionary dict)
+        {
+            bw.Write((byte)BinKind.Dict);
+
+            var entries = new List<DictionaryEntry>(dict.Count);
+            foreach (DictionaryEntry e in dict) entries.Add(e);
+
+            bool allStringKey = true;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].Key is not string) { allStringKey = false; break; }
+            }
+
+            if (allStringKey)
+            {
+                entries.Sort((a, b) => StringComparer.Ordinal.Compare((string)a.Key, (string)b.Key));
+            }
+
+            bw.Write(entries.Count);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                WriteNode(bw, entries[i].Key);
+                WriteNode(bw, entries[i].Value);
+            }
+
+            return;
+        }
 
         if (value is IEnumerable en && value is not string)
         {
@@ -774,6 +869,19 @@ public interface ISerializable
                 for (int i = 0; i < count; i++)
                     list.Add(ReadNode(br));
                 return list;
+            }
+            
+            case BinKind.Dict:
+            {
+                int count = br.ReadInt32();
+                var map = new Dictionary<object, object?>(System.Math.Max(0, count));
+                for (int i = 0; i < count; i++)
+                {
+                    var k = ReadNode(br);
+                    var v = ReadNode(br);
+                    map[k] = v;
+                }
+                return map;
             }
 
             case BinKind.State:

@@ -22,12 +22,15 @@ internal static class SerializingStateYamlCodec
     private const string K_VALUE = "$value";
     private const string K_ITEMS = "$items";
     private const string K_FIELDS = "$fields";
+    private const string K_K = "$k";
+    private const string K_V = "$v";
 
     // node kinds
     private const string KIND_NULL  = "null";
     private const string KIND_PRIM  = "prim";
     private const string KIND_ENUM  = "enum";
     private const string KIND_LIST  = "list";
+    private const string KIND_DICT  = "dict";
     private const string KIND_STATE = "state";
     private const string KIND_STRUCT = "struct";
     private const string KIND_WRAPPER = "serializableWrapper"; // your in-memory wrapper: { "__type", "data": SerializingState }
@@ -77,8 +80,9 @@ internal static class SerializingStateYamlCodec
             var m = new Dictionary<string, object?>(dict.Count, StringComparer.Ordinal);
             foreach (DictionaryEntry e in dict)
             {
-                var key = e.Key as string ?? e.Key?.ToString() ?? string.Empty;
-                if (key.Length == 0) continue;
+                if (e.Key is not string key || key.Length == 0)
+                    throw new InvalidOperationException("YAML mapping keys must be strings (tagged nodes expected).");
+
                 m[key] = NormalizeYamlObject(e.Value);
             }
             return m;
@@ -163,6 +167,26 @@ internal static class SerializingStateYamlCodec
             return new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 [K_KIND]  = KIND_LIST,
+                [K_ITEMS] = items,
+            };
+        }
+        
+        // dictionary: encode as list of pairs to preserve non-string keys losslessly
+        if (v is IDictionary dict)
+        {
+            var items = new List<object?>(dict.Count);
+            foreach (DictionaryEntry e in dict)
+            {
+                items.Add(new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    [K_K] = EncodeNode(e.Key),
+                    [K_V] = EncodeNode(e.Value),
+                });
+            }
+
+            return new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                [K_KIND]  = KIND_DICT,
                 [K_ITEMS] = items,
             };
         }
@@ -256,6 +280,34 @@ internal static class SerializingStateYamlCodec
                     list.Add(DecodeNode(items[i]));
                 return list;
             }
+            
+            case KIND_DICT:
+            {
+                if (!m.TryGetValue(K_ITEMS, out var itemsObj) || itemsObj is not List<object?> items)
+                    throw new InvalidOperationException("dict node missing $items.");
+
+                var dict = new Dictionary<object, object?>(items.Count);
+
+                for (int i = 0; i < items.Count; i++)
+                {
+                    var pairObj = NormalizeYamlObject(items[i]);
+                    if (pairObj is not Dictionary<string, object?> pair)
+                        throw new InvalidOperationException("dict item must be a mapping with $k/$v.");
+
+                    if (!pair.TryGetValue(K_K, out var kObj))
+                        throw new InvalidOperationException("dict item missing $k.");
+                    if (!pair.TryGetValue(K_V, out var vObj))
+                        throw new InvalidOperationException("dict item missing $v.");
+
+                    var k = DecodeNode(kObj);
+                    var v = DecodeNode(vObj);
+
+                    if (k != null) dict[k] = v;
+                }
+
+                return dict;
+            }
+
 
             case KIND_STATE:
             {
@@ -318,6 +370,8 @@ internal static class SerializingStateYamlCodec
                         continue;
                     }
                 }
+                
+                // Currently Ignored
 
                 return boxed;
             }
