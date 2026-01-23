@@ -1,14 +1,13 @@
 using System;
 
 using Inno.Assets.AssetType;
-using Inno.Core.Serialization;
 
 namespace Inno.Assets.Core;
 
-public struct AssetRef<T> : ISerializable where T : InnoAsset
+public struct AssetRef<T> where T : InnoAsset
 {
-    [SerializableProperty] public Guid guid { get; private set; } = Guid.Empty;
-    [SerializableProperty] public bool isEmbedded { get; private set; }
+    public Guid guid { get; private set; } = Guid.Empty;
+    public bool isEmbedded { get; private set; }
 
     internal AssetRef(Guid guid, bool isEmbedded)
     {

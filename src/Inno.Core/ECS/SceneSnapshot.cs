@@ -16,29 +16,30 @@ namespace Inno.Core.ECS;
 /// </summary>
 public static class SceneSnapshot
 {
-    public sealed class SceneSnapshotData
+    public class SceneSnapshotData : ISerializable
     {
-        public string sceneName { get; init; } = "";
-        public List<GameObjectSnapshotData> objects { get; init; } = [];
+        [SerializableProperty] public string sceneName { get; init; } = "";
+        [SerializableProperty] public List<GameObjectSnapshotData> objects { get; init; } = [];
     }
 
-    public sealed class GameObjectSnapshotData
+    public readonly struct GameObjectSnapshotData()
     {
         public string name { get; init; } = "";
         public string? parentName { get; init; }
         public List<ComponentSnapshotData> components { get; init; } = [];
     }
 
-    public sealed class ComponentSnapshotData
+    public readonly struct ComponentSnapshotData()
     {
         public string type { get; init; } = "";
 
         /// <summary>
         /// Component state node produced by ISerializable.CaptureState().
         /// </summary>
-        public SerializedState state { get; init; } = new SerializedState(
+        public SerializingState state { get; init; } = new SerializingState(
             new Dictionary<string, object?>(StringComparer.Ordinal)
         );
+        
     }
 
     public static SceneSnapshotData Capture(GameScene scene)

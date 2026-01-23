@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Inno.Assets.AssetType;
 using Inno.Assets.Core;
+using Inno.Core.Serialization;
 
 namespace Inno.Assets.Loader;
 
@@ -62,7 +63,10 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 
         // -------------------- Load meta --------------------
         var yaml = File.ReadAllText(assetMetaPath);
-        var assetLoaded = AssetYamlSerializer.DeserializeFromYaml<T>(yaml);
+        var assetSerializingState = AssetYamlSerializer.DeserializeStateFromYaml(yaml);
+        var newAssetInstance = ISerializable.CreateSerializableInstance(typeof(T));
+        newAssetInstance.RestoreState(assetSerializingState);
+        var assetLoaded = (newAssetInstance as T)!;
 
         // -------------------- Resolve source path --------------------
         string recordedRelSourcePath = string.IsNullOrWhiteSpace(assetLoaded.sourcePath)
@@ -131,7 +135,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 
     private static void WriteMeta(string metaPath, T asset)
     {
-        string yaml = AssetYamlSerializer.SerializeToYaml(asset);
+        string yaml = AssetYamlSerializer.SerializeStateToYaml(((ISerializable)asset).CaptureState());
         Directory.CreateDirectory(Path.GetDirectoryName(metaPath)!);
         File.WriteAllText(metaPath, yaml);
     }

@@ -1,57 +1,23 @@
 using System;
-using System.Collections;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-
-using YamlDotNet.Serialization;
 
 namespace Inno.Assets.Core;
 
-public class AssetObjectFactory : IObjectFactory
+internal static class AssetObjectFactory
 {
-    public object Create(Type type)
+    public static object Create(Type runtimeType)
     {
-        if (type.IsAbstract)
-            throw new InvalidOperationException($"Cannot instantiate abstract class {type.FullName}");
+        if (runtimeType == null) throw new ArgumentNullException(nameof(runtimeType));
 
-        var ctor = type.GetConstructor(
-            BindingFlags.Instance | 
-            BindingFlags.Public | 
-            BindingFlags.NonPublic, 
-            null, Type.EmptyTypes, null);
-
-        if (ctor != null) return ctor.Invoke(null);
-        
-        return RuntimeHelpers.GetUninitializedObject(type);
-    }
-
-    public object? CreatePrimitive(Type type)
-    {
-        if (type.IsValueType)
-            return Activator.CreateInstance(type);
-        return null;
-    }
-
-    public bool GetDictionary(IObjectDescriptor descriptor, out IDictionary? dictionary, out Type[]? genericArguments)
-    {
-        var type = descriptor.Type;
-
-        if (typeof(IDictionary).IsAssignableFrom(type))
+        try
         {
-            dictionary = Activator.CreateInstance(type) as IDictionary;
-            genericArguments = type.IsGenericType ? type.GetGenericArguments() : null;
-            return true;
+            return Activator.CreateInstance(runtimeType, nonPublic: true)
+                   ?? throw new InvalidOperationException($"Activator returned null for {runtimeType.FullName}");
         }
-
-        dictionary = null;
-        genericArguments = null;
-        return false;
+        catch
+        {
+            // Deterministic fallback (no ctor)
+            return RuntimeHelpers.GetUninitializedObject(runtimeType);
+        }
     }
-
-    public Type GetValueType(Type type) => type;
-
-    public void ExecuteOnDeserializing(object value) {}
-    public void ExecuteOnDeserialized(object value) {}
-    public void ExecuteOnSerializing(object value) {}
-    public void ExecuteOnSerialized(object value) {}
 }

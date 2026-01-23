@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 
+using Inno.Assets.AssetType;
 using Inno.Core.Serialization;
 
 using YamlDotNet.Core;
@@ -11,104 +10,101 @@ using YamlDotNet.Serialization.TypeInspectors;
 
 namespace Inno.Assets.Core;
 
-public class AssetPropertyTypeInspector : TypeInspectorSkeleton
+internal sealed class AssetPropertyTypeInspector(ITypeInspector inner) : TypeInspectorSkeleton
 {
-    public override string GetEnumName(Type enumType, string name) => name;
-    public override string GetEnumValue(object enumValue) => enumValue.ToString()!;
+    private readonly ITypeInspector m_inner = inner ?? throw new ArgumentNullException(nameof(inner));
+
+    public override string GetEnumName(Type enumType, string name)
+    {
+        // Delegate to the inner inspector for consistent enum handling.
+        return m_inner.GetEnumName(enumType, name);
+    }
+
+    public override string GetEnumValue(object enumValue)
+    {
+        // Delegate to the inner inspector for consistent enum handling.
+        return m_inner.GetEnumValue(enumValue);
+    }
 
     public override IEnumerable<IPropertyDescriptor> GetProperties(Type type, object? container)
     {
-        if (!type.IsAssignableTo(typeof(ISerializable))) 
-            throw new ArgumentException($"{nameof(type)} must be assignable to {nameof(ISerializable)}");
-        
-        foreach (var prop in GetAllProperties(type))
-        {
-            var attr = prop.GetCustomAttribute<SerializablePropertyAttribute>();
-            if (attr == null) continue;
+        // Non-assets: default behavior
+        if (!typeof(InnoAsset).IsAssignableFrom(type))
+            return m_inner.GetProperties(type, container);
 
-            if (attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly)
-            {
-                yield return new ReadonlyPropertyDescriptor(prop);
-            }
-            else
-            {
-                yield return new ForceSetPropertyDescriptor(prop);
-            }
-        }
+        // Assets: expose only envelope fields, do NOT reflect-expand the object graph.
+        return
+        [
+            new LambdaPropertyDescriptor(
+                name: "$type",
+                propertyType: typeof(string),
+                order: 0,
+                getter: o =>
+                {
+                    var t = o.GetType();
+                    return t.AssemblyQualifiedName ?? t.FullName ?? t.Name;
+                }
+            ),
+            new LambdaPropertyDescriptor(
+                name: "$state",
+                propertyType: typeof(object),
+                order: 1,
+                getter: o =>
+                {
+                    if (o is not ISerializable ser)
+                        throw new InvalidOperationException($"{o.GetType().FullName} must implement ISerializable.");
+
+                    // This should be a YAML-friendly tagged node tree (Dictionary<string, object?> etc.)
+                    return SerializingStateYamlCodec.EncodeState(ser.CaptureState());
+                }
+            )
+        ];
     }
 
-    private static IEnumerable<PropertyInfo> GetAllProperties(Type type)
+    private sealed class LambdaPropertyDescriptor(
+        string name,
+        Type propertyType,
+        int order,
+        Func<object, object?> getter)
+        : IPropertyDescriptor
     {
-        var stack = new Stack<Type>();
-        var t = type;
-        while (t != null && t != typeof(object))
-        {
-            stack.Push(t);
-            t = t.BaseType;
-        }
+        private readonly Func<object, object?> m_getter = getter ?? throw new ArgumentNullException(nameof(getter));
 
-        while (stack.Count > 0)
-        {
-            var current = stack.Pop();
-            foreach (var p in current.GetProperties(
-                             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                         .OrderBy(p => p.MetadataToken))
-            {
-                yield return p;
-            }
-        }
-    }
+        public string Name { get; set; } = name;
 
-
-    private class ReadonlyPropertyDescriptor(PropertyInfo property) : IPropertyDescriptor
-    {
-        public string Name => property.Name;
+        // For our virtual props, allow nulls (safe for $state when empty).
         public bool AllowNulls => true;
+
+        public Type Type { get; set; } = propertyType;
+        public Type? TypeOverride { get; set; }
+        public int Order { get; set; } = order;
+        public ScalarStyle ScalarStyle { get; set; } = ScalarStyle.Any;
+
+        // We are not mapping these from attributes; defaults are fine.
+        public bool Required => false;
+        public Type? ConverterType => null;
+
+        // We intentionally prevent writing via YamlDotNet reflection route.
         public bool CanWrite => false;
-        public Type Type => property.PropertyType;
-        public Type? TypeOverride { get; set; }
-        public int Order { get; set; }
-        public ScalarStyle ScalarStyle { get; set; }
-        public bool Required => false;
-        public Type? ConverterType => null;
 
-        public T? GetCustomAttribute<T>() where T : Attribute => property.GetCustomAttribute<T>();
-
-        public IObjectDescriptor Read(object target)
+        IObjectDescriptor IPropertyDescriptor.Read(object target)
         {
-            var value = property.GetValue(target);
-            return new ObjectDescriptor(value, property.PropertyType, property.PropertyType);
+            var value = m_getter(target);
+
+            // Use ObjectDescriptor so YamlDotNet knows the runtime/static type.
+            // - value can be null
+            // - property Type is the declared type for this virtual property
+            var staticType = TypeOverride ?? Type;
+            var actualType = value?.GetType() ?? staticType;
+
+            return new ObjectDescriptor(value, actualType, staticType);
         }
 
         public void Write(object target, object? value)
         {
-            // DO NOTHING
-        }
-    }
-
-    private class ForceSetPropertyDescriptor(PropertyInfo property) : IPropertyDescriptor
-    {
-        public string Name => property.Name;
-        public bool AllowNulls => true;
-        public bool CanWrite => true;
-        public Type Type => property.PropertyType;
-        public Type? TypeOverride { get; set; }
-        public int Order { get; set; }
-        public ScalarStyle ScalarStyle { get; set; }
-        public bool Required => false;
-        public Type? ConverterType => null;
-
-        public T? GetCustomAttribute<T>() where T : Attribute => property.GetCustomAttribute<T>();
-
-        public IObjectDescriptor Read(object target)
-        {
-            var value = property.GetValue(target);
-            return new ObjectDescriptor(value, property.PropertyType, property.PropertyType);
+            // no-op (CanWrite=false)
         }
 
-        public void Write(object target, object? value)
-        {
-            property.SetValue(target, value);
-        }
+        public T? GetCustomAttribute<T>() where T : Attribute => null;
     }
 }
