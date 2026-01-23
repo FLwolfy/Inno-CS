@@ -20,7 +20,7 @@ namespace Inno.Core.Serialization;
 /// This is intentionally stricter than "serialize anything" to avoid cycles,
 /// runtime handles (e.g. Sprite/Texture/GPU objects), and ctor requirements.
 /// </summary>
-public abstract class Serializable
+public interface ISerializable
 {
     private sealed record MemberSlot(
         string name,
@@ -34,7 +34,7 @@ public abstract class Serializable
     private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
 
     /// <summary>
-    /// Returns the editor-facing serialized properties (used by Inspector).
+    /// Returns the serialized properties.
     /// </summary>
     public IReadOnlyList<SerializedProperty> GetSerializedProperties()
     {
@@ -59,7 +59,7 @@ public abstract class Serializable
     /// Captures a deep, cycle-free state node consisting only of allowed types.
     /// Values are primitives/value-types, or nested dictionaries for Serializable.
     /// </summary>
-    public Dictionary<string, object?> CaptureState()
+    public SerializedState CaptureState()
     {
         var slots = GetSlots(GetType());
         var node = new Dictionary<string, object?>(slots.Length, StringComparer.Ordinal);
@@ -70,31 +70,52 @@ public abstract class Serializable
             node[s.name] = CaptureValue(v, s.type);
         }
 
-        return node;
+        return new SerializedState(node);
     }
 
     /// <summary>
     /// Restores state captured by <see cref="CaptureState"/>.
     /// </summary>
-    public void RestoreState(IReadOnlyDictionary<string, object?> node)
+    public void RestoreState(SerializedState state)
     {
+        if (state == null) throw new ArgumentNullException(nameof(state));
+
         var slots = GetSlots(GetType());
         foreach (var s in slots)
         {
-            if (!node.TryGetValue(s.name, out var raw))
+            if (!state.values.TryGetValue(s.name, out var raw))
                 continue;
 
             var v = RestoreValue(raw, s.type);
             s.setter(this, v);
         }
-        
-        OnAfterRestore();
+
+        InvokeAfterRestoreHooks();
     }
-    
+
     /// <summary>
     /// Called after the restoration of this instance is done.
     /// </summary>
-    protected virtual void OnAfterRestore() { }
+    private void InvokeAfterRestoreHooks()
+    {
+        const BindingFlags c_flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        var type = GetType();
+
+        foreach (var m in type.GetMethods(c_flags))
+        {
+            var attr = m.GetCustomAttribute<OnSerializableRestored>(inherit: true);
+            if (attr == null) continue;
+
+            if (m.GetParameters().Length != 0)
+                throw new InvalidOperationException($"{type.FullName}.{m.Name} must have 0 parameters.");
+
+            if (m.ReturnType != typeof(void))
+                throw new InvalidOperationException($"{type.FullName}.{m.Name} must return void.");
+
+            // Must invoke on the instance (not null).
+            m.Invoke(this, null);
+        }
+    }
 
     // -----------------
     // Slot reflection
@@ -103,11 +124,11 @@ public abstract class Serializable
 
     private static MemberSlot[] BuildSlots(Type type)
     {
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        const BindingFlags c_flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         var list = new List<MemberSlot>(32);
 
         // Properties
-        foreach (var p in type.GetProperties(flags))
+        foreach (var p in type.GetProperties(c_flags))
         {
             var attr = p.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
             if (attr == null) continue;
@@ -123,7 +144,7 @@ public abstract class Serializable
         }
 
         // Fields
-        foreach (var f in type.GetFields(flags))
+        foreach (var f in type.GetFields(c_flags))
         {
             var attr = f.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
             if (attr == null) continue;
@@ -162,16 +183,12 @@ public abstract class Serializable
         }
 
         // Nested Serializable
-        if (typeof(Serializable).IsAssignableFrom(t))
+        if (typeof(ISerializable).IsAssignableFrom(t))
             return;
 
         // Engine value-types (Vector2/3/4, Quaternion, Matrix, Color, etc.)
         // If you want to be stricter, replace this with an explicit whitelist.
         if (t.IsValueType && (t.Namespace?.StartsWith("Inno.Core.Math", StringComparison.Ordinal) ?? false))
-            return;
-
-        // AssetRef<T> is a value-type used widely across your pipeline.
-        if (t.IsValueType && (t.FullName?.StartsWith("Inno.Assets.AssetRef`1", StringComparison.Ordinal) ?? false))
             return;
 
         throw new InvalidOperationException(
@@ -205,9 +222,10 @@ public abstract class Serializable
             return value;
         }
 
-        if (value is Serializable s)
+        if (value is ISerializable s)
         {
             // Store runtime type for safety (polymorphism).
+            // 'data' now stores SerializedState.
             return new Dictionary<string, object?>(2, StringComparer.Ordinal)
             {
                 ["__type"] = s.GetType().AssemblyQualifiedName ?? s.GetType().FullName ?? s.GetType().Name,
@@ -215,7 +233,7 @@ public abstract class Serializable
             };
         }
 
-        // Engine value-types and AssetRef<T> are copied by value.
+        // Engine value-types are copied by value.
         if (t.IsValueType)
             return value;
 
@@ -264,13 +282,13 @@ public abstract class Serializable
         if (t == typeof(double)) return Convert.ToDouble(raw);
         if (t == typeof(decimal)) return Convert.ToDecimal(raw);
 
-        if (typeof(Serializable).IsAssignableFrom(t))
+        if (typeof(ISerializable).IsAssignableFrom(t))
         {
             if (raw is not IReadOnlyDictionary<string, object?> wrapper)
                 throw new InvalidOperationException($"Serializable node must be a dictionary. Got: {raw.GetType().FullName}");
 
-            if (!wrapper.TryGetValue("data", out var dataObj) || dataObj is not IReadOnlyDictionary<string, object?> data)
-                throw new InvalidOperationException("Serializable node missing 'data'.");
+            if (!wrapper.TryGetValue("data", out var dataObj) || dataObj is not SerializedState data)
+                throw new InvalidOperationException("Serializable node missing 'data' (SerializedState).");
 
             // Resolve runtime type if present.
             var runtimeType = t;
@@ -286,27 +304,26 @@ public abstract class Serializable
             return inst;
         }
 
-        // Value-types (Vector/Quaternion/Matrix, AssetRef<T>) are stored as boxed values.
+        // Value-types (Vector/Quaternion/Matrix) are stored as boxed values.
         if (t.IsValueType)
             return raw;
 
         throw new InvalidOperationException($"Unsupported RestoreValue type: {t.FullName}");
     }
-    
-    private static Serializable CreateSerializableInstance(Type runtimeType)
+
+    private static ISerializable CreateSerializableInstance(Type runtimeType)
     {
         // Prefer parameterless ctor if it exists (public or non-public).
         // This keeps invariants for types that rely on ctor initialization.
         try
         {
-            return (Serializable)Activator.CreateInstance(runtimeType, nonPublic: true)!;
+            return (ISerializable)Activator.CreateInstance(runtimeType, nonPublic: true)!;
         }
         catch
         {
             // Fallback: create without running any ctor.
             // .NET 8/9: RuntimeHelpers.GetUninitializedObject is the supported API.
-            return (Serializable)RuntimeHelpers.GetUninitializedObject(runtimeType);
+            return (ISerializable)RuntimeHelpers.GetUninitializedObject(runtimeType);
         }
     }
-
 }

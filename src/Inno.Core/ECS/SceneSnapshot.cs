@@ -34,10 +34,11 @@ public static class SceneSnapshot
         public string type { get; init; } = "";
 
         /// <summary>
-        /// Component state node produced by Serializable.CaptureState().
-        /// Values are primitives/value-types or nested dictionaries for Serializable.
+        /// Component state node produced by ISerializable.CaptureState().
         /// </summary>
-        public Dictionary<string, object?> state { get; init; } = new(StringComparer.Ordinal);
+        public SerializedState state { get; init; } = new SerializedState(
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+        );
     }
 
     public static SceneSnapshotData Capture(GameScene scene)
@@ -82,7 +83,7 @@ public static class SceneSnapshot
         {
             var compType = comp.GetType();
 
-            if (comp is not Serializable s)
+            if (comp is not ISerializable s)
                 continue;
 
             result.Add(new ComponentSnapshotData

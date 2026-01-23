@@ -1,12 +1,13 @@
 using Inno.Assets;
 using Inno.Assets.AssetType;
+using Inno.Assets.Core;
 using Inno.Core.Math;
 using Inno.Core.Serialization;
 using Inno.Graphics.Decoder;
 
 namespace Inno.Graphics.Resources.CpuResources;
 
-public sealed class Sprite : Serializable
+public sealed class Sprite : ISerializable
 {
     public Texture? texture { get; private set; }
 
@@ -46,7 +47,8 @@ public sealed class Sprite : Serializable
         );
     }
 
-    protected override void OnAfterRestore()
+    [OnSerializableRestored]
+    private void OnAfterRestore()
     {
         if (m_textureAsset != null)
         {

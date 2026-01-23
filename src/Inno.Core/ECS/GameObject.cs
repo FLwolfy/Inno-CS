@@ -8,7 +8,7 @@ namespace Inno.Core.ECS;
 /// <summary>
 /// Represents an entity in the scene. It holds an ID and allows component operations.
 /// </summary>
-public class GameObject : Serializable
+public class GameObject : ISerializable
 {
     public readonly Guid id = Guid.NewGuid();
     public readonly Transform transform;

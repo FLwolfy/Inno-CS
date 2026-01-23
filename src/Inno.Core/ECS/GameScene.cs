@@ -8,7 +8,7 @@ namespace Inno.Core.ECS;
 /// <summary>
 /// Represents a scene that contains and manages GameObjects.
 /// </summary>
-public class GameScene : Serializable
+public class GameScene : ISerializable
 {
     public readonly Guid id = Guid.NewGuid();
     public string name = "GameScene";
@@ -87,7 +87,7 @@ public class GameScene : Serializable
 
                 if (comp == null) continue;
 
-                if (comp is Serializable s)
+                if (comp is ISerializable s)
                     s.RestoreState(c.state);
             }
         }

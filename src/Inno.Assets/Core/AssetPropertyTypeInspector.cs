@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+
 using Inno.Core.Serialization;
+
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.TypeInspectors;
 
-namespace Inno.Assets.Serializer;
+namespace Inno.Assets.Core;
 
 public class AssetPropertyTypeInspector : TypeInspectorSkeleton
 {
@@ -16,8 +18,8 @@ public class AssetPropertyTypeInspector : TypeInspectorSkeleton
 
     public override IEnumerable<IPropertyDescriptor> GetProperties(Type type, object? container)
     {
-        if (!type.IsAssignableTo(typeof(Serializable))) 
-            throw new ArgumentException($"{nameof(type)} must be assignable to {nameof(Serializable)}");
+        if (!type.IsAssignableTo(typeof(ISerializable))) 
+            throw new ArgumentException($"{nameof(type)} must be assignable to {nameof(ISerializable)}");
         
         foreach (var prop in GetAllProperties(type))
         {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Inno.Core.Serialization;
 
 namespace Inno.Core.ECS;
 
@@ -10,10 +11,10 @@ namespace Inno.Core.ECS;
 /// Deterministic, type-preserving binary codec for <see cref="SceneSnapshot.SceneSnapshotData"/>.
 ///
 /// Rationale:
-/// - <see cref="Inno.Core.Serialization.Serializable.CaptureState"/> produces a node of <c>Dictionary&lt;string, object?&gt;</c>
-///   which contains boxed engine value-types (Vector2/3/Quaternion/Matrix, etc.) and AssetRef&lt;T&gt;.
+/// - ISerializable.CaptureState now produces a <see cref="SerializedState"/> which wraps a map of boxed values
+///   (engine value-types like Vector2/3/Quaternion/Matrix, etc.) and AssetRef&lt;T&gt;.
 /// - Text formats (YAML/JSON) commonly round-trip those boxed structs into generic dictionaries, losing runtime types.
-/// - <see cref="Inno.Core.Serialization.Serializable.RestoreState"/> expects boxed values of the original runtime types for value-types.
+/// - ISerializable.RestoreState expects boxed values of the original runtime types for value-types.
 ///
 /// This codec stores runtime types for all values, enabling stable SceneAsset persistence.
 /// </summary>
@@ -21,7 +22,9 @@ public static class SceneSnapshotBinaryCodec
 {
     // NOTE: Keep header short but unique; ASCII only.
     private static readonly byte[] MAGIC = "INNO_SCENE"u8.ToArray();
-    private const int C_VERSION = 1;
+
+    // Version bump because we introduced a dedicated node kind for SerializedState.
+    private const int C_VERSION = 2;
 
     private enum NodeKind : byte
     {
@@ -35,7 +38,9 @@ public static class SceneSnapshotBinaryCodec
         String = 7,
         Guid = 8,
 
-        Map = 20,
+        Map = 20,       // Dictionary<string, object?>
+        StateMap = 21,  // SerializedState (wraps IReadOnlyDictionary<string, object?>)
+
         Struct = 30,
         AssetRef = 31,
     }
@@ -72,7 +77,9 @@ public static class SceneSnapshotBinaryCodec
                 {
                     var comp = o.components[c];
                     bw.Write(comp.type ?? string.Empty);
-                    WriteMap(bw, comp.state ?? new Dictionary<string, object?>(StringComparer.Ordinal));
+
+                    // Component state is a SerializedState now.
+                    WriteState(bw, comp.state);
                 }
             }
         }
@@ -115,7 +122,8 @@ public static class SceneSnapshotBinaryCodec
             for (int c = 0; c < compCount; c++)
             {
                 var type = br.ReadString();
-                var state = ReadMap(br);
+                var state = ReadState(br);
+
                 comps.Add(new SceneSnapshot.ComponentSnapshotData
                 {
                     type = type,
@@ -138,7 +146,53 @@ public static class SceneSnapshotBinaryCodec
         };
     }
 
-    private static void WriteMap(BinaryWriter bw, Dictionary<string, object?> map)
+    // ----------------------------
+    // SerializedState support
+    // ----------------------------
+
+    private static void WriteState(BinaryWriter bw, SerializedState state)
+    {
+        if (state == null) throw new ArgumentNullException(nameof(state));
+
+        bw.Write((byte)NodeKind.StateMap);
+
+        // Deterministic: sort keys.
+        var keys = state.values.Keys.ToList();
+        keys.Sort(StringComparer.Ordinal);
+
+        bw.Write(keys.Count);
+        for (int i = 0; i < keys.Count; i++)
+        {
+            var k = keys[i];
+            bw.Write(k);
+            state.values.TryGetValue(k, out var v);
+            WriteNode(bw, v);
+        }
+    }
+
+    private static SerializedState ReadState(BinaryReader br)
+    {
+        var kind = (NodeKind)br.ReadByte();
+        if (kind != NodeKind.StateMap)
+            throw new InvalidDataException($"Expected SerializedState node, got {kind}.");
+
+        int count = br.ReadInt32();
+        var map = new Dictionary<string, object?>(System.Math.Max(0, count), StringComparer.Ordinal);
+        for (int i = 0; i < count; i++)
+        {
+            var key = br.ReadString();
+            var val = ReadNode(br);
+            map[key] = val;
+        }
+
+        return new SerializedState(map);
+    }
+
+    // ----------------------------
+    // Dictionary (wrapper map) support
+    // ----------------------------
+
+    private static void WriteMap(BinaryWriter bw, IReadOnlyDictionary<string, object?> map)
     {
         bw.Write((byte)NodeKind.Map);
 
@@ -193,6 +247,13 @@ public static class SceneSnapshotBinaryCodec
         if (t == typeof(string)) { bw.Write((byte)NodeKind.String); bw.Write((string)value); return; }
         if (t == typeof(Guid)) { bw.Write((byte)NodeKind.Guid); bw.Write(((Guid)value).ToByteArray()); return; }
 
+        // NEW: SerializedState nodes (used by nested Serializable wrappers: { "__type": "...", "data": SerializedState })
+        if (value is SerializedState ss)
+        {
+            WriteState(bw, ss);
+            return;
+        }
+
         // Nested Serializable wrapper nodes are emitted as Dictionary<string, object?>.
         if (value is Dictionary<string, object?> dict)
         {
@@ -202,22 +263,6 @@ public static class SceneSnapshotBinaryCodec
 
         if (t.IsValueType)
         {
-            if (IsAssetRefType(t))
-            {
-                bw.Write((byte)NodeKind.AssetRef);
-                bw.Write(t.AssemblyQualifiedName ?? t.FullName ?? t.Name);
-
-                var guidProp = t.GetProperty("guid", BindingFlags.Instance | BindingFlags.Public);
-                var embProp = t.GetProperty("isEmbedded", BindingFlags.Instance | BindingFlags.Public);
-
-                var g = guidProp != null ? (Guid)guidProp.GetValue(value)! : Guid.Empty;
-                var isEmb = embProp != null && (bool)embProp.GetValue(value)!;
-
-                bw.Write(g.ToByteArray());
-                bw.Write(isEmb);
-                return;
-            }
-
             bw.Write((byte)NodeKind.Struct);
             bw.Write(t.AssemblyQualifiedName ?? t.FullName ?? t.Name);
 
@@ -249,9 +294,12 @@ public static class SceneSnapshotBinaryCodec
             NodeKind.Decimal => br.ReadDecimal(),
             NodeKind.String => br.ReadString(),
             NodeKind.Guid => new Guid(br.ReadBytes(16)),
+
             NodeKind.Map => ReadMapAfterKind(br),
+            NodeKind.StateMap => ReadStateAfterKind(br),
+
             NodeKind.Struct => ReadStruct(br),
-            NodeKind.AssetRef => ReadAssetRef(br),
+
             _ => throw new InvalidDataException($"Unknown node kind: {kind}")
         };
     }
@@ -267,6 +315,19 @@ public static class SceneSnapshotBinaryCodec
             map[key] = val;
         }
         return map;
+    }
+
+    private static SerializedState ReadStateAfterKind(BinaryReader br)
+    {
+        int count = br.ReadInt32();
+        var map = new Dictionary<string, object?>(System.Math.Max(0, count), StringComparer.Ordinal);
+        for (int i = 0; i < count; i++)
+        {
+            var key = br.ReadString();
+            var val = ReadNode(br);
+            map[key] = val;
+        }
+        return new SerializedState(map);
     }
 
     private static object ReadStruct(BinaryReader br)
@@ -295,33 +356,7 @@ public static class SceneSnapshotBinaryCodec
 
         return boxed;
     }
-
-    private static object ReadAssetRef(BinaryReader br)
-    {
-        string typeName = br.ReadString();
-        var t = Type.GetType(typeName);
-        if (t == null)
-            throw new InvalidDataException($"Could not resolve AssetRef type '{typeName}'.");
-
-        var guid = new Guid(br.ReadBytes(16));
-        bool isEmbedded = br.ReadBoolean();
-
-        var ctor = t.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(c =>
-            {
-                var p = c.GetParameters();
-                return p.Length == 2 && p[0].ParameterType == typeof(Guid) && p[1].ParameterType == typeof(bool);
-            });
-
-        if (ctor == null)
-            throw new InvalidDataException($"Could not find AssetRef ctor on '{t.FullName}'.");
-
-        return ctor.Invoke([guid, isEmbedded]);
-    }
-
-    private static bool IsAssetRefType(Type t)
-        => t.IsGenericType && t.GetGenericTypeDefinition().FullName == "Inno.Assets.AssetRef`1";
-
+    
     private static FieldInfo[] GetSerializableStructFields(Type t)
     {
         return t.GetFields(BindingFlags.Instance | BindingFlags.Public)

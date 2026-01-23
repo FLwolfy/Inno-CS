@@ -16,7 +16,7 @@ public class TransformEditor : ComponentEditor
         
         if (EditorGUILayout.CollapsingHeader(compName))
         {
-            var serializedProps = comp.GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
+            var serializedProps = ((ISerializable)comp).GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
             if (serializedProps.Count == 0)
             {
                 EditorGUILayout.Label("No editable properties.");

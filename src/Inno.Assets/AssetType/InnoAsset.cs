@@ -1,12 +1,12 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
-using Inno.Assets.Serializer;
+
 using Inno.Core.Serialization;
 
 namespace Inno.Assets.AssetType;
 
-public abstract class InnoAsset : Serializable
+public abstract class InnoAsset : ISerializable
 {
     [SerializableProperty] private string type { get; set; }
     [SerializableProperty] public Guid guid { get; internal set; } = Guid.Empty;

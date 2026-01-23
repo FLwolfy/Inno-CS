@@ -1,28 +1,12 @@
 using System;
 using System.IO;
 using Inno.Assets.AssetType;
-using Inno.Assets.Serializer;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
+using Inno.Assets.Core;
 
 namespace Inno.Assets.Loader;
 
 internal interface IAssetLoader
 {
-    protected static readonly IDeserializer DESERIALIZER = new DeserializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .IncludeNonPublicProperties()
-        .WithTypeInspector(_ => new AssetPropertyTypeInspector())
-        .WithObjectFactory(new AssetObjectFactory())
-        .IgnoreUnmatchedProperties()
-        .Build();
-
-    protected static readonly ISerializer SERIALIZER = new SerializerBuilder()
-        .IncludeNonPublicProperties()
-        .WithTypeInspector(_ => new AssetPropertyTypeInspector())
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .Build();
-    
     /// <summary>
     /// Load the asset from disk / raw file.
     /// </summary>
@@ -78,7 +62,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 
         // -------------------- Load meta --------------------
         var yaml = File.ReadAllText(assetMetaPath);
-        var assetLoaded = IAssetLoader.DESERIALIZER.Deserialize<T>(yaml);
+        var assetLoaded = AssetYamlSerializer.DeserializeFromYaml<T>(yaml);
 
         // -------------------- Resolve source path --------------------
         string recordedRelSourcePath = string.IsNullOrWhiteSpace(assetLoaded.sourcePath)
@@ -147,7 +131,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 
     private static void WriteMeta(string metaPath, T asset)
     {
-        string yaml = IAssetLoader.SERIALIZER.Serialize(asset);
+        string yaml = AssetYamlSerializer.SerializeToYaml(asset);
         Directory.CreateDirectory(Path.GetDirectoryName(metaPath)!);
         File.WriteAllText(metaPath, yaml);
     }
@@ -168,7 +152,6 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         asset.assetBinaries = bin;
         return asset;
     }
-
 
     /// <summary>
     /// Loads raw source data and produces a binary representation suitable for runtime use,

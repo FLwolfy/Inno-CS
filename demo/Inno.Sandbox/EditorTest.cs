@@ -1,5 +1,6 @@
 using Inno.Assets;
 using Inno.Assets.AssetType;
+using Inno.Assets.Core;
 using Inno.Core.ECS;
 using Inno.Core.Layers;
 using Inno.Core.Math;

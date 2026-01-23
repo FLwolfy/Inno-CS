@@ -1,14 +1,14 @@
 using System;
-using System.Security.Cryptography;
-using System.Text;
+
 using Inno.Assets.AssetType;
+using Inno.Core.Serialization;
 
-namespace Inno.Assets;
+namespace Inno.Assets.Core;
 
-public readonly struct AssetRef<T> where T : InnoAsset
+public struct AssetRef<T> : ISerializable where T : InnoAsset
 {
-    public Guid guid { get; }
-    public bool isEmbedded { get; }
+    [SerializableProperty] public Guid guid { get; private set; } = Guid.Empty;
+    [SerializableProperty] public bool isEmbedded { get; private set; }
 
     internal AssetRef(Guid guid, bool isEmbedded)
     {

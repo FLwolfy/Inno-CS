@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 using YamlDotNet.Serialization;
 
-namespace Inno.Assets.Serializer;
+namespace Inno.Assets.Core;
 
 public class AssetObjectFactory : IObjectFactory
 {
