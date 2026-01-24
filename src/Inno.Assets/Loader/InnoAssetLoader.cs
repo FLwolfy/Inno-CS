@@ -17,11 +17,17 @@ internal interface IAssetLoader
     /// Load the asset directly from bytes.
     /// </summary>
     InnoAsset LoadRaw(string assetName, Guid assetGuid, byte[] rawBytes);
+    
+    /// <summary>
+    /// Save modifications back to the ORIGINAL source file, and sync meta/bin.
+    /// relativePath follows the same convention as Load(): path under AssetManager.assetDirectory.
+    /// </summary>
+    void SaveSource(string relativePath, InnoAsset asset);
 }
 
 internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
 {
-    private const string C_VIRTUAL_SOURCE_NAME = "InnoVirtualAsset";
+    private const string VIRTUAL_SOURCE_NAME = "InnoVirtualAsset";
     
     public abstract string[] validExtensions { get; }
 
@@ -50,8 +56,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             string assetName = Path.GetFileName(relativePath);
             byte[] bin = OnLoadBinaries(assetName, raw, out T asset);
 
-            asset.guid = Guid.NewGuid();
-            asset.sourcePath = relativePath;
+            asset.SetSourcePath(relativePath);
             asset.RecomputeHash(relativePath);
 
             WriteMeta(assetMetaPath, asset);
@@ -81,7 +86,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             {
                 recordedRelSourcePath = relativePath;
                 recordedAbsSourcePath = requestedAbsSourcePath;
-                assetLoaded.sourcePath = recordedRelSourcePath;
+                assetLoaded.SetSourcePath(recordedRelSourcePath);
             }
             else
             {
@@ -95,7 +100,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         // -------------------- Rebuild if source changed --------------------
         string oldHash = assetLoaded.sourceHash;
 
-        assetLoaded.sourcePath = recordedRelSourcePath;
+        assetLoaded.SetSourcePath(recordedRelSourcePath);
         assetLoaded.RecomputeHash(recordedRelSourcePath);
 
         if (oldHash != assetLoaded.sourceHash)
@@ -106,7 +111,7 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             byte[] bin = OnLoadBinaries(assetName, raw, out T rebuilt);
 
             rebuilt.guid = assetLoaded.guid;
-            rebuilt.sourcePath = recordedRelSourcePath;
+            rebuilt.SetSourcePath(recordedRelSourcePath);
             rebuilt.RecomputeHash(recordedRelSourcePath);
 
             WriteMeta(assetMetaPath, rebuilt);
@@ -151,10 +156,59 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         byte[] bin = OnLoadBinaries(assetName, rawBytes, out T asset);
 
         asset.guid = assetGuid;
-        asset.sourcePath = C_VIRTUAL_SOURCE_NAME + "/" + assetName;
+        asset.SetSourcePath(VIRTUAL_SOURCE_NAME + "/" + assetName);
         asset.RecomputeHash(rawBytes);
         asset.assetBinaries = bin;
         return asset;
+    }
+    
+    public void SaveSource(string relativePath, InnoAsset asset)
+    {
+        relativePath = relativePath.TrimEnd('/', '\\');
+
+        if (asset is not T typed)
+            throw new ArgumentException(
+                $"Asset type mismatch. Expected {typeof(T).Name}, got {asset.GetType().Name}.");
+
+        // Resolve paths (same pattern as Load)
+        string absSourcePath = Path.Combine(AssetManager.assetDirectory, relativePath);
+
+        string assetMetaPath = Path.Combine(
+            AssetManager.assetDirectory,
+            relativePath + AssetManager.C_ASSET_POSTFIX);
+
+        string assetBinPath = Path.Combine(
+            AssetManager.binDirectory,
+            relativePath + AssetManager.C_BINARY_ASSET_POSTFIX);
+
+        // Disallow saving virtual assets back to disk source
+        if (!string.IsNullOrWhiteSpace(typed.sourcePath) &&
+            typed.sourcePath.StartsWith(VIRTUAL_SOURCE_NAME, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Cannot SaveSource() for a virtual asset.");
+        }
+
+        // Ensure directory exists for source file
+        Directory.CreateDirectory(Path.GetDirectoryName(absSourcePath)!);
+
+        // 1) Encode asset -> raw source bytes (asset-type specific)
+        string assetName = Path.GetFileName(relativePath);
+        byte[] raw = OnSaveSource(assetName, typed);
+
+        // 2) Write back to the ORIGINAL source file
+        File.WriteAllBytes(absSourcePath, raw);
+
+        // 3) Rebuild runtime binaries deterministically from raw bytes
+        byte[] bin = OnLoadBinaries(assetName, raw, out _);
+        typed.SetSourcePath(relativePath);
+        typed.RecomputeHash(raw);
+
+        // 5) Persist meta + bin
+        WriteMeta(assetMetaPath, typed);
+        WriteBin(assetBinPath, bin);
+
+        // 6) Update in-memory runtime payload
+        typed.assetBinaries = bin;
     }
 
     /// <summary>
@@ -219,5 +273,17 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         byte[] rawBytes,
         out T asset
     );
-
+    
+    
+    /// <summary>
+    /// Encode the current asset state back into its SOURCE file format.
+    /// For example:
+    /// - TextAsset -> UTF8 bytes
+    /// - ShaderAsset -> text bytes
+    /// - TextureAsset -> PNG bytes (if you support encoding)
+    /// </summary>
+    protected abstract byte[] OnSaveSource(
+        string assetName, 
+        in T asset
+    );
 }

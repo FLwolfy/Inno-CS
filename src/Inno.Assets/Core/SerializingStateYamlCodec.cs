@@ -17,23 +17,27 @@ namespace Inno.Assets.Core;
 internal static class SerializingStateYamlCodec
 {
     // tagged node keys
-    private const string K_KIND  = "$kind";
-    private const string K_TYPE  = "$type";
-    private const string K_VALUE = "$value";
-    private const string K_ITEMS = "$items";
+    private const string K_KIND   = "$kind";
+    private const string K_TYPE   = "$type";
+    private const string K_VALUE  = "$value";
+    private const string K_ITEMS  = "$items";
     private const string K_FIELDS = "$fields";
-    private const string K_K = "$k";
-    private const string K_V = "$v";
+    private const string K_K      = "$k";
+    private const string K_V      = "$v";
 
     // node kinds
-    private const string KIND_NULL  = "null";
-    private const string KIND_PRIM  = "prim";
-    private const string KIND_ENUM  = "enum";
-    private const string KIND_LIST  = "list";
-    private const string KIND_DICT  = "dict";
-    private const string KIND_STATE = "state";
-    private const string KIND_STRUCT = "struct";
-    private const string KIND_WRAPPER = "serializableWrapper"; // your in-memory wrapper: { "__type", "data": SerializingState }
+    private const string KIND_NULL    = "null";
+    private const string KIND_PRIM    = "prim";
+    private const string KIND_ENUM    = "enum";
+    private const string KIND_LIST    = "list";
+    private const string KIND_DICT    = "dict";
+    private const string KIND_STATE   = "state";
+    private const string KIND_STRUCT  = "struct";
+    private const string KIND_WRAPPER = "serializableWrapper"; // wrapper: { "__type", "data": SerializingState }
+
+    // wrapper keys (your in-memory shape expected by ISerializable.RestoreValue)
+    private const string WRAP_TYPE_KEY = "__type";
+    private const string WRAP_DATA_KEY = "data";
 
     // ------------------------------------------------------------
     // Public API (tree-level)
@@ -58,11 +62,19 @@ internal static class SerializingStateYamlCodec
         if (yamlRoot is not Dictionary<string, object?> root)
             throw new InvalidOperationException("State YAML root must be a mapping.");
 
-        if (!TryGetString(root, K_KIND, out var kind) || kind != KIND_STATE)
+        // NOTE: YAML implicit typing can turn "null" into null if unquoted.
+        // So we must read $kind as scalar, not string-only.
+        string kind = RequireScalarString(root, K_KIND);
+        if (!string.Equals(kind, KIND_STATE, StringComparison.Ordinal))
             throw new InvalidOperationException("State YAML root must be a { $kind: state } node.");
 
-        if (!root.TryGetValue(K_VALUE, out var mapObj) || mapObj is not Dictionary<string, object?> map)
+        if (!root.TryGetValue(K_VALUE, out var mapObj))
             throw new InvalidOperationException("State node missing $value mapping.");
+
+        mapObj = NormalizeYamlObject(mapObj);
+
+        if (mapObj is not Dictionary<string, object?> map)
+            throw new InvalidOperationException("State node $value must be a mapping.");
 
         return new SerializingState(DecodeMap(map));
     }
@@ -100,7 +112,7 @@ internal static class SerializingStateYamlCodec
     }
 
     // ------------------------------------------------------------
-    // Encode / Decode nodes
+    // Encode / Decode maps
     // ------------------------------------------------------------
 
     private static Dictionary<string, object?> EncodeMap(IReadOnlyDictionary<string, object?> map)
@@ -119,10 +131,20 @@ internal static class SerializingStateYamlCodec
         return outMap;
     }
 
+    // ------------------------------------------------------------
+    // Encode nodes
+    // ------------------------------------------------------------
+
     private static object EncodeNode(object? v)
     {
         if (v == null)
-            return new Dictionary<string, object?>(StringComparer.Ordinal) { [K_KIND] = KIND_NULL };
+            return new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                // IMPORTANT:
+                // If this is emitted as bare YAML (unquoted), "null" becomes YAML null on load.
+                // Decoder is defensive (handles null), but you may also choose to quote strings in serializer.
+                [K_KIND] = KIND_NULL
+            };
 
         if (v is SerializingState ss)
         {
@@ -130,6 +152,23 @@ internal static class SerializingStateYamlCodec
             {
                 [K_KIND]  = KIND_STATE,
                 [K_VALUE] = EncodeMap(ss.values),
+            };
+        }
+
+        // ----------------------------
+        // WRAPPER MUST COME BEFORE IDictionary
+        // ----------------------------
+        // wrapper shape for ISerializable in your current in-memory state graph:
+        // { "__type": "...", "data": SerializingState }
+        if (v is Dictionary<string, object?> wrap
+            && wrap.TryGetValue(WRAP_TYPE_KEY, out var typeObj) && typeObj is string typeStr
+            && wrap.TryGetValue(WRAP_DATA_KEY, out var dataObj) && dataObj is SerializingState dataState)
+        {
+            return new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                [K_KIND]  = KIND_WRAPPER,
+                [K_TYPE]  = typeStr,
+                [K_VALUE] = EncodeState(dataState),
             };
         }
 
@@ -170,7 +209,7 @@ internal static class SerializingStateYamlCodec
                 [K_ITEMS] = items,
             };
         }
-        
+
         // dictionary: encode as list of pairs to preserve non-string keys losslessly
         if (v is IDictionary dict)
         {
@@ -188,20 +227,6 @@ internal static class SerializingStateYamlCodec
             {
                 [K_KIND]  = KIND_DICT,
                 [K_ITEMS] = items,
-            };
-        }
-
-        // wrapper shape for ISerializable in your current in-memory state graph:
-        // { "__type": "...", "data": SerializingState }
-        if (v is Dictionary<string, object?> wrap
-            && wrap.TryGetValue("__type", out var typeObj) && typeObj is string typeStr
-            && wrap.TryGetValue("data", out var dataObj) && dataObj is SerializingState dataState)
-        {
-            return new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                [K_KIND]  = KIND_WRAPPER,
-                [K_TYPE]  = typeStr,
-                [K_VALUE] = EncodeState(dataState),
             };
         }
 
@@ -232,15 +257,27 @@ internal static class SerializingStateYamlCodec
         throw new InvalidOperationException($"SerializingState YAML cannot encode node type: {t.FullName}");
     }
 
+    // ------------------------------------------------------------
+    // Decode nodes
+    // ------------------------------------------------------------
+
     private static object? DecodeNode(object? node)
     {
         node = NormalizeYamlObject(node);
 
         if (node == null) return null;
 
-        if (node is not Dictionary<string, object?> m
-            || !TryGetString(m, K_KIND, out var kind))
+        if (node is not Dictionary<string, object?> m)
             throw new InvalidOperationException("Invalid state YAML node (expected tagged mapping with $kind).");
+
+        if (!m.TryGetValue(K_KIND, out var kindObj))
+            throw new InvalidOperationException("Invalid state YAML node (expected tagged mapping with $kind).");
+
+        // YAML implicit typing fix:
+        // - "$kind: null" -> null
+        // - "$value: true" -> bool
+        // We always treat these scalars as strings in our codec contract.
+        string kind = ScalarToString(kindObj, treatNullAsLiteralNull: true);
 
         switch (kind)
         {
@@ -249,10 +286,8 @@ internal static class SerializingStateYamlCodec
 
             case KIND_PRIM:
             {
-                if (!TryGetString(m, K_TYPE, out var typeStr))
-                    throw new InvalidOperationException("prim node missing $type.");
-                if (!TryGetString(m, K_VALUE, out var valStr))
-                    throw new InvalidOperationException("prim node missing $value.");
+                string typeStr = RequireScalarString(m, K_TYPE);
+                string valStr  = RequireScalarString(m, K_VALUE);
 
                 var t = Type.GetType(typeStr) ?? throw new InvalidOperationException($"Cannot resolve prim type: {typeStr}");
                 return DecodePrimitiveFromString(valStr, t);
@@ -260,10 +295,8 @@ internal static class SerializingStateYamlCodec
 
             case KIND_ENUM:
             {
-                if (!TryGetString(m, K_TYPE, out var typeStr))
-                    throw new InvalidOperationException("enum node missing $type.");
-                if (!TryGetString(m, K_VALUE, out var valStr))
-                    throw new InvalidOperationException("enum node missing $value.");
+                string typeStr = RequireScalarString(m, K_TYPE);
+                string valStr  = RequireScalarString(m, K_VALUE);
 
                 var enumType = Type.GetType(typeStr) ?? throw new InvalidOperationException($"Cannot resolve enum type: {typeStr}");
                 var n = long.Parse(valStr, CultureInfo.InvariantCulture);
@@ -272,19 +305,29 @@ internal static class SerializingStateYamlCodec
 
             case KIND_LIST:
             {
-                if (!m.TryGetValue(K_ITEMS, out var itemsObj) || itemsObj is not List<object?> items)
+                if (!m.TryGetValue(K_ITEMS, out var itemsObj))
                     throw new InvalidOperationException("list node missing $items.");
+
+                itemsObj = NormalizeYamlObject(itemsObj);
+
+                if (itemsObj is not List<object?> items)
+                    throw new InvalidOperationException("list node $items must be a list.");
 
                 var list = new List<object?>(items.Count);
                 for (int i = 0; i < items.Count; i++)
                     list.Add(DecodeNode(items[i]));
                 return list;
             }
-            
+
             case KIND_DICT:
             {
-                if (!m.TryGetValue(K_ITEMS, out var itemsObj) || itemsObj is not List<object?> items)
+                if (!m.TryGetValue(K_ITEMS, out var itemsObj))
                     throw new InvalidOperationException("dict node missing $items.");
+
+                itemsObj = NormalizeYamlObject(itemsObj);
+
+                if (itemsObj is not List<object?> items)
+                    throw new InvalidOperationException("dict node $items must be a list.");
 
                 var dict = new Dictionary<object?, object?>(items.Count);
 
@@ -308,22 +351,40 @@ internal static class SerializingStateYamlCodec
                     dict[k] = v;
                 }
 
+                // ----------------------------
+                // Back-compat:
+                // Older buggy encoder wrote wrapper dictionaries as KIND_DICT.
+                // Detect dict that looks like { "__type": string, "data": SerializingState } and convert.
+                // ----------------------------
+                if (LooksLikeWrapperDict(dict, out var typeStr, out var dataState))
+                {
+                    return new Dictionary<string, object?>(2, StringComparer.Ordinal)
+                    {
+                        [WRAP_TYPE_KEY] = typeStr,
+                        [WRAP_DATA_KEY] = dataState
+                    };
+                }
+
                 return dict;
             }
 
-
             case KIND_STATE:
             {
-                if (!m.TryGetValue(K_VALUE, out var mapObj) || mapObj is not Dictionary<string, object?> map)
+                if (!m.TryGetValue(K_VALUE, out var mapObj))
                     throw new InvalidOperationException("state node missing $value mapping.");
+
+                mapObj = NormalizeYamlObject(mapObj);
+
+                if (mapObj is not Dictionary<string, object?> map)
+                    throw new InvalidOperationException("state node $value must be a mapping.");
 
                 return new SerializingState(DecodeMap(map));
             }
 
             case KIND_WRAPPER:
             {
-                if (!TryGetString(m, K_TYPE, out var typeStr))
-                    throw new InvalidOperationException("wrapper node missing $type.");
+                string typeStr = RequireScalarString(m, K_TYPE);
+
                 if (!m.TryGetValue(K_VALUE, out var stObj))
                     throw new InvalidOperationException("wrapper node missing $value (state).");
 
@@ -334,17 +395,22 @@ internal static class SerializingStateYamlCodec
                 // Rebuild the SAME wrapper shape used in your state graph
                 return new Dictionary<string, object?>(2, StringComparer.Ordinal)
                 {
-                    ["__type"] = typeStr,
-                    ["data"] = ss
+                    [WRAP_TYPE_KEY] = typeStr,
+                    [WRAP_DATA_KEY] = ss
                 };
             }
 
             case KIND_STRUCT:
             {
-                if (!TryGetString(m, K_TYPE, out var typeStr))
-                    throw new InvalidOperationException("struct node missing $type.");
-                if (!m.TryGetValue(K_FIELDS, out var fieldsObj) || fieldsObj is not Dictionary<string, object?> fields)
+                string typeStr = RequireScalarString(m, K_TYPE);
+
+                if (!m.TryGetValue(K_FIELDS, out var fieldsObj))
                     throw new InvalidOperationException("struct node missing $fields.");
+
+                fieldsObj = NormalizeYamlObject(fieldsObj);
+
+                if (fieldsObj is not Dictionary<string, object?> fields)
+                    throw new InvalidOperationException("struct node $fields must be a mapping.");
 
                 var t = Type.GetType(typeStr) ?? throw new InvalidOperationException($"Cannot resolve struct type: {typeStr}");
                 if (!t.IsValueType || t.IsEnum)
@@ -373,8 +439,6 @@ internal static class SerializingStateYamlCodec
                         continue;
                     }
                 }
-                
-                // Currently Ignored
 
                 return boxed;
             }
@@ -382,6 +446,59 @@ internal static class SerializingStateYamlCodec
             default:
                 throw new InvalidOperationException($"Unknown state yaml node kind: {kind}");
         }
+    }
+
+    private static bool LooksLikeWrapperDict(
+        Dictionary<object?, object?> dict,
+        out string typeStr,
+        out SerializingState dataState)
+    {
+        typeStr = string.Empty;
+        dataState = null!;
+
+        if (dict.Count != 2) return false;
+
+        if (!dict.TryGetValue(WRAP_TYPE_KEY, out var tObj) || tObj is not string ts) return false;
+        if (!dict.TryGetValue(WRAP_DATA_KEY, out var dObj) || dObj is not SerializingState ss) return false;
+
+        typeStr = ts;
+        dataState = ss;
+        return true;
+    }
+
+    // ------------------------------------------------------------
+    // Scalar helpers (YAML implicit typing)
+    // ------------------------------------------------------------
+
+    private static string RequireScalarString(Dictionary<string, object?> m, string key)
+    {
+        if (!m.TryGetValue(key, out var obj))
+            throw new InvalidOperationException($"node missing {key}.");
+
+        // For most keys, null is not allowed; treatNullAsLiteralNull=false
+        return ScalarToString(obj, treatNullAsLiteralNull: false);
+    }
+
+    private static string ScalarToString(object? obj, bool treatNullAsLiteralNull)
+    {
+        return obj switch
+        {
+            string s => s,
+            null => treatNullAsLiteralNull ? KIND_NULL : throw new InvalidOperationException("Scalar value is null."),
+            bool b => b ? "true" : "false",
+            byte v => v.ToString(CultureInfo.InvariantCulture),
+            sbyte v => v.ToString(CultureInfo.InvariantCulture),
+            short v => v.ToString(CultureInfo.InvariantCulture),
+            ushort v => v.ToString(CultureInfo.InvariantCulture),
+            int v => v.ToString(CultureInfo.InvariantCulture),
+            uint v => v.ToString(CultureInfo.InvariantCulture),
+            long v => v.ToString(CultureInfo.InvariantCulture),
+            ulong v => v.ToString(CultureInfo.InvariantCulture),
+            float v => v.ToString("R", CultureInfo.InvariantCulture),
+            double v => v.ToString("R", CultureInfo.InvariantCulture),
+            decimal v => v.ToString(CultureInfo.InvariantCulture),
+            _ => throw new InvalidOperationException($"Scalar value must be a YAML scalar. Got: {obj.GetType().FullName}")
+        };
     }
 
     // ------------------------------------------------------------
@@ -443,6 +560,7 @@ internal static class SerializingStateYamlCodec
         throw new InvalidOperationException($"Unsupported primitive type: {t.FullName}");
     }
 
+    // Kept for compatibility with older call sites; prefer RequireScalarString for codec fields.
     private static bool TryGetString(Dictionary<string, object?> m, string key, out string value)
     {
         value = string.Empty;

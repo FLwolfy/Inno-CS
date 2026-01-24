@@ -9,9 +9,9 @@ namespace Inno.Assets.AssetType;
 public abstract class InnoAsset : ISerializable
 {
     [SerializableProperty] private string type { get; set; }
-    [SerializableProperty] public Guid guid { get; internal set; } = Guid.Empty;
-    [SerializableProperty] public string sourceHash { get; private set; } = string.Empty;
-    [SerializableProperty] public string sourcePath { get; internal set; } = string.Empty;
+    [SerializableProperty] public Guid guid { get; internal set; }
+    [SerializableProperty] internal string sourceHash { get; private set; } = string.Empty;
+    [SerializableProperty] internal string sourcePath { get; private set; } = string.Empty;
 
     public string name => Path.GetFileName(sourcePath);
     public byte[] assetBinaries { get; internal set; } = [];
@@ -19,6 +19,7 @@ public abstract class InnoAsset : ISerializable
     protected InnoAsset()
     {
         type = GetType().Name;
+        guid = Guid.NewGuid();
     }
     
     internal void RecomputeHash(string relativePath)
@@ -33,5 +34,10 @@ public abstract class InnoAsset : ISerializable
     {
         var hashBytes = SHA256.HashData(bytes);
         sourceHash = Convert.ToHexString(hashBytes);
+    }
+
+    internal void SetSourcePath(string relativePath)
+    {
+        sourcePath = relativePath;
     }
 }

@@ -1,35 +1,19 @@
-// using Inno.Core.ECS;
-// using Inno.Core.Serialization;
-//
-// namespace Inno.Assets.AssetType;
-//
-// /// <summary>
-// /// Scene asset backed by <see cref="SceneSnapshotBinaryCodec"/> bytes.
-// /// </summary>
-// public sealed class SceneAsset : InnoAsset
-// {
-//     [SerializableProperty] public string sceneName { get; private set; }
-//     [SerializableProperty] public int objectCount { get; private set; }
-//
-//     internal SceneAsset(string sceneName, int objectCount)
-//     {
-//         this.sceneName = sceneName;
-//         this.objectCount = objectCount;
-//     }
-//
-//     /// <summary>
-//     /// Decodes this asset's binaries into a snapshot suitable for <see cref="SceneSnapshot.Restore"/>.
-//     /// </summary>
-//     public SceneSnapshot.SceneSnapshotData ToSnapshot()
-//     {
-//         ass
-//     }
-//
-//     /// <summary>
-//     /// Encodes a snapshot into canonical bytes used for *.scene source files.
-//     /// </summary>
-//     public static byte[] Encode(SceneSnapshot.SceneSnapshotData snapshot)
-//     {
-//         // TODO
-//     }
-// }
+using Inno.Core.Serialization;
+
+namespace Inno.Assets.AssetType;
+
+/// <summary>
+/// Scene asset.
+/// </summary>
+public sealed class SceneAsset : InnoAsset
+{
+    /// <summary>
+    /// This scene state 
+    /// </summary>
+    internal readonly SerializingState sceneState;
+
+    public SceneAsset(SerializingState sceneState)
+    {
+        this.sceneState = sceneState;
+    }
+}

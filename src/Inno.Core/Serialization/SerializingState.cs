@@ -41,7 +41,7 @@ public sealed record SerializingState
     /// <summary>
     /// Serializes this state into a deterministic binary format.
     /// </summary>
-    public byte[] Serialize()
+    public static byte[] Serialize(SerializingState state)
     {
         using var ms = new MemoryStream(16 * 1024);
         using var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true);
@@ -49,7 +49,7 @@ public sealed record SerializingState
         bw.Write(INNO_MAGIC_HEADER);     // Magic
         bw.Write(SERIALIZATION_VERSION); // Version
 
-        BinaryCodec.WriteState(bw, this);
+        BinaryCodec.WriteState(bw, state);
 
         bw.Flush();
         return ms.ToArray();
@@ -58,7 +58,7 @@ public sealed record SerializingState
     /// <summary>
     /// Internal binary decode (kept internal to avoid expanding public API surface).
     /// </summary>
-    internal static SerializingState Deserialize(byte[] bytes)
+    public static SerializingState Deserialize(byte[] bytes)
     {
         if (bytes == null) throw new ArgumentNullException(nameof(bytes));
 

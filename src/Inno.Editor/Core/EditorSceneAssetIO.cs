@@ -5,6 +5,7 @@ using Inno.Assets;
 using Inno.Assets.AssetType;
 using Inno.Core.ECS;
 using Inno.Core.Logging;
+using Inno.Core.Serialization;
 
 namespace Inno.Editor.Core;
 
@@ -56,80 +57,74 @@ public static class EditorSceneAssetIO
 
     public static bool SaveActiveSceneAs(string relativePath)
     {
-        // var scene = SceneManager.GetActiveScene();
-        // if (scene == null)
-        // {
-        //     Log.Warn("Save failed: no active scene.");
-        //     return false;
-        // }
-        //
-        // if (EditorManager.mode != EditorMode.Edit)
-        // {
-        //     Log.Warn("Save is only allowed in Edit mode.");
-        //     return false;
-        // }
-        //
-        // relativePath = NormalizeRelativePath(relativePath);
-        // if (!relativePath.EndsWith(".scene", StringComparison.OrdinalIgnoreCase))
-        //     relativePath += ".scene";
-        //
-        // var snapshot = SceneSnapshot.Capture(scene);
-        // var bytes = SceneAsset.Encode(snapshot);
-        //
-        // var abs = Path.Combine(AssetManager.assetDirectory, relativePath);
-        // Directory.CreateDirectory(Path.GetDirectoryName(abs) ?? AssetManager.assetDirectory);
-        // File.WriteAllBytes(abs, bytes);
-        //
-        // // Import/reimport through AssetManager so meta + binaries stay consistent.
-        // AssetManager.Load<SceneAsset>(relativePath);
-        //
-        // currentScenePath = relativePath;
-        // Log.Info($"Scene saved: {relativePath}");
-        return true;
+        var scene = SceneManager.GetActiveScene();
+        if (scene == null)
+        {
+            Log.Warn("Save failed: no active scene.");
+            return false;
+        }
+        
+        if (EditorManager.mode != EditorMode.Edit)
+        {
+            Log.Warn("Save is only allowed in Edit mode.");
+            return false;
+        }
+        
+        relativePath = NormalizeRelativePath(relativePath);
+        if (!relativePath.EndsWith(".scene", StringComparison.OrdinalIgnoreCase))
+            relativePath += ".scene";
+
+        var sceneState = ((ISerializable)scene).CaptureState();
+        var sceneAsset = new SceneAsset(sceneState);
+
+        var result = AssetManager.Save(relativePath, sceneAsset);
+
+        if (result)
+        {
+            Log.Info($"Scene saved: {relativePath}");
+            return true;
+        }
+        else
+        {
+            Log.Warn($"Scene saved: {relativePath} failed to save.");
+            return false;
+        }
     }
 
     public static bool OpenScene(string relativePath)
     {
-        // relativePath = NormalizeRelativePath(relativePath);
-        //
-        // // If user is playing, stop first.
-        // if (EditorManager.mode != EditorMode.Edit)
-        // {
-        //     EditorRuntimeController.Stop();
-        // }
-        //
-        // if (!AssetManager.Load<SceneAsset>(relativePath))
-        // {
-        //     Log.Error($"Failed to load scene asset: {relativePath}");
-        //     return false;
-        // }
-        //
-        // var sceneRef = AssetManager.Get<SceneAsset>(relativePath);
-        // var sceneAsset = sceneRef.Resolve();
-        // if (sceneAsset == null)
-        // {
-        //     Log.Error($"Failed to resolve scene asset: {relativePath}");
-        //     return false;
-        // }
-        //
-        // var snapshot = sceneAsset.ToSnapshot();
-        //
-        // var active = SceneManager.GetActiveScene();
-        // if (active == null)
-        // {
-        //     active = SceneManager.CreateScene(snapshot.sceneName);
-        //     SceneManager.SetActiveScene(active);
-        // }
-        // else
-        // {
-        //     active.name = snapshot.sceneName;
-        // }
-        //
-        // SceneSnapshot.Restore(active, snapshot);
-        // EditorManager.selection.Deselect();
-        //
-        // currentScenePath = relativePath;
-        // Log.Info($"Scene opened: {relativePath}");
+        relativePath = NormalizeRelativePath(relativePath);
+        
+        // If user is playing, stop first.
+        if (EditorManager.mode != EditorMode.Edit)
+        {
+            EditorRuntimeController.Stop();
+        }
+        
+        if (!AssetManager.Load<SceneAsset>(relativePath))
+        {
+            Log.Error($"Failed to load scene asset: {relativePath}");
+            return false;
+        }
+        
+        var sceneRef = AssetManager.Get<SceneAsset>(relativePath);
+        var sceneAsset = sceneRef.Resolve();
+        if (sceneAsset == null)
+        {
+            Log.Error($"Failed to resolve scene asset: {relativePath}");
+            return false;
+        }
+        
+        var sceneState = SerializingState.Deserialize(sceneAsset.assetBinaries);
+        
+        var active = SceneManager.CreateScene();
+        ((ISerializable)active).RestoreState(sceneState);
+        SceneManager.SetActiveScene(active);
+        
+        EditorManager.selection.Deselect();
+        
+        currentScenePath = relativePath;
+        Log.Info($"Scene opened: {relativePath}");
         return true;
     }
 

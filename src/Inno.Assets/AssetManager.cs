@@ -205,6 +205,34 @@ public static class AssetManager
         RegisterEmbedded(embeddedKey, asset);
         return true;
     }
+    
+    // ===========
+    // Save
+    // ===========
+    public static bool Save(InnoAsset asset)
+    {
+        if (string.IsNullOrWhiteSpace(asset.sourcePath))
+        {
+            Log.Error("Asset has no sourcePath.");
+            return false;
+        }
+
+        var assetType = asset.GetType();
+        if (!AssetLoaderRegistry.TryGetLoader(assetType, out var loader) || loader == null)
+        {
+            Log.Error($"Asset loader not found for {assetType.Name}");
+            return false;
+        }
+
+        loader.SaveSource(asset.sourcePath, asset);
+        return true;
+    }
+
+    public static bool Save(string relativePath, InnoAsset asset)
+    {
+        asset.SetSourcePath(relativePath);
+        return Save(asset);
+    }
 
     // ===========
     // Get (AssetRef)
@@ -478,7 +506,7 @@ public static class AssetManager
             }
 
             reloaded.guid = guid;
-            reloaded.sourcePath = newRelativePath;
+            reloaded.SetSourcePath(newRelativePath);
 
             LOADED_ASSETS[guid] = reloaded;
             PATH_TO_GUID[newRelativePath] = guid;

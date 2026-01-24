@@ -76,7 +76,7 @@ public class GameScene : ISerializable
             ((ISerializable)go).RestoreState(goe.objectState);
         }
         
-        // Second pass: handle transform and parent-child relation
+        // Second pass: restore transform
         for (int i = 0; i < snapshot.gameObjectEntries.Count; i++)
         {
             // Object
@@ -94,8 +94,12 @@ public class GameScene : ISerializable
                 .First();
             var trans = go.AddComponent<Transform>();
             ((ISerializable)trans).RestoreState(transState);
-            
-            // Parent restore
+        }
+        
+        // Third pass: parent-child relation
+        foreach (var go in m_gameObjects)
+        {
+            var trans = go.transform;
             var parentId = trans.parentId;
             if (parentId != Guid.Empty)
             {
@@ -103,7 +107,7 @@ public class GameScene : ISerializable
             }
         }
         
-        // Third pass: restore components and state.
+        // Forth pass: restore components and state.
         for (int i = 0; i < snapshot.gameObjectEntries.Count; i++)
         {
             var goe = snapshot.gameObjectEntries[i];

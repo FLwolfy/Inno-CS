@@ -436,8 +436,7 @@ public interface ISerializable
 
         if (typeof(ISerializable).IsAssignableFrom(t))
         {
-            if (raw is not IReadOnlyDictionary<string, object?> wrapper)
-                throw new InvalidOperationException($"Serializable wrapper must be a dictionary. Got: {raw.GetType().FullName}");
+            var wrapper = CoerceToStringKeyDictionary(raw);
 
             if (!wrapper.TryGetValue("data", out var dataObj) || dataObj is not SerializingState data)
                 throw new InvalidOperationException("Serializable wrapper missing 'data' (SerializingState).");
@@ -459,6 +458,30 @@ public interface ISerializable
             return raw;
 
         throw new InvalidOperationException($"Unsupported RestoreValue type: {t.FullName}");
+    }
+    
+    private static Dictionary<string, object?> CoerceToStringKeyDictionary(object raw)
+    {
+        if (raw is Dictionary<string, object?> sdict) return sdict;
+
+        if (raw is IDictionary dict)
+        {
+            var result = new Dictionary<string, object?>(dict.Count, StringComparer.Ordinal);
+
+            foreach (DictionaryEntry e in dict)
+            {
+                if (e.Key is not string k)
+                    throw new InvalidOperationException(
+                        $"Serializable wrapper dict keys must be strings. Got key type: {e.Key?.GetType().FullName ?? "null"}");
+
+                result[k] = e.Value;
+            }
+
+            return result;
+        }
+
+        throw new InvalidOperationException(
+            $"Serializable wrapper must be a dictionary. Got: {raw.GetType().FullName}");
     }
     
     public static ISerializable CreateSerializableInstance(Type runtimeType)

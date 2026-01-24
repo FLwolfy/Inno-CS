@@ -1401,6 +1401,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
     private static void TryOpenFile(string fullPathNormalized)
     {
+        // TODO: Add more types
         var ext = Path.GetExtension(fullPathNormalized);
         if (!ext.Equals(".scene", StringComparison.OrdinalIgnoreCase))
             return;
