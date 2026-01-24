@@ -24,6 +24,11 @@ internal static class SerializableGraph
                || t == typeof(Guid);
     }
 
+    internal static bool IsSerializingState(Type t)
+    {
+        return t == typeof(SerializingState);
+    }
+
     internal static bool TryGetListElementType(Type t, out Type elem)
     {
         elem = null!;
@@ -146,6 +151,7 @@ internal static class SerializableGraph
 
         if (t.IsEnum) return;
         if (IsAllowedPrimitive(t)) return;
+        if (IsSerializingState(t)) return;
 
         if (t.IsArray)
         {
@@ -200,6 +206,4 @@ internal static class SerializableGraph
             $"{where} has unsupported type '{t.FullName}'. " +
             "Allowed: primitives, enums, structs (recursive), ISerializable (recursive), arrays, List<T>, Dictionary<K,V>.");
     }
-
-    
 }

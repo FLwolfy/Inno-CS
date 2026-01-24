@@ -282,6 +282,12 @@ public interface ISerializable
         if (SerializableGraph.IsAllowedPrimitive(t))
             return value;
 
+        // Allow embedding captured SerializingState nodes inside the graph.
+        // This is used by higher-level serializers that want to carry
+        // pre-captured state trees without re-encoding them.
+        if (SerializableGraph.IsSerializingState(t))
+            return value;
+
         if (t.IsArray)
         {
             var elemType = t.GetElementType()!;
@@ -373,6 +379,14 @@ public interface ISerializable
 
             throw new InvalidOperationException($"Unexpected primitive type: {t.FullName}");
         }
+        
+        if (SerializableGraph.IsSerializingState(t))
+        {
+            if (raw is SerializingState ss) return ss;
+            throw new InvalidOperationException(
+                $"RestoreValue failed: expected SerializingState node for '{t.FullName}', got '{raw.GetType().FullName}'.");
+        }
+
 
         if (t.IsArray)
         {

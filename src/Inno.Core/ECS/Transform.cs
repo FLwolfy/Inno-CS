@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Inno.Core.Math;
 using Inno.Core.Serialization;
@@ -19,7 +20,7 @@ public class Transform : GameComponent
     // Local transform relative to parent
     private Vector3 m_localPosition = Vector3.ZERO;
     private Quaternion m_localRotation = Quaternion.identity;
-    private float m_localRotationZ = 0f;
+    private float m_localRotationZ;
     private Vector3 m_localScale = Vector3.ONE;
 
     // Children transforms
@@ -184,6 +185,7 @@ public class Transform : GameComponent
     /// Parent transform. Null if root.
     /// </summary>
     public Transform? parent { get; private set; }
+    [SerializableProperty] internal Guid parentId { get; private set; } = Guid.Empty;
 
     /// <summary>
     /// Read-only list of children transforms.
@@ -251,6 +253,7 @@ public class Transform : GameComponent
             parent?.m_children.Add(this);
         }
 
+        parentId = newParent == null ? Guid.Empty : newParent.gameObject.id;
         MarkDirty();
     }
     

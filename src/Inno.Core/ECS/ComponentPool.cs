@@ -7,7 +7,7 @@ namespace Inno.Core.ECS;
 /// <summary>
 /// Manages components by entity and updates components ordered by tag.
 /// </summary>
-internal class ComponentManager
+internal class ComponentPool
 {
     private bool m_isRunning;
     private bool m_isUpdating;
@@ -22,7 +22,7 @@ internal class ComponentManager
     private readonly List<GameComponent> m_pendingStartComponents = [];
     private readonly List<List<GameComponent>> m_pendingToSortLists = [];
     
-    public ComponentManager()
+    public ComponentPool()
     {
         foreach (var tag in Enum.GetValues<ComponentTag>())
         {
@@ -115,6 +115,70 @@ internal class ComponentManager
         
         return component;
     }
+    
+    /// <summary>
+    /// Adds an existing component instance to the entity if it doesn't exist.
+    /// Returns the existing component (if already present) or the provided instance (if added).
+    /// Initialization behavior matches other Add overloads:
+    /// </summary>
+    public GameComponent Add(GameObject obj, GameComponent component)
+    {
+        if (component == null) throw new ArgumentNullException(nameof(component));
+
+        // Initialize the map for a new entity
+        if (!m_componentsByEntity.TryGetValue(obj.id, out var entityComponents))
+        {
+            entityComponents = new Dictionary<Type, GameComponent>();
+            m_componentsByEntity[obj.id] = entityComponents;
+        }
+
+        var type = component.GetType();
+
+        // Already exists, return it directly (same semantics as other Add overloads)
+        if (entityComponents.TryGetValue(type, out var existingComponent))
+        {
+            return existingComponent;
+        }
+
+        // Ensure it is a valid component type (defensive; aligns with Add(obj, Type))
+        if (!typeof(GameComponent).IsAssignableFrom(type))
+        {
+            throw new ArgumentException($"Type {type} is not a GameComponent.", nameof(component));
+        }
+
+        // Initialize + register
+        component.Initialize(obj);
+        entityComponents[type] = component;
+
+        // Type map
+        AddToTypeMap(component);
+
+        // Tag map (safe iteration)
+        if (m_isUpdating)
+        {
+            m_pendingAddRemoveAction.Add(() => InsertSorted(m_componentsByTag[component.orderTag], component));
+        }
+        else
+        {
+            InsertSorted(m_componentsByTag[component.orderTag], component);
+        }
+
+        // Game already started, execute Awake()
+        if (m_isRunning && !component.hasAwakened)
+        {
+            component.Awake();
+            component.hasAwakened = true;
+        }
+
+        // Delay Start()
+        if (component.isActive && !component.hasStarted)
+        {
+            m_pendingStartComponents.Add(component);
+        }
+
+        return component;
+    }
+
     
     /// <summary>
     /// Adds a component with given type to the entity if it doesn't exist.

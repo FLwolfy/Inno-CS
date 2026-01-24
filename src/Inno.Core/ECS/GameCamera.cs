@@ -14,7 +14,6 @@ public abstract class GameCamera : GameComponent
     private Matrix m_cachedProjectionMatrix;
     private Rect m_cachedViewRect;
     private float m_aspectRatio = 1.7777f;
-    
 
     /// <summary>
     /// Sets or gets whether this camera is the main camera in the scene.
