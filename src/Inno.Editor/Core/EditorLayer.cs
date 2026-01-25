@@ -78,20 +78,24 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
     private void HandleSceneSave(KeyPressedEvent keyEvent)
     {
         if (keyEvent.repeat) return;
-
-        // Ctrl+S: Save
-        // Ctrl+Shift+S: Save As (Assets/Scenes)
         if (keyEvent.key != Input.KeyCode.S) return;
 
-        bool ctrl = (keyEvent.modifiers & Input.KeyModifier.Control) != 0;
+        var mods = keyEvent.modifiers;
+        bool ctrl  = (mods & Input.KeyModifier.Control) != 0;
         if (!ctrl) return;
 
-        bool shift = (keyEvent.modifiers & Input.KeyModifier.Shift) != 0;
+        bool shift = (mods & Input.KeyModifier.Shift) != 0;
+
         if (shift)
+        {
             EditorSceneAssetIO.SaveActiveSceneAsDefaultFolder();
-        else
-            EditorSceneAssetIO.SaveActiveScene();
+            return;
+        }
+
+        // Ctrl+S: strictly Save only; requires currentScenePath to exist
+        EditorSceneAssetIO.SaveActiveScene();
     }
+
 
 
     public override void OnRender()

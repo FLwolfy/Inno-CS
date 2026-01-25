@@ -32,10 +32,22 @@ public class HierarchyPanel : EditorPanel
         m_branch.Clear();
 
         ImGuiNet.BeginChild("##HierarchyScroll", new Vector2(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.HorizontalScrollbar);
+        
+        var activeScene = SceneManager.GetActiveScene();
 
-        DrawSceneRoot();
-        foreach (var obj in SceneManager.GetActiveScene()!.GetAllRootGameObjects()) DrawGameObject(obj);
+        if (activeScene != null)
+        {
+            // Scene root
+            DrawSceneRoot();
 
+            // Scene object
+            foreach (var obj in activeScene.GetAllRootGameObjects())
+            {
+                DrawGameObject(obj);
+            }
+        }
+
+        // Menu
         HandleMenu();
         while (m_pendingGuiUpdateAction.Count > 0) m_pendingGuiUpdateAction.Dequeue().Invoke();
 

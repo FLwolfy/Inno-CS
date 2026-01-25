@@ -8,44 +8,45 @@ using System.Runtime.CompilerServices;
 
 namespace Inno.Core.Serialization;
 
+
+/// <summary>
+/// Marks an instance method to be invoked after <see cref="ISerializable.RestoreState"/> completes.
+/// </summary>
+/// <remarks>
+/// The method must be parameterless and return <see cref="void"/>. Invocation order is base-type to derived-type.
+/// </remarks>
 [AttributeUsage(AttributeTargets.Method, Inherited = true)]
 public sealed class OnSerializableRestored : Attribute;
 
+
 /// <summary>
-/// Base contract for editor/runtime state that is allowed to be saved/restored.
-///
-/// Allowed graph (recursive, super-nested):
-/// 1) Primitive-like scalars: bool/number/decimal/string/Guid
-/// 2) enum
-/// 3) struct: public instance fields + public settable properties (with SerializableProperty overrides)
-/// 4) ISerializable: only [SerializableProperty] members
-/// 5) Containers: T[] / List / Dictionary (and compatible interfaces), where K/V/T are allowed (recursive)
-///
-/// Visibility rules (applies to BOTH structs and ISerializable):
-/// - Show: participate in serialize + deserialize
-/// - Hide: participate in neither serialize nor deserialize
-/// - ReadOnly: participate in serialize only (skip deserialize); can have no setter (property) / can be readonly field
-///
-/// Notes:
-/// - Binary serialization is provided by <see cref="SerializingState"/> (NOT by ISerializable).
+/// Represents an object that can capture and restore its state using <see cref="SerializingState"/>.
 /// </summary>
+/// <remarks>
+/// Only members annotated with <see cref="SerializablePropertyAttribute"/> participate in the state graph.
+/// </remarks>
 public interface ISerializable
 {
-    // =====================================================================
-    //  Reflection slots for [SerializableProperty] (ISerializable objects)
-    // =====================================================================
+    #region Public API
 
-    private sealed record MemberSlot(
-        string name,
-        Type type,
-        Func<object, object?> getter,
-        Action<object, object?> setter, // may be no-op for ReadOnly
-        SerializedProperty.PropertyVisibility visibility,
-        int orderKey
-    );
-
-    private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
-
+    /// <summary>
+    /// Returns the serialized properties declared on this instance type.
+    /// </summary>
+    /// <returns>A stable, ordered list of serialized properties for this instance.</returns>
+    /// <remarks>
+    /// The returned list applies <see cref="SerializedProperty.PropertyVisibility.Hide"/> and
+    /// <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> rules.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var props = obj.GetSerializedProperties();
+    /// foreach (var p in props)
+    /// {
+    ///     if (p.visibility == SerializedProperty.PropertyVisibility.ReadOnly) continue;
+    ///     Console.WriteLine($"{p.name} = {p.GetValue()}");
+    /// }
+    /// </code>
+    /// </example>
     public IReadOnlyList<SerializedProperty> GetSerializedProperties()
     {
         var slots = GetSlots(GetType());
@@ -58,28 +59,54 @@ public interface ISerializable
                 s.type,
                 () => s.getter(this),
                 v => s.setter(this, v),
-                s.visibility
-            ));
+                s.visibility));
         }
 
         return result;
     }
 
+    /// <summary>
+    /// Captures this instance into an in-memory state tree.
+    /// </summary>
+    /// <returns>A <see cref="SerializingState"/> representing this instance.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when a member value is not supported by the serialization graph.</exception>
+    /// <remarks>
+    /// <see cref="SerializedProperty.PropertyVisibility.Hide"/> members are excluded.
+    /// <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> members are included in capture only.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// SerializingState state = component.CaptureState();
+    /// byte[] bytes = SerializingState.Serialize(state);
+    /// </code>
+    /// </example>
     public SerializingState CaptureState()
     {
         var slots = GetSlots(GetType());
         var node = new Dictionary<string, object?>(slots.Length, StringComparer.Ordinal);
 
         foreach (var s in slots)
-        {
-            // Show + ReadOnly participate in serialization; Hide never appears in slots.
-            var v = s.getter(this);
-            node[s.name] = CaptureValue(v, s.type);
-        }
+            node[s.name] = CaptureValue(s.getter(this), s.type);
 
         return new SerializingState(node);
     }
 
+    /// <summary>
+    /// Restores this instance from a previously captured state.
+    /// </summary>
+    /// <param name="state">The source state.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="state"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a state value cannot be converted to the declared member type.</exception>
+    /// <remarks>
+    /// Members marked as <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> are not assigned during restore.
+    /// After restoration, methods annotated with <see cref="OnSerializableRestored"/> are invoked.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var state = SerializingState.Deserialize(bytes);
+    /// obj.RestoreState(state);
+    /// </code>
+    /// </example>
     public void RestoreState(SerializingState state)
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
@@ -87,90 +114,104 @@ public interface ISerializable
         var slots = GetSlots(GetType());
         foreach (var s in slots)
         {
-            // ReadOnly does NOT participate in deserialize
             if (s.visibility == SerializedProperty.PropertyVisibility.ReadOnly)
                 continue;
 
             if (!state.values.TryGetValue(s.name, out var raw))
                 continue;
 
-            var v = RestoreValue(raw, s.type);
-            s.setter(this, v);
+            s.setter(this, RestoreValue(raw, s.type));
         }
 
         InvokeAfterRestoreHooks();
     }
 
-    private void InvokeAfterRestoreHooks()
+    /// <summary>
+    /// Creates an instance for a runtime <see cref="Type"/> that implements <see cref="ISerializable"/>.
+    /// </summary>
+    /// <param name="runtimeType">The concrete runtime type.</param>
+    /// <returns>An instance of <paramref name="runtimeType"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="runtimeType"/> is null.</exception>
+    /// <exception cref="InvalidCastException">Thrown when <paramref name="runtimeType"/> does not implement <see cref="ISerializable"/>.</exception>
+    /// <remarks>
+    /// The creation strategy prefers a non-public parameterless constructor; otherwise it falls back to an uninitialized object.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var inst = ISerializable.CreateSerializableInstance(typeof(MyComponent));
+    /// inst.RestoreState(state);
+    /// </code>
+    /// </example>
+    public static ISerializable CreateSerializableInstance(Type runtimeType)
     {
-        const BindingFlags c_declaredFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-        var type = GetType();
+        if (runtimeType == null) throw new ArgumentNullException(nameof(runtimeType));
+        if (!typeof(ISerializable).IsAssignableFrom(runtimeType))
+            throw new InvalidCastException($"Type '{runtimeType.FullName}' does not implement {nameof(ISerializable)}.");
 
-        // base -> derived
-        var chain = new List<Type>(8);
-        for (var t = type; t != null && t != typeof(object); t = t.BaseType)
-            chain.Add(t);
-        chain.Reverse();
-
-        foreach (var t in chain)
+        try
         {
-            foreach (var m in t.GetMethods(c_declaredFlags))
-            {
-                var attr = m.GetCustomAttribute<OnSerializableRestored>(inherit: true);
-                if (attr == null) continue;
-
-                if (m.GetParameters().Length != 0)
-                    throw new InvalidOperationException($"{type.FullName}.{m.Name} must have 0 parameters.");
-                if (m.ReturnType != typeof(void))
-                    throw new InvalidOperationException($"{type.FullName}.{m.Name} must return void.");
-
-                m.Invoke(this, null);
-            }
+            return (ISerializable)Activator.CreateInstance(runtimeType, nonPublic: true)!;
+        }
+        catch
+        {
+            return (ISerializable)RuntimeHelpers.GetUninitializedObject(runtimeType);
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Slot cache
-    // ---------------------------------------------------------------------
+    #endregion
 
-    private static MemberSlot[] GetSlots(Type type)
-    {
-        return SLOT_CACHE.GetOrAdd(type, BuildSlots);
-    }
+    #region Internal Validation API
 
-    /// <summary>
-    /// Internal helper for <see cref="SerializableGraph.ValidateAllowedTypeGraph"/>.
-    /// Returns the declared member types participating in the serializable graph for this ISerializable type.
-    /// </summary>
     internal static (string name, Type type)[] GetSlotsForValidation(Type type)
     {
         var slots = GetSlots(type);
         var arr = new (string name, Type type)[slots.Length];
-        for (int i = 0; i < slots.Length; i++) arr[i] = (slots[i].name, slots[i].type);
+
+        for (var i = 0; i < slots.Length; i++)
+            arr[i] = (slots[i].name, slots[i].type);
+
         return arr;
     }
 
+    #endregion
+
+    #region Slot Cache
+
+    private sealed record MemberSlot(
+        string name,
+        Type type,
+        Func<object, object?> getter,
+        Action<object, object?> setter,
+        SerializedProperty.PropertyVisibility visibility,
+        int orderKey);
+
+    private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
+
+    private static MemberSlot[] GetSlots(Type type) => SLOT_CACHE.GetOrAdd(type, BuildSlots);
+
     private static MemberSlot[] BuildSlots(Type type)
     {
-        const BindingFlags c_declaredFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        const BindingFlags declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
         var chain = new List<Type>(8);
         for (var t = type; t != null && t != typeof(object); t = t.BaseType)
             chain.Add(t);
         chain.Reverse();
 
+        var chainIndex = chain
+            .Select((t, i) => (t, i))
+            .ToDictionary(x => x.t, x => x.i);
+
         var list = new List<MemberSlot>(64);
+
         foreach (var t in chain)
         {
-            // -----------------------------
-            // Properties (declared in t)
-            // -----------------------------
-            foreach (var p in t.GetProperties(c_declaredFlags))
+            var depth = chainIndex[t];
+
+            foreach (var p in t.GetProperties(declared))
             {
                 var attr = p.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
-                if (attr == null) continue;
-
-                if (attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
+                if (attr == null || attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
                     continue;
 
                 if (p.GetIndexParameters().Length != 0)
@@ -179,73 +220,50 @@ public interface ISerializable
                 if (!p.CanRead)
                     throw new InvalidOperationException($"{type.FullName}.{p.Name} must be readable to be [SerializableProperty].");
 
-                bool isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
+                var isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
 
-                // Show
                 if (!isReadOnly && p.GetSetMethod(nonPublic: true) == null)
                     throw new InvalidOperationException($"{type.FullName}.{p.Name} must have setter when visibility=Show.");
 
                 SerializableGraph.ValidateAllowedTypeGraph(p.PropertyType, $"{type.FullName}.{p.Name}");
 
-                Func<object, object?> getter = obj => p.GetValue(obj);
-                Action<object, object?> setter = BuildPropertySetter(type, p, isReadOnly);
-
-                int depth = chain.IndexOf(t);
-                int orderKey = (depth << 24) ^ p.MetadataToken;
-
                 list.Add(new MemberSlot(
                     p.Name,
                     p.PropertyType,
-                    getter,
-                    setter,
+                    obj => p.GetValue(obj),
+                    BuildPropertySetter(type, p, isReadOnly),
                     attr.propertyVisibility,
-                    orderKey));
+                    (depth << 24) ^ p.MetadataToken));
             }
 
-            // -----------------------------
-            // Fields (declared in t)
-            // -----------------------------
-            foreach (var f in t.GetFields(c_declaredFlags))
+            foreach (var f in t.GetFields(declared))
             {
                 var attr = f.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
-                if (attr == null) continue;
-
-                if (attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
+                if (attr == null || attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
                     continue;
 
-                bool isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
+                var isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
 
                 if (!isReadOnly && f.IsInitOnly)
                     throw new InvalidOperationException($"{type.FullName}.{f.Name} is readonly; it must be writable when visibility=Show.");
 
                 SerializableGraph.ValidateAllowedTypeGraph(f.FieldType, $"{type.FullName}.{f.Name}");
 
-                Func<object, object?> getter = obj => f.GetValue(obj);
-                Action<object, object?> setter =
-                    (!isReadOnly && !f.IsInitOnly)
-                        ? (obj, v) => f.SetValue(obj, v)
-                        : static (_, _) => { };
-
-                int depth = chain.IndexOf(t);
-                int orderKey = (depth << 24) ^ f.MetadataToken;
-
                 list.Add(new MemberSlot(
                     f.Name,
                     f.FieldType,
-                    getter,
-                    setter,
+                    obj => f.GetValue(obj),
+                    (!isReadOnly && !f.IsInitOnly) ? (obj, v) => f.SetValue(obj, v) : static (_, _) => { },
                     attr.propertyVisibility,
-                    orderKey));
+                    (depth << 24) ^ f.MetadataToken));
             }
         }
 
-        // Handle overrides
-        list = list
+        return list
             .GroupBy(s => s.name, StringComparer.Ordinal)
             .Select(g => g.OrderBy(x => x.orderKey).Last())
-            .ToList();
-
-        return list.OrderBy(s => s.orderKey).ToArray();
+            .OrderBy(s => s.orderKey)
+            .ToArray();
     }
 
     private static Action<object, object?> BuildPropertySetter(Type ownerType, PropertyInfo p, bool isReadOnly)
@@ -253,22 +271,18 @@ public interface ISerializable
         if (isReadOnly)
             return static (_, _) => { };
 
-        // allow private/protected setters
         var setMethod = p.GetSetMethod(nonPublic: true);
         if (setMethod == null)
             throw new InvalidOperationException($"{ownerType.FullName}.{p.Name} must have a setter when visibility=Show.");
 
-        // fast path for public setter
-        if (setMethod.IsPublic)
-            return (obj, v) => p.SetValue(obj, v);
-
-        // non-public setter: invoke directly
-        return (obj, v) => setMethod.Invoke(obj, new[] { v });
+        return setMethod.IsPublic
+            ? (obj, v) => p.SetValue(obj, v)
+            : (obj, v) => setMethod.Invoke(obj, new[] { v });
     }
 
-    // =====================================================================
-    //  State capture/restore value conversions (in-memory graph)
-    // =====================================================================
+    #endregion
+
+    #region Value Conversions
 
     private static object? CaptureValue(object? value, Type declaredType)
     {
@@ -276,24 +290,16 @@ public interface ISerializable
 
         var t = Nullable.GetUnderlyingType(declaredType) ?? declaredType;
 
-        if (t.IsEnum)
-            return Convert.ToInt64(value);
-
-        if (SerializableGraph.IsAllowedPrimitive(t))
-            return value;
-
-        // Allow embedding captured SerializingState nodes inside the graph.
-        // This is used by higher-level serializers that want to carry
-        // pre-captured state trees without re-encoding them.
-        if (SerializableGraph.IsSerializingState(t))
-            return value;
+        if (t.IsEnum) return Convert.ToInt64(value);
+        if (SerializableGraph.IsAllowedPrimitive(t)) return value;
+        if (SerializableGraph.IsSerializingState(t)) return value;
 
         if (t.IsArray)
         {
             var elemType = t.GetElementType()!;
             var arr = (Array)value;
             var list = new List<object?>(arr.Length);
-            for (int i = 0; i < arr.Length; i++)
+            for (var i = 0; i < arr.Length; i++)
                 list.Add(CaptureValue(arr.GetValue(i), elemType));
             return list;
         }
@@ -306,27 +312,17 @@ public interface ISerializable
             return result;
         }
 
-        // Dictionary support
         if (value is IDictionary dict)
         {
             var node = new Dictionary<object?, object?>(dict.Count);
             foreach (DictionaryEntry e in dict)
-            {
-                var k = CaptureValue(e.Key, e.Key?.GetType() ?? typeof(object));
-                var v = CaptureValue(e.Value, e.Value?.GetType() ?? typeof(object));
-                node[k] = v;
-            }
+                node[CaptureValue(e.Key, e.Key?.GetType() ?? typeof(object))] = CaptureValue(e.Value, e.Value?.GetType() ?? typeof(object));
             return node;
         }
 
-        // If declared type is dictionary-like but runtime isn't IDictionary, it's an error.
         if (SerializableGraph.TryGetDictionaryTypes(t, out _, out _))
-        {
-            throw new InvalidOperationException(
-                $"CaptureValue: Declared type is dictionary-like ('{t.FullName}') but runtime value is not IDictionary ('{value.GetType().FullName}').");
-        }
+            throw new InvalidOperationException($"CaptureValue: Declared type is dictionary-like ('{t.FullName}') but runtime value is not IDictionary ('{value.GetType().FullName}').");
 
-        // Polymorphic ISerializable wrapper uses Dictionary<string, object?> in-memory.
         if (value is ISerializable s)
         {
             return new Dictionary<string, object?>(2, StringComparer.Ordinal)
@@ -336,8 +332,7 @@ public interface ISerializable
             };
         }
 
-        if (t.IsValueType)
-            return value;
+        if (t.IsValueType) return value;
 
         throw new InvalidOperationException($"Unsupported CaptureValue type: {t.FullName}");
     }
@@ -353,11 +348,7 @@ public interface ISerializable
             throw new InvalidOperationException($"RestoreValue failed: value-type '{t.FullName}' cannot be null.");
         }
 
-        if (t.IsEnum)
-        {
-            var n = Convert.ToInt64(raw);
-            return Enum.ToObject(t, n);
-        }
+        if (t.IsEnum) return Enum.ToObject(t, Convert.ToInt64(raw));
 
         if (SerializableGraph.IsAllowedPrimitive(t))
         {
@@ -379,14 +370,12 @@ public interface ISerializable
 
             throw new InvalidOperationException($"Unexpected primitive type: {t.FullName}");
         }
-        
+
         if (SerializableGraph.IsSerializingState(t))
         {
             if (raw is SerializingState ss) return ss;
-            throw new InvalidOperationException(
-                $"RestoreValue failed: expected SerializingState node for '{t.FullName}', got '{raw.GetType().FullName}'.");
+            throw new InvalidOperationException($"RestoreValue failed: expected SerializingState node for '{t.FullName}', got '{raw.GetType().FullName}'.");
         }
-
 
         if (t.IsArray)
         {
@@ -395,8 +384,7 @@ public interface ISerializable
 
             var elemType = t.GetElementType()!;
             var arr = Array.CreateInstance(elemType, list.Count);
-
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
                 arr.SetValue(RestoreValue(list[i], elemType), i);
 
             return arr;
@@ -410,7 +398,7 @@ public interface ISerializable
             var concreteType = typeof(List<>).MakeGenericType(listElem);
             var concrete = (IList)Activator.CreateInstance(concreteType)!;
 
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
                 concrete.Add(RestoreValue(list[i], listElem));
 
             return concrete;
@@ -425,11 +413,7 @@ public interface ISerializable
             var concrete = (IDictionary)Activator.CreateInstance(concreteType)!;
 
             foreach (DictionaryEntry e in rawDict)
-            {
-                var rk = RestoreValue(e.Key, keyType);
-                var rv = RestoreValue(e.Value, valueType);
-                concrete.Add(rk!, rv);
-            }
+                concrete.Add(RestoreValue(e.Key, keyType)!, RestoreValue(e.Value, valueType));
 
             return concrete;
         }
@@ -454,12 +438,11 @@ public interface ISerializable
             return inst;
         }
 
-        if (t.IsValueType)
-            return raw;
+        if (t.IsValueType) return raw;
 
         throw new InvalidOperationException($"Unsupported RestoreValue type: {t.FullName}");
     }
-    
+
     private static Dictionary<string, object?> CoerceToStringKeyDictionary(object raw)
     {
         if (raw is Dictionary<string, object?> sdict) return sdict;
@@ -471,8 +454,7 @@ public interface ISerializable
             foreach (DictionaryEntry e in dict)
             {
                 if (e.Key is not string k)
-                    throw new InvalidOperationException(
-                        $"Serializable wrapper dict keys must be strings. Got key type: {e.Key?.GetType().FullName ?? "null"}");
+                    throw new InvalidOperationException($"Serializable wrapper dict keys must be strings. Got key type: {e.Key?.GetType().FullName ?? "null"}");
 
                 result[k] = e.Value;
             }
@@ -480,19 +462,39 @@ public interface ISerializable
             return result;
         }
 
-        throw new InvalidOperationException(
-            $"Serializable wrapper must be a dictionary. Got: {raw.GetType().FullName}");
+        throw new InvalidOperationException($"Serializable wrapper must be a dictionary. Got: {raw.GetType().FullName}");
     }
-    
-    public static ISerializable CreateSerializableInstance(Type runtimeType)
+
+    #endregion
+
+    #region Restore Hooks
+
+    private void InvokeAfterRestoreHooks()
     {
-        try
+        const BindingFlags declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        var type = GetType();
+
+        var chain = new List<Type>(8);
+        for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+            chain.Add(t);
+        chain.Reverse();
+
+        foreach (var t in chain)
         {
-            return (ISerializable)Activator.CreateInstance(runtimeType, nonPublic: true)!;
-        }
-        catch
-        {
-            return (ISerializable)RuntimeHelpers.GetUninitializedObject(runtimeType);
+            foreach (var m in t.GetMethods(declared))
+            {
+                if (m.GetCustomAttribute<OnSerializableRestored>(inherit: true) == null)
+                    continue;
+
+                if (m.GetParameters().Length != 0)
+                    throw new InvalidOperationException($"{type.FullName}.{m.Name} must have 0 parameters.");
+                if (m.ReturnType != typeof(void))
+                    throw new InvalidOperationException($"{type.FullName}.{m.Name} must return void.");
+
+                m.Invoke(this, null);
+            }
         }
     }
+
+    #endregion
 }

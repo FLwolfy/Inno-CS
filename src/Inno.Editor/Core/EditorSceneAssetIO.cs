@@ -13,14 +13,21 @@ public static class EditorSceneAssetIO
 {
     /// <summary>
     /// Relative path (to AssetManager.assetDirectory) of the currently opened scene.
-    /// Null when the active scene has never been saved/opened from disk.
+    /// Null when the active scene has never been opened from disk (or has no bound asset path).
     /// </summary>
     public static string? currentScenePath { get; private set; }
 
+    /// <summary>
+    /// Save the currently opened scene to its bound asset path.
+    /// This requires the scene to have been opened from disk (currentScenePath != null).
+    /// </summary>
     public static bool SaveActiveScene()
     {
         if (string.IsNullOrWhiteSpace(currentScenePath))
-            return SaveActiveSceneAsDefaultFolder();
+        {
+            Log.Warn("Save failed: no bound scene path. Please open a scene first (or use Save As).");
+            return false;
+        }
 
         return SaveActiveSceneAs(currentScenePath);
     }
@@ -63,13 +70,13 @@ public static class EditorSceneAssetIO
             Log.Warn("Save failed: no active scene.");
             return false;
         }
-        
+
         if (EditorManager.mode != EditorMode.Edit)
         {
             Log.Warn("Save is only allowed in Edit mode.");
             return false;
         }
-        
+
         relativePath = NormalizeRelativePath(relativePath);
         if (!relativePath.EndsWith(".scene", StringComparison.OrdinalIgnoreCase))
             relativePath += ".scene";
@@ -81,12 +88,13 @@ public static class EditorSceneAssetIO
 
         if (result)
         {
+            currentScenePath = relativePath; // bind path after successful save
             Log.Info($"Scene saved: {relativePath}");
             return true;
         }
         else
         {
-            Log.Warn($"Scene saved: {relativePath} failed to save.");
+            Log.Warn($"Scene save failed: {relativePath}");
             return false;
         }
     }
@@ -94,19 +102,19 @@ public static class EditorSceneAssetIO
     public static bool OpenScene(string relativePath)
     {
         relativePath = NormalizeRelativePath(relativePath);
-        
+
         // If user is playing, stop first.
         if (EditorManager.mode != EditorMode.Edit)
         {
             EditorRuntimeController.Stop();
         }
-        
+
         if (!AssetManager.Load<SceneAsset>(relativePath))
         {
             Log.Error($"Failed to load scene asset: {relativePath}");
             return false;
         }
-        
+
         var sceneRef = AssetManager.Get<SceneAsset>(relativePath);
         var sceneAsset = sceneRef.Resolve();
         if (sceneAsset == null)
@@ -114,16 +122,16 @@ public static class EditorSceneAssetIO
             Log.Error($"Failed to resolve scene asset: {relativePath}");
             return false;
         }
-        
+
         var sceneState = SerializingState.Deserialize(sceneAsset.assetBinaries);
-        
+
         var active = SceneManager.CreateScene();
         ((ISerializable)active).RestoreState(sceneState);
         SceneManager.SetActiveScene(active);
-        
+
         EditorManager.selection.Deselect();
-        
-        currentScenePath = relativePath;
+
+        currentScenePath = relativePath; // bind path after successful open
         Log.Info($"Scene opened: {relativePath}");
         return true;
     }

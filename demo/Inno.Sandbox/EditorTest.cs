@@ -27,11 +27,11 @@ public class EditorTest
     
     private class TestEngineCore : EngineCore
     {
-        private TestEditorLayer m_editorLayer = null!;
+        private EditorLayer m_editorLayer = null!;
         
         protected override void Setup()
         {
-            m_editorLayer = new TestEditorLayer(GetImplementedPlatform());
+            m_editorLayer = new EditorLayer(GetImplementedPlatform());
         }
         protected override void RegisterLayers(LayerStack layerStack)
         {

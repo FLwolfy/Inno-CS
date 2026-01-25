@@ -2,52 +2,112 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Linq;
+using System.Text;
 
 namespace Inno.Core.Serialization;
 
+/// <summary>
+/// Represents a deterministic, serializable state tree used by the engine serialization layer.
+/// </summary>
 public sealed record SerializingState
 {
+    #region Constants
+
     private const string INNO_MAGIC_HEADER = "INNO";
     private const int SERIALIZATION_VERSION = 1;
 
+    #endregion
+
+    #region Public State
+
+    /// <summary>
+    /// Gets the root value map of this state.
+    /// </summary>
     public IReadOnlyDictionary<string, object?> values { get; }
 
+    #endregion
+
+    #region Construction
+
+    /// <summary>
+    /// Initializes a new <see cref="SerializingState"/> instance.
+    /// </summary>
+    /// <param name="values">The root key/value map.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
     public SerializingState(IReadOnlyDictionary<string, object?> values)
     {
         this.values = values ?? throw new ArgumentNullException(nameof(values));
     }
 
+    #endregion
+
+    #region Public Queries
+
+    /// <summary>
+    /// Tests whether a key exists in the root map.
+    /// </summary>
+    /// <param name="key">The key to look up.</param>
+    /// <returns><see langword="true"/> if the key exists; otherwise <see langword="false"/>.</returns>
     public bool Contains(string key) => values.ContainsKey(key);
 
+    /// <summary>
+    /// Attempts to get a value from the root map.
+    /// </summary>
+    /// <param name="key">The key to look up.</param>
+    /// <param name="value">The resolved value.</param>
+    /// <returns><see langword="true"/> if found; otherwise <see langword="false"/>.</returns>
     public bool TryGetValue(string key, out object? value) => values.TryGetValue(key, out value);
 
+    /// <summary>
+    /// Gets a typed value from the root map.
+    /// </summary>
+    /// <typeparam name="T">The expected value type.</typeparam>
+    /// <param name="key">The key to look up.</param>
+    /// <returns>The value cast to <typeparamref name="T"/>.</returns>
+    /// <exception cref="KeyNotFoundException">Thrown when the key is missing.</exception>
+    /// <exception cref="InvalidCastException">Thrown when the stored value is not assignable to <typeparamref name="T"/>.</exception>
+    /// <example>
+    /// <code>
+    /// var sceneName = state.GetValue&lt;string&gt;("sceneName");
+    /// </code>
+    /// </example>
     public T GetValue<T>(string key)
     {
         if (!values.TryGetValue(key, out var v))
             throw new KeyNotFoundException(key);
 
-        if (v is T t) return t;
+        if (v is T t)
+            return t;
 
-        throw new InvalidCastException(
-            $"State value '{key}' is {v?.GetType().FullName}, expected {typeof(T).FullName}");
+        throw new InvalidCastException($"State value '{key}' is {v?.GetType().FullName}, expected {typeof(T).FullName}");
     }
 
-    // =====================================================================
-    //  Public Binary API lives here (keep stable)
-    // =====================================================================
+    #endregion
+
+    #region Public Binary API
 
     /// <summary>
-    /// Serializes this state into a deterministic binary format.
+    /// Serializes a state into a deterministic binary representation.
     /// </summary>
+    /// <param name="state">The state to serialize.</param>
+    /// <returns>The encoded bytes.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="state"/> is null.</exception>
+    /// <example>
+    /// <code>
+    /// var bytes = SerializingState.Serialize(state);
+    /// File.WriteAllBytes(path, bytes);
+    /// </code>
+    /// </example>
     public static byte[] Serialize(SerializingState state)
     {
+        if (state == null) throw new ArgumentNullException(nameof(state));
+
         using var ms = new MemoryStream(16 * 1024);
         using var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true);
 
-        bw.Write(INNO_MAGIC_HEADER);     // Magic
-        bw.Write(SERIALIZATION_VERSION); // Version
+        bw.Write(INNO_MAGIC_HEADER);
+        bw.Write(SERIALIZATION_VERSION);
 
         BinaryCodec.WriteState(bw, state);
 
@@ -56,8 +116,18 @@ public sealed record SerializingState
     }
 
     /// <summary>
-    /// Internal binary decode (kept internal to avoid expanding public API surface).
+    /// Deserializes a state from a binary representation.
     /// </summary>
+    /// <param name="bytes">The encoded bytes.</param>
+    /// <returns>The decoded state.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="bytes"/> is null.</exception>
+    /// <exception cref="InvalidDataException">Thrown when the data is invalid or the version is unsupported.</exception>
+    /// <example>
+    /// <code>
+    /// var bytes = File.ReadAllBytes(path);
+    /// var state = SerializingState.Deserialize(bytes);
+    /// </code>
+    /// </example>
     public static SerializingState Deserialize(byte[] bytes)
     {
         if (bytes == null) throw new ArgumentNullException(nameof(bytes));
@@ -69,33 +139,30 @@ public sealed record SerializingState
         if (!string.Equals(magic, INNO_MAGIC_HEADER, StringComparison.Ordinal))
             throw new InvalidDataException($"Invalid state magic header '{magic}'.");
 
-        int ver = br.ReadInt32();
+        var ver = br.ReadInt32();
         if (ver != SERIALIZATION_VERSION)
             throw new InvalidDataException($"Unsupported state serialization version {ver} (expected {SERIALIZATION_VERSION}).");
 
         return BinaryCodec.ReadState(br);
     }
 
-    // =====================================================================
-    //  Binary codec internals (used by SerializingState only)
-    // =====================================================================
+    #endregion
+
+    #region Binary Codec
 
     private static class BinaryCodec
     {
         private enum BinKind : byte
         {
             Null = 0,
-
             Primitive = 1,
             Enum = 2,
-
             Array = 10,
             List = 11,
             Dict = 12,
-
             State = 20,
             Serializable = 21,
-            Struct = 22,
+            Struct = 22
         }
 
         private enum PrimKind : byte
@@ -113,19 +180,18 @@ public sealed record SerializingState
             Double = 11,
             Decimal = 12,
             String = 13,
-            Guid = 14,
+            Guid = 14
         }
 
         internal static void WriteState(BinaryWriter bw, SerializingState state)
         {
             bw.Write((byte)BinKind.State);
 
-            // Deterministic ordering
-            var keys = new List<string>(state.values.Keys);
+            var keys = state.values.Keys.ToList();
             keys.Sort(StringComparer.Ordinal);
 
             bw.Write(keys.Count);
-            for (int i = 0; i < keys.Count; i++)
+            for (var i = 0; i < keys.Count; i++)
             {
                 var k = keys[i];
                 bw.Write(k);
@@ -140,15 +206,11 @@ public sealed record SerializingState
             if (kind != BinKind.State)
                 throw new InvalidDataException($"Expected State node, got {kind}.");
 
-            int count = br.ReadInt32();
+            var count = br.ReadInt32();
             var map = new Dictionary<string, object?>(System.Math.Max(0, count), StringComparer.Ordinal);
 
-            for (int i = 0; i < count; i++)
-            {
-                var key = br.ReadString();
-                var val = ReadNode(br);
-                map[key] = val;
-            }
+            for (var i = 0; i < count; i++)
+                map[br.ReadString()] = ReadNode(br);
 
             return new SerializingState(map);
         }
@@ -189,7 +251,7 @@ public sealed record SerializingState
                 var arr = (Array)value;
                 bw.Write((byte)BinKind.Array);
                 bw.Write(arr.Length);
-                for (int i = 0; i < arr.Length; i++)
+                for (var i = 0; i < arr.Length; i++)
                     WriteNode(bw, arr.GetValue(i));
                 return;
             }
@@ -198,21 +260,15 @@ public sealed record SerializingState
             {
                 bw.Write((byte)BinKind.Dict);
 
-                // For determinism: if all keys are string, sort by ordinal key.
                 var entries = new List<DictionaryEntry>(dict.Count);
                 foreach (DictionaryEntry e in dict) entries.Add(e);
 
-                bool allStringKey = true;
-                for (int i = 0; i < entries.Count; i++)
-                {
-                    if (entries[i].Key is not string) { allStringKey = false; break; }
-                }
-
+                var allStringKey = entries.All(e => e.Key is string);
                 if (allStringKey)
                     entries.Sort((a, b) => StringComparer.Ordinal.Compare((string)a.Key, (string)b.Key));
 
                 bw.Write(entries.Count);
-                for (int i = 0; i < entries.Count; i++)
+                for (var i = 0; i < entries.Count; i++)
                 {
                     WriteNode(bw, entries[i].Key);
                     WriteNode(bw, entries[i].Value);
@@ -228,7 +284,7 @@ public sealed record SerializingState
 
                 bw.Write((byte)BinKind.List);
                 bw.Write(tmp.Count);
-                for (int i = 0; i < tmp.Count; i++)
+                for (var i = 0; i < tmp.Count; i++)
                     WriteNode(bw, tmp[i]);
 
                 return;
@@ -258,14 +314,14 @@ public sealed record SerializingState
 
                 bw.Write(fields.Length + props.Length);
 
-                for (int i = 0; i < fields.Length; i++)
+                for (var i = 0; i < fields.Length; i++)
                 {
                     var f = fields[i];
                     bw.Write("F:" + f.Name);
                     WriteNode(bw, f.GetValue(value));
                 }
 
-                for (int i = 0; i < props.Length; i++)
+                for (var i = 0; i < props.Length; i++)
                 {
                     var p = props[i];
                     bw.Write("P:" + p.Name);
@@ -294,43 +350,37 @@ public sealed record SerializingState
                     var enumTypeName = br.ReadString();
                     var enumType = Type.GetType(enumTypeName)
                                    ?? throw new InvalidDataException($"Could not resolve enum type '{enumTypeName}'.");
-                    var n = br.ReadInt64();
-                    return Enum.ToObject(enumType, n);
+                    return Enum.ToObject(enumType, br.ReadInt64());
                 }
 
                 case BinKind.Array:
                 {
-                    int len = br.ReadInt32();
+                    var len = br.ReadInt32();
                     var arr = new object?[len];
-                    for (int i = 0; i < len; i++)
+                    for (var i = 0; i < len; i++)
                         arr[i] = ReadNode(br);
                     return arr;
                 }
 
                 case BinKind.List:
                 {
-                    int count = br.ReadInt32();
+                    var count = br.ReadInt32();
                     var list = new List<object?>(System.Math.Max(0, count));
-                    for (int i = 0; i < count; i++)
+                    for (var i = 0; i < count; i++)
                         list.Add(ReadNode(br));
                     return list;
                 }
 
                 case BinKind.Dict:
                 {
-                    int count = br.ReadInt32();
+                    var count = br.ReadInt32();
                     var map = new Dictionary<object?, object?>(System.Math.Max(0, count));
-                    for (int i = 0; i < count; i++)
-                    {
-                        var k = ReadNode(br);
-                        var v = ReadNode(br);
-                        map[k] = v;
-                    }
+                    for (var i = 0; i < count; i++)
+                        map[ReadNode(br)] = ReadNode(br);
                     return map;
                 }
 
                 case BinKind.State:
-                    // We already consumed the kind byte; delegate to a variant that assumes it.
                     return ReadStateAfterKind(br);
 
                 case BinKind.Serializable:
@@ -360,15 +410,11 @@ public sealed record SerializingState
 
         private static SerializingState ReadStateAfterKind(BinaryReader br)
         {
-            int count = br.ReadInt32();
+            var count = br.ReadInt32();
             var map = new Dictionary<string, object?>(System.Math.Max(0, count), StringComparer.Ordinal);
 
-            for (int i = 0; i < count; i++)
-            {
-                var key = br.ReadString();
-                var val = ReadNode(br);
-                map[key] = val;
-            }
+            for (var i = 0; i < count; i++)
+                map[br.ReadString()] = ReadNode(br);
 
             return new SerializingState(map);
         }
@@ -386,7 +432,7 @@ public sealed record SerializingState
 
             object boxed = Activator.CreateInstance(t)!;
 
-            int memberCount = br.ReadInt32();
+            var memberCount = br.ReadInt32();
 
             var fieldMap = SerializableGraph.GetStructSerializableFields(t)
                 .ToDictionary(f => "F:" + f.Name, f => f, StringComparer.Ordinal);
@@ -394,7 +440,7 @@ public sealed record SerializingState
             var propMap = SerializableGraph.GetStructSerializableProperties(t)
                 .ToDictionary(p => "P:" + p.Name, p => p, StringComparer.Ordinal);
 
-            for (int i = 0; i < memberCount; i++)
+            for (var i = 0; i < memberCount; i++)
             {
                 var key = br.ReadString();
                 var val = ReadNode(br);
@@ -414,8 +460,6 @@ public sealed record SerializingState
                         pi.SetValue(boxed, val);
                     continue;
                 }
-
-                // Unknown member: ignore for forward compatibility.
             }
 
             return boxed;
@@ -469,4 +513,6 @@ public sealed record SerializingState
             };
         }
     }
+
+    #endregion
 }
