@@ -32,24 +32,26 @@ public class HierarchyPanel : EditorPanel
         m_branch.Clear();
 
         ImGuiNet.BeginChild("##HierarchyScroll", new Vector2(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.HorizontalScrollbar);
-        
+
+        // Split draw channels: 0 = background (stripes), 1 = normal content (tree/items/drag highlight)
+        var dl = ImGuiNet.GetWindowDrawList();
+        dl.ChannelsSplit(2);
+        dl.ChannelsSetCurrent(1);
+
         var activeScene = SceneManager.GetActiveScene();
 
         if (activeScene != null)
         {
-            // Scene root
             DrawSceneRoot();
-
-            // Scene object
             foreach (var obj in activeScene.GetAllRootGameObjects())
-            {
                 DrawGameObject(obj);
-            }
         }
 
-        // Menu
         HandleMenu();
         while (m_pendingGuiUpdateAction.Count > 0) m_pendingGuiUpdateAction.Dequeue().Invoke();
+
+        // Merge channels back
+        dl.ChannelsMerge();
 
         ImGuiNet.EndChild();
     }
@@ -200,10 +202,15 @@ public class HierarchyPanel : EditorPanel
         var p = ImGuiNet.GetCursorScreenPos();
         float hh = ImGuiNet.GetFrameHeight();
 
-        ImGuiNet.GetWindowDrawList().AddRectFilled(
+        var dl = ImGuiNet.GetWindowDrawList();
+
+        // Draw stripe on background channel so it never covers drag/hover highlight
+        dl.ChannelsSetCurrent(0);
+        dl.AddRectFilled(
             new Vector2(winPos.X, p.Y),
             new Vector2(winPos.X + winSize.X, p.Y + hh),
             ImGuiNet.GetColorU32(col)
         );
+        dl.ChannelsSetCurrent(1);
     }
 }

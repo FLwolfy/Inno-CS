@@ -842,7 +842,7 @@ public static class EditorGUILayout
     /// <summary>
     /// Draws a GUID drop target field.
     /// </summary>
-    public static bool GuidDrop(
+    public static bool GuidRef(
         string label,
         string payloadType,
         ref Guid value,

@@ -23,11 +23,10 @@ public sealed class FileBrowserPanel : EditorPanel
     public const string C_ASSET_GUID_TYPE = "FileAssetGUID";
 
     // Splitter
-    private const float C_SPLITTER_DEFAULT_WIDTH = 280f;
     private const float C_SPLITTER_WIDTH = 3f;
     private const float C_LEFT_MIN_WIDTH = 10f;
     private const float C_RIGHT_MIN_WIDTH = 20f;
-    private float m_leftWidth;
+    private float m_leftWidth = -1f; // first frame init to half of window width
     private float m_leftRatio = -1f; // keep ratio when window resizes
 
     // Grid
@@ -76,6 +75,8 @@ public sealed class FileBrowserPanel : EditorPanel
     private string? m_renameTargetPath;
     private string m_renameBuffer = "";
     private string? m_deleteTargetPath;
+    private bool m_requestOpenRenamePopup;
+    private bool m_requestOpenDeletePopup;
 
     private enum ViewMode { Grid, List }
     private enum SortField { Name, Type, Source }
@@ -115,9 +116,6 @@ public sealed class FileBrowserPanel : EditorPanel
         // Selection
         m_selectedPath = null;
 
-        // UI
-        m_leftWidth = ImGuiHost.GetStorageData("Editor.File.SplitterLeftWidth", C_SPLITTER_DEFAULT_WIDTH);
-
         PushHistory(m_currentDir);
 
         // Snapshot refresh is driven by AssetManager's single watcher (coalesced).
@@ -136,10 +134,24 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGuiNet.BeginChild("##FileBrowserBody", new Vector2(0, bodyH));
 
+        // First-time init: left panel defaults to half of current window width
         var region = ImGuiNet.GetContentRegionAvail();
         float totalW = Math.Max(0f, region.X);
-        if (m_leftRatio < 0f && totalW > 0f)
-            m_leftRatio = Math.Clamp(m_leftWidth / totalW, 0f, 1f);
+        if (totalW > 0f)
+        {
+            if (m_leftWidth < 0f || m_leftRatio < 0f)
+            {
+                m_leftRatio = 0.5f;
+                m_leftWidth = Math.Clamp(totalW * m_leftRatio, C_LEFT_MIN_WIDTH, Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH));
+            }
+            else
+            {
+                // If ratio was not set, derive it from current width
+                if (m_leftRatio < 0f)
+                    m_leftRatio = Math.Clamp(m_leftWidth / totalW, 0f, 1f);
+            }
+        }
+
 
         // Left: tree
         {
@@ -960,14 +972,20 @@ public sealed class FileBrowserPanel : EditorPanel
     {
         m_renameTargetPath = pathNormalized;
         m_renameBuffer = Path.GetFileName(pathNormalized);
-        ImGuiNet.OpenPopup("Rename##popup");
+        m_requestOpenRenamePopup = true;
     }
 
     private void DrawRenamePopup()
     {
+        if (m_requestOpenRenamePopup)
+        {
+            ImGuiNet.OpenPopup("Rename##popup");
+            m_requestOpenRenamePopup = false;
+        }
+        
         if (!ImGuiNet.BeginPopupModal("Rename##popup", ImGuiWindowFlags.AlwaysAutoResize))
             return;
-
+        
         ImGuiNet.TextUnformatted("New name:");
         ImGuiNet.SetNextItemWidth(360f);
         ImGuiNet.InputText("##rename", ref m_renameBuffer, 256);
@@ -1040,11 +1058,17 @@ public sealed class FileBrowserPanel : EditorPanel
     private void BeginDelete(string pathNormalized)
     {
         m_deleteTargetPath = pathNormalized;
-        ImGuiNet.OpenPopup("Delete##popup");
+        m_requestOpenDeletePopup = true;
     }
 
     private void DrawDeletePopup()
     {
+        if (m_requestOpenDeletePopup)
+        {
+            ImGuiNet.OpenPopup("Delete##popup");
+            m_requestOpenDeletePopup = false;
+        }
+        
         if (!ImGuiNet.BeginPopupModal("Delete##popup", ImGuiWindowFlags.AlwaysAutoResize))
             return;
 
@@ -1072,6 +1096,41 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGuiNet.EndPopup();
     }
+    
+    private void DeleteFolderByInternalDelete(string folderNormalized)
+    {
+        string folderNative = ToNativePath(folderNormalized);
+        if (!Directory.Exists(folderNative))
+            return;
+
+        // 1) Delete files first (internal delete)
+        foreach (var file in Directory.GetFiles(folderNative))
+        {
+            if (IsHidden(file)) continue;
+            if (IsEditorFilteredFile(file)) continue;
+
+            TryDelete(NormalizePath(file));
+        }
+
+        // 2) Recurse into subfolders (post-order)
+        foreach (var dir in Directory.GetDirectories(folderNative))
+        {
+            if (IsHidden(dir)) continue;
+            DeleteFolderByInternalDelete(NormalizePath(dir));
+        }
+        
+        // TODO: This is buggy due to async-delete file system,
+        // try move all create/rename/delete logics to AssetFileSystem
+        // 3) Finally delete this (now-empty) folder
+        try
+        {
+            Directory.Delete(folderNative, recursive: false);
+        }
+        catch (Exception e)
+        {
+            Log.Error(e.Message);
+        }
+    }
 
     private void TryDelete(string pathNormalized)
     {
@@ -1083,8 +1142,8 @@ public sealed class FileBrowserPanel : EditorPanel
 
             if (Directory.Exists(native))
             {
-                Directory.Delete(native, recursive: true);
-                deleted = true;
+                DeleteFolderByInternalDelete(pathNormalized);
+                deleted = !Directory.Exists(native);
             }
             else if (File.Exists(native))
             {
@@ -1155,7 +1214,6 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             float delta = ImGuiNet.GetIO().MouseDelta.X;
             leftWidth = Math.Clamp(leftWidth + delta, minLeft, maxLeft);
-            ImGuiHost.SetStorageData("Editor.File.SplitterLeftWidth", leftWidth);
         }
 
         if (ImGuiNet.IsItemHovered())

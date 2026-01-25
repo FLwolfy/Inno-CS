@@ -21,7 +21,7 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
             Guid spriteGuid = sprite.texture?.guid ?? Guid.Empty;
             string? displayName = sprite.texture?.name;
             EditorGUILayout.Indent(16);
-            if (EditorGUILayout.GuidDrop("source", FileBrowserPanel.C_ASSET_GUID_TYPE, ref spriteGuid, displayName, enabled))
+            if (EditorGUILayout.GuidRef("source", FileBrowserPanel.C_ASSET_GUID_TYPE, ref spriteGuid, displayName, enabled))
             {
                 var assetRef = AssetManager.Get<TextureAsset>(spriteGuid);
                 if (!assetRef.isValid)
