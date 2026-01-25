@@ -17,20 +17,15 @@ public class TransformEditor : ComponentEditor
         if (EditorGUILayout.CollapsingHeader(compName))
         {
             var serializedProps = ((ISerializable)comp).GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
-            if (serializedProps.Count == 0)
-            {
-                EditorGUILayout.Label("No editable properties.");
-            }
             
             foreach (var prop in serializedProps)
             {
+                if (prop.visibility != SerializedProperty.PropertyVisibility.Show)
+                    continue;
+                
                 if (PropertyRendererRegistry.TryGetRenderer(prop.propertyType, out var renderer))
                 {
                     renderer!.Bind(prop.name, () => prop.GetValue(), val => prop.SetValue(val), prop.visibility == SerializedProperty.PropertyVisibility.Show);
-                }
-                else
-                {
-                    EditorGUILayout.Label($"No renderer for {prop.name} ({prop.propertyType.Name})");
                 }
             }
         }
