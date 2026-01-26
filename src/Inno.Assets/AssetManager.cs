@@ -28,6 +28,7 @@ public static class AssetManager
     private static readonly Dictionary<Guid, InnoAsset> EMBEDDED_ASSETS = new();
 
     private static AssetFileSystem? m_fs;
+    private static int m_suppressAutoReload;
 
     public static string binDirectory { get; private set; } = null!;
     public static string assetDirectory { get; private set; } = null!;
@@ -69,7 +70,7 @@ public static class AssetManager
         binDirectory = binDir;
 
         m_fs?.Dispose();
-        m_fs = new AssetFileSystem(assetDir);
+        m_fs = new AssetFileSystem(assetDir, binDir);
 
         // forward events (keep external API stable & clean)
         m_fs.AssetDirectoryChanged += ForwardDirectoryChanged;
@@ -334,6 +335,7 @@ public static class AssetManager
         // - Changed: if already loaded -> reload (preserve guid) ; if not loaded but loader exists -> load and register.
         // - Deleted: if loaded -> remove.
         // - Renamed: update mapping; if loaded -> reload under new name preserving guid.
+        if (Volatile.Read(ref m_suppressAutoReload) > 0) return;
         for (int i = 0; i < changes.Count; i++)
         {
             var c = changes[i];
@@ -568,4 +570,153 @@ public static class AssetManager
 
         throw new AmbiguousMatchException($"Embedded resource suffix '{nameOrSuffix}' is ambiguous. Matches: {string.Join(", ", matches)}");
     }
+    
+    #region Asset-aware file operations
+
+    private readonly struct AutoReloadSuppressor : IDisposable
+    {
+        public void Dispose() => Interlocked.Decrement(ref m_suppressAutoReload);
+    }
+
+    private static AutoReloadSuppressor SuppressAutoReload()
+    {
+        Interlocked.Increment(ref m_suppressAutoReload);
+        return new AutoReloadSuppressor();
+    }
+
+    public static bool CreateFolder(string relativeDirectory)
+    {
+        if (m_fs == null) return false;
+
+        using var _ = SuppressAutoReload();
+        return m_fs.CreateDirectory(relativeDirectory);
+    }
+
+    public static bool DeletePath(string relativePath)
+    {
+        if (m_fs == null) return false;
+
+        using var _ = SuppressAutoReload();
+
+        bool ok = m_fs.DeletePath(relativePath);
+        if (!ok) return false;
+
+        RemoveCacheByPrefix(relativePath);
+        return true;
+    }
+
+    public static bool RenamePath(string oldRelativePath, string newRelativePath)
+    {
+        if (m_fs == null) return false;
+
+        using var _ = SuppressAutoReload();
+
+        bool ok = m_fs.RenamePath(oldRelativePath, newRelativePath);
+        if (!ok) return false;
+
+        UpdateCacheByRename(oldRelativePath, newRelativePath);
+        return true;
+    }
+
+    private static void RemoveCacheByPrefix(string relativePath)
+    {
+        relativePath = NormalizeRel(relativePath);
+
+        lock (SYNC)
+        {
+            if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
+            {
+                PATH_TO_GUID.Remove(relativePath);
+                LOADED_ASSETS.Remove(guid);
+            }
+
+            string prefix = relativePath.Length == 0 ? "" : (relativePath + "/");
+            if (prefix.Length == 0) return;
+
+            var toRemove = PATH_TO_GUID.Keys
+                .Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            for (int i = 0; i < toRemove.Count; i++)
+            {
+                string k = toRemove[i];
+                if (PATH_TO_GUID.TryGetValue(k, out var g))
+                    LOADED_ASSETS.Remove(g);
+
+                PATH_TO_GUID.Remove(k);
+            }
+        }
+    }
+
+    private static void UpdateCacheByRename(string oldRelativePath, string newRelativePath)
+    {
+        oldRelativePath = NormalizeRel(oldRelativePath);
+        newRelativePath = NormalizeRel(newRelativePath);
+
+        lock (SYNC)
+        {
+            if (PATH_TO_GUID.TryGetValue(oldRelativePath, out var guid))
+            {
+                PATH_TO_GUID.Remove(oldRelativePath);
+                PATH_TO_GUID[newRelativePath] = guid;
+
+                if (LOADED_ASSETS.TryGetValue(guid, out var a))
+                    a.SetSourcePath(newRelativePath);
+
+                return;
+            }
+
+            string oldPrefix = oldRelativePath.Length == 0 ? "" : (oldRelativePath + "/");
+            if (oldPrefix.Length == 0) return;
+
+            var toMove = PATH_TO_GUID.Keys
+                .Where(k => k.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            for (int i = 0; i < toMove.Count; i++)
+            {
+                string oldKey = toMove[i];
+                var g = PATH_TO_GUID[oldKey];
+
+                string suffix = oldKey.Substring(oldPrefix.Length);
+                string newKey = (newRelativePath.Length == 0 ? "" : (newRelativePath.TrimEnd('/') + "/")) + suffix;
+
+                PATH_TO_GUID.Remove(oldKey);
+                PATH_TO_GUID[newKey] = g;
+
+                if (LOADED_ASSETS.TryGetValue(g, out var a) && a.sourcePath.Equals(oldKey, StringComparison.OrdinalIgnoreCase))
+                    a.SetSourcePath(newKey);
+            }
+        }
+    }
+
+    private static string NormalizeRel(string relativePath)
+    {
+        relativePath = (relativePath ?? string.Empty).Replace('\\', '/').Trim();
+        relativePath = relativePath.TrimStart('/');
+        while (relativePath.Contains("//", StringComparison.Ordinal))
+            relativePath = relativePath.Replace("//", "/", StringComparison.Ordinal);
+        return relativePath.TrimEnd('/');
+    }
+
+    #endregion
+    
+    public static string ToRelativePathFromAssetDirectory(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return string.Empty;
+
+        string rel = Path.GetRelativePath(assetDirectory, fullPath);
+        return NormalizeAssetRelativePath(rel);
+    }
+
+    public static string NormalizeAssetRelativePath(string relativePath)
+    {
+        relativePath = (relativePath ?? string.Empty).Replace('\\', '/').Trim();
+        relativePath = relativePath.TrimStart('/');
+        while (relativePath.Contains("//", StringComparison.Ordinal))
+            relativePath = relativePath.Replace("//", "/", StringComparison.Ordinal);
+        return relativePath.TrimEnd('/');
+    }
+
 }

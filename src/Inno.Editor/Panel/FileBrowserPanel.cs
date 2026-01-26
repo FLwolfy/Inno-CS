@@ -1024,30 +1024,16 @@ public sealed class FileBrowserPanel : EditorPanel
             if (IsSamePath(oldPathNormalized, newPathNorm))
                 return;
 
-            string oldNative = ToNativePath(oldPathNormalized);
-            string newNative = ToNativePath(newPathNorm);
+            string oldRel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(oldPathNormalized));
+            string newRel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(newPathNorm));
 
-            bool renamed = false;
+            if (!AssetManager.RenamePath(oldRel, newRel))
+                return;
 
-            if (Directory.Exists(oldNative))
-            {
-                Directory.Move(oldNative, newNative);
-                renamed = true;
-            }
-            else if (File.Exists(oldNative))
-            {
-                File.Move(oldNative, newNative);
-                renamed = true;
-            }
+            if (IsSelected(oldPathNormalized))
+                SelectPath(newPathNorm);
 
-            if (renamed)
-            {
-                // keep selection on renamed item
-                if (IsSelected(oldPathNormalized))
-                    SelectPath(newPathNorm);
-
-                RefreshSnapshot(force: true);
-            }
+            RefreshSnapshot(force: true);
         }
         catch (Exception e)
         {
@@ -1096,68 +1082,20 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGuiNet.EndPopup();
     }
-    
-    private void DeleteFolderByInternalDelete(string folderNormalized)
-    {
-        string folderNative = ToNativePath(folderNormalized);
-        if (!Directory.Exists(folderNative))
-            return;
-
-        // 1) Delete files first (internal delete)
-        foreach (var file in Directory.GetFiles(folderNative))
-        {
-            if (IsHidden(file)) continue;
-            if (IsEditorFilteredFile(file)) continue;
-
-            TryDelete(NormalizePath(file));
-        }
-
-        // 2) Recurse into subfolders (post-order)
-        foreach (var dir in Directory.GetDirectories(folderNative))
-        {
-            if (IsHidden(dir)) continue;
-            DeleteFolderByInternalDelete(NormalizePath(dir));
-        }
-        
-        // TODO: This is buggy due to async-delete file system,
-        // try move all create/rename/delete logics to AssetFileSystem
-        // 3) Finally delete this (now-empty) folder
-        try
-        {
-            Directory.Delete(folderNative, recursive: false);
-        }
-        catch (Exception e)
-        {
-            Log.Error(e.Message);
-        }
-    }
 
     private void TryDelete(string pathNormalized)
     {
         try
         {
-            string native = ToNativePath(pathNormalized);
+            string rel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(pathNormalized));
 
-            bool deleted = false;
+            if (!AssetManager.DeletePath(rel))
+                return;
 
-            if (Directory.Exists(native))
-            {
-                DeleteFolderByInternalDelete(pathNormalized);
-                deleted = !Directory.Exists(native);
-            }
-            else if (File.Exists(native))
-            {
-                File.Delete(native);
-                deleted = true;
-            }
+            if (IsSelected(pathNormalized))
+                ClearSelection();
 
-            if (deleted)
-            {
-                if (IsSelected(pathNormalized))
-                    ClearSelection();
-
-                RefreshSnapshot(force: true);
-            }
+            RefreshSnapshot(force: true);
         }
         catch (Exception e)
         {
@@ -1182,12 +1120,13 @@ public sealed class FileBrowserPanel : EditorPanel
                 i++;
             }
 
-            Directory.CreateDirectory(candidateNative);
+            string rel = AssetManager.ToRelativePathFromAssetDirectory(candidateNative);
+            if (!AssetManager.CreateFolder(rel))
+                return;
 
             string candidateNorm = NormalizePath(candidateNative);
             RefreshSnapshot(force: true);
 
-            // select then rename
             SelectFolder(candidateNorm);
             BeginRename(candidateNorm);
         }
