@@ -17,84 +17,72 @@ namespace Inno.Editor.Panel;
 
 public sealed class FileBrowserPanel : EditorPanel
 {
+    /// <summary>
+    /// Gets the panel title.
+    /// </summary>
     public override string title => "File";
-    
-    // Drag typeID
-    public const string C_ASSET_GUID_TYPE = "FileAssetGUID";
 
-    // Splitter
+    /// <summary>
+    /// Drag payload type for asset GUID dragging (files only).
+    /// </summary>
+    public const string ASSET_GUID_PAYLOAD_TYPE = "PAYLOAD:FileAssetGuid";
+    private const string MOVE_PATH_PAYLOAD_TYPE = "PAYLOAD:FileMovePath";
+
     private const float C_SPLITTER_WIDTH = 3f;
     private const float C_LEFT_MIN_WIDTH = 10f;
     private const float C_RIGHT_MIN_WIDTH = 20f;
-    private float m_leftWidth = -1f; // first frame init to half of window width
-    private float m_leftRatio = -1f; // keep ratio when window resizes
+    private float m_leftWidth = -1f;
+    private float m_leftRatio = -1f;
 
-    // Grid
     private const float C_GRID_ICON_SIZE = 54f;
+    private const double C_SNAPSHOT_TTL_SECONDS = 0.5;
+    private const float C_GRID_SCALE_MIN = 0.2f;
+    private const float C_GRID_SCALE_MAX = 5.0f;
+    private float m_gridScale = 1.0f;
 
-    // Root Paths
     private readonly string m_rootPath;
     private string m_currentDir;
     private readonly string m_rootPathNative;
     private string m_currentDirNative;
-
-    // Selection
     private string? m_selectedPath;
 
-    // Reveal selection in tree (one-frame force-open)
     private readonly HashSet<string> m_revealOpenPaths = new(StringComparer.OrdinalIgnoreCase);
     private bool m_revealOpenPending;
 
-    // Cached directory snapshot
-    private const double C_SNAPSHOT_TTL_SECONDS = 0.5;
     private readonly DirectorySnapshot m_snapshot = new();
     private DateTime m_snapshotTime = DateTime.MinValue;
     private readonly List<string> m_history = new();
     private int m_historyIndex = -1;
-
-    // Asset directory change versioning (single source of truth is AssetManager watcher)
     private int m_assetAppliedVersion;
 
-    // Search
     private readonly DirectorySnapshot m_searchSnapshot = new();
     private DateTime m_searchSnapshotTime = DateTime.MinValue;
     private string m_search = "";
     private string m_searchLast = "";
 
-    // View
     private ViewMode m_viewMode = ViewMode.Grid;
     private SortField m_sortField = SortField.Name;
     private bool m_sortAscending = true;
 
-    // Grid scale
-    private const float C_GRID_SCALE_MIN = 0.2f;
-    private const float C_GRID_SCALE_MAX = 5.0f;
-    private float m_gridScale = 1.0f;
-
-    // Rename / Delete UI state
     private string? m_renameTargetPath;
     private string m_renameBuffer = "";
     private string? m_deleteTargetPath;
     private bool m_requestOpenRenamePopup;
     private bool m_requestOpenDeletePopup;
 
+    private readonly Dictionary<Guid, string> m_relByGuid = new();
+
     private enum ViewMode { Grid, List }
     private enum SortField { Name, Type, Source }
 
-    private readonly struct Entry(
-        string fullPath,
-        string name,
-        bool isDir,
-        string type,
-        string source)
+    private struct Entry(string fullPath, string name, bool isDir, string type, string source, Guid? guid)
     {
-        public readonly string fullPath = fullPath;  // normalized
-        public readonly string name = name;          // display name (file/folder name)
+        public readonly string fullPath = fullPath;
+        public readonly string name = name;
         public readonly bool isDir = isDir;
         public readonly string type = type;
-
-        // Finder-like "Source" column: relative to current dir, using "~" prefix
         public readonly string source = source;
+        public readonly Guid? guid = guid;
     }
 
     private sealed class DirectorySnapshot
@@ -103,22 +91,18 @@ public sealed class FileBrowserPanel : EditorPanel
         public void Clear() => entries.Clear();
     }
 
+    #region Lifecycle
+
     internal FileBrowserPanel()
     {
-        // Native paths
         m_rootPathNative = Path.GetFullPath(AssetManager.assetDirectory);
         m_currentDirNative = m_rootPathNative;
 
-        // Normalized paths
         m_rootPath = NormalizePath(m_rootPathNative);
         m_currentDir = m_rootPath;
 
-        // Selection
-        m_selectedPath = null;
-
         PushHistory(m_currentDir);
 
-        // Snapshot refresh is driven by AssetManager's single watcher (coalesced).
         m_assetAppliedVersion = AssetManager.assetDirectoryChangeVersion;
         RefreshSnapshot(force: true);
     }
@@ -128,13 +112,12 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGuiNet.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(10, 10));
         ImGuiNet.BeginChild("##FileBrowserRoot", new Vector2(0, 0));
 
-        float statusH = ImGuiNet.GetFrameHeight(); // fits SmallButton nicely
+        float statusH = ImGuiNet.GetFrameHeight();
         var avail = ImGuiNet.GetContentRegionAvail();
         float bodyH = Math.Max(0f, avail.Y - statusH - 6f);
 
         ImGuiNet.BeginChild("##FileBrowserBody", new Vector2(0, bodyH));
 
-        // First-time init: left panel defaults to half of current window width
         var region = ImGuiNet.GetContentRegionAvail();
         float totalW = Math.Max(0f, region.X);
         if (totalW > 0f)
@@ -142,38 +125,30 @@ public sealed class FileBrowserPanel : EditorPanel
             if (m_leftWidth < 0f || m_leftRatio < 0f)
             {
                 m_leftRatio = 0.5f;
-                m_leftWidth = Math.Clamp(totalW * m_leftRatio, C_LEFT_MIN_WIDTH, Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH));
+                m_leftWidth = Math.Clamp(totalW * m_leftRatio, C_LEFT_MIN_WIDTH,
+                    Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH));
             }
             else
             {
-                // If ratio was not set, derive it from current width
                 if (m_leftRatio < 0f)
                     m_leftRatio = Math.Clamp(m_leftWidth / totalW, 0f, 1f);
             }
         }
 
-
-        // Left: tree
         {
-            ImGuiNet.BeginChild(
-                "##Tree",
-                new Vector2(m_leftWidth, 0),
-                ImGuiChildFlags.None,
-                ImGuiWindowFlags.HorizontalScrollbar
-            );
+            ImGuiNet.BeginChild("##Tree", new Vector2(m_leftWidth, 0), ImGuiChildFlags.None,
+                ImGuiWindowFlags.HorizontalScrollbar);
 
             DrawDirectoryTree(m_rootPathNative, m_rootPath);
             ImGuiNet.EndChild();
         }
 
-        // Clear one-frame reveal request after tree has been rendered
         if (m_revealOpenPending)
         {
             m_revealOpenPending = false;
             m_revealOpenPaths.Clear();
         }
 
-        // Middle: Splitter
         {
             ImGuiNet.SameLine();
             float maxLeft = Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH);
@@ -185,18 +160,12 @@ public sealed class FileBrowserPanel : EditorPanel
                 float maxLeft2 = Math.Max(C_LEFT_MIN_WIDTH, totalW - C_RIGHT_MIN_WIDTH);
 
                 if (draggingSplitter)
-                {
                     m_leftRatio = Math.Clamp(m_leftWidth / totalW, 0f, 1f);
-                }
                 else
-                {
-                    float target = m_leftRatio * totalW;
-                    m_leftWidth = Math.Clamp(target, C_LEFT_MIN_WIDTH, maxLeft2);
-                }
+                    m_leftWidth = Math.Clamp(m_leftRatio * totalW, C_LEFT_MIN_WIDTH, maxLeft2);
             }
         }
 
-        // Right: content
         {
             ImGuiNet.BeginChild("##Content", new Vector2(0, 0));
             DrawToolbar();
@@ -204,21 +173,21 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.EndChild();
         }
 
-        ImGuiNet.EndChild(); // body
-
+        ImGuiNet.EndChild();
         ImGuiNet.Separator();
         DrawStatusBarFinderPath(statusH);
 
-        ImGuiNet.EndChild(); // root
+        ImGuiNet.EndChild();
         ImGuiNet.PopStyleVar();
 
         DrawRenamePopup();
         DrawDeletePopup();
     }
 
-    // ============================
-    // Toolbar
-    // ============================
+    #endregion
+
+    #region Toolbar
+
     private void DrawToolbar()
     {
         ImGuiNet.AlignTextToFramePadding();
@@ -239,9 +208,10 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGuiNet.TextUnformatted(GetCurrentFolderDisplayName());
     }
 
-    // ============================
-    // Left Tree (folders + files)
-    // ============================
+    #endregion
+
+    #region Tree
+
     private void DrawDirectoryTree(string pathNative, string pathNormalized)
     {
         if (!Directory.Exists(pathNative))
@@ -249,37 +219,35 @@ public sealed class FileBrowserPanel : EditorPanel
 
         string displayName = IsSamePath(pathNormalized, m_rootPath) ? "Assets" : Path.GetFileName(pathNative);
 
-        // Highlight is driven by selection (single-click), not currentDir.
         bool selected = IsSelected(pathNormalized);
 
         var flags = ImGuiTreeNodeFlags.OpenOnArrow | ImGuiTreeNodeFlags.SpanFullWidth;
         if (selected) flags |= ImGuiTreeNodeFlags.Selected;
 
-        // Keep currentDir open behavior
         bool shouldOpen = IsAncestorOrSelf(pathNormalized, m_currentDir);
 
-        // One-frame forced reveal for selection path chain
         if (m_revealOpenPending && m_revealOpenPaths.Contains(pathNormalized))
-        {
             ImGuiNet.SetNextItemOpen(true, ImGuiCond.Always);
-        }
         else
-        {
             ImGuiNet.SetNextItemOpen(shouldOpen, ImGuiCond.Once);
-        }
 
         bool open = ImGuiNet.TreeNodeEx($"##tree_{pathNormalized}", flags);
 
-        // Single click: select only (do NOT enter)
         if (ImGuiNet.IsItemClicked(ImGuiMouseButton.Left))
-        {
             SelectFolder(pathNormalized);
+
+        if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+            NavigateTo(pathNormalized, pushHistory: true);
+
+        if (!IsSamePath(pathNormalized, m_rootPath))
+        {
+            EmitFolderDragSource(pathNormalized, displayName);
         }
 
-        // Double click: enter (navigate)
-        if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+        if (BeginMoveDropTarget(pathNormalized, out var srcRel))
         {
-            NavigateTo(pathNormalized, pushHistory: true);
+            string dstFolderRel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(pathNormalized)));
+            TryMoveToFolder(srcRel, dstFolderRel);
         }
 
         bool insideDirectory = IsSamePath(pathNormalized, m_currentDir);
@@ -303,30 +271,30 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.EndPopup();
         }
 
-        if (open)
+        if (!open)
+            return;
+
+        try
         {
-            try
+            foreach (var dir in Directory.GetDirectories(pathNative))
             {
-                foreach (var dir in Directory.GetDirectories(pathNative))
-                {
-                    if (IsHidden(dir)) continue;
-                    DrawDirectoryTree(dir, NormalizePath(dir));
-                }
-
-                foreach (var file in Directory.GetFiles(pathNative))
-                {
-                    if (IsHidden(file)) continue;
-                    if (IsEditorFilteredFile(file)) continue;
-                    DrawTreeFileItem(file);
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Error(e.Message);
+                if (IsHidden(dir)) continue;
+                DrawDirectoryTree(dir, NormalizePath(dir));
             }
 
-            ImGuiNet.TreePop();
+            foreach (var file in Directory.GetFiles(pathNative))
+            {
+                if (IsHidden(file)) continue;
+                if (IsEditorFilteredFile(file)) continue;
+                DrawTreeFileItem(file);
+            }
         }
+        catch (Exception e)
+        {
+            Log.Error(e.Message);
+        }
+
+        ImGuiNet.TreePop();
     }
 
     private void DrawTreeFileItem(string filePathNative)
@@ -338,49 +306,47 @@ public sealed class FileBrowserPanel : EditorPanel
         string type = ToType(fi.Extension);
         bool selected = IsSelected(full);
 
-        var flags =
-            ImGuiTreeNodeFlags.Leaf |
-            ImGuiTreeNodeFlags.NoTreePushOnOpen |
-            ImGuiTreeNodeFlags.SpanFullWidth;
-
+        var flags = ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen | ImGuiTreeNodeFlags.SpanFullWidth;
         if (selected) flags |= ImGuiTreeNodeFlags.Selected;
 
         ImGuiNet.TreeNodeEx($"##tree_file_{full}", flags);
 
-        // Click
         if (ImGuiNet.IsItemClicked(ImGuiMouseButton.Left))
-        {
             SelectFile(full);
-        }
-            
-        // Double Click
+
         if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-        {
             TryOpenFile(full);
-        }
+
+        Guid? guid = TryGetGuidForFileByNativePath(filePathNative);
+        var e = new Entry(
+            fullPath: full,
+            name: name,
+            isDir: false,
+            type: type,
+            source: "~",
+            guid: guid
+        );
+
+        CacheGuidMapping(e);
+
+        EmitFileDragSource(e);
 
         ImGuiNet.SameLine();
         EditorImGuiEx.DrawIconAndText(FileIcon(type), name);
 
         if (ImGuiNet.BeginPopupContextItem($"##tree_file_ctx_{full}"))
         {
-            DrawItemContextItems(new Entry(
-                fullPath: full,
-                name: name,
-                isDir: false,
-                type: type,
-                source: "~"
-            ));
+            DrawItemContextItems(e);
             ImGuiNet.EndPopup();
         }
     }
 
-    // ============================
-    // Right Content
-    // ============================
+    #endregion
+
+    #region Content
+
     private void DrawContent()
     {
-        // TopBar: View toggle + Search
         DrawViewTopBar();
         ImGuiNet.Separator();
 
@@ -389,7 +355,8 @@ public sealed class FileBrowserPanel : EditorPanel
         if (searching) RefreshSearchSnapshot(force: false);
         else RefreshSnapshot(force: false);
 
-        if (ImGuiNet.BeginPopupContextWindow("##content_ctx", ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
+        if (ImGuiNet.BeginPopupContextWindow("##content_ctx",
+                ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
         {
             DrawCommonContextItems(m_currentDir);
             ImGuiNet.EndPopup();
@@ -419,9 +386,6 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGuiNet.InputTextWithHint("##Search", "Search", ref m_search, 256);
     }
 
-    // ============================
-    // Grid (fixed spacing; no periodic jitter on resize)
-    // ============================
     private void DrawGrid(List<Entry> entries, float iconSize)
     {
         float availW = ImGuiNet.GetContentRegionAvail().X;
@@ -429,13 +393,13 @@ public sealed class FileBrowserPanel : EditorPanel
 
         int cols = Math.Max(1, (int)Math.Floor(availW / cellW));
 
-        var flags =
-            ImGuiTableFlags.SizingFixedFit |
-            ImGuiTableFlags.PadOuterX |
-            ImGuiTableFlags.NoBordersInBody |
-            ImGuiTableFlags.NoSavedSettings;
+        var flags = ImGuiTableFlags.SizingFixedFit |
+                    ImGuiTableFlags.PadOuterX |
+                    ImGuiTableFlags.NoBordersInBody |
+                    ImGuiTableFlags.NoSavedSettings;
 
-        if (!ImGuiNet.BeginTable("##grid_table", cols, flags)) return;
+        if (!ImGuiNet.BeginTable("##grid_table", cols, flags))
+            return;
 
         for (int c = 0; c < cols; c++)
             ImGuiNet.TableSetupColumn($"##gc{c}", ImGuiTableColumnFlags.WidthFixed, cellW);
@@ -462,14 +426,13 @@ public sealed class FileBrowserPanel : EditorPanel
     private void DrawGridItem(Entry e, float itemSize, float iconScale)
     {
         ImGuiNet.BeginGroup();
-        ImGuiNet.PushID(e.fullPath);
+        ImGuiNet.PushID(e.guid.HasValue ? e.guid.Value.ToString() : e.fullPath);
 
-        // Hoverable
         Vector2 p0 = ImGuiNet.GetCursorScreenPos();
         Vector2 size = new Vector2(itemSize, itemSize);
-        
+
         ImGuiNet.InvisibleButton("##grid_item_btn", size);
-        
+
         bool selected = IsSelected(e.fullPath);
         bool hovered = ImGuiNet.IsItemHovered();
         bool clicked = ImGuiNet.IsItemClicked(ImGuiMouseButton.Left);
@@ -482,24 +445,16 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.GetWindowDrawList().AddRectFilled(p0, p0 + size, bg, rounding);
         }
 
-        // Click event
         if (clicked)
         {
             if (e.isDir) SelectFolder(e.fullPath);
             else SelectFile(e.fullPath);
         }
 
-        // Double click
         if (hovered && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
-            if (e.isDir)
-            {
-                NavigateTo(e.fullPath, pushHistory: true);
-            }
-            else
-            {
-                TryOpenFile(e.fullPath);
-            }
+            if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+            else TryOpenFile(e.fullPath);
         }
 
         if (ImGuiNet.BeginPopupContextItem("##item_ctx"))
@@ -507,24 +462,24 @@ public sealed class FileBrowserPanel : EditorPanel
             DrawItemContextItems(e);
             ImGuiNet.EndPopup();
         }
-        
-        // Drag
-        if (!e.isDir && ImGuiNet.BeginDragDropSource())
+
+        if (e.isDir)
+            EmitFolderDragSource(e.fullPath, e.name);
+        else
+            EmitFileDragSource(e);
+
+        if (e.isDir && BeginMoveDropTarget(e.fullPath, out var srcRel))
         {
-            var relativePath = GetRelativeDisplay(AssetManager.assetDirectory, e.fullPath);
-            EditorImGuiEx.SetDragPayload(C_ASSET_GUID_TYPE, AssetManager.GetGuid(relativePath));
-            ImGuiNet.Text($"Dragging {relativePath}");
-            ImGuiNet.EndDragDropSource();
+            string dstFolderRel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(e.fullPath)));
+            TryMoveToFolder(srcRel, dstFolderRel);
         }
-        
-        // Icon
+
         var icon = e.isDir ? ImGuiIcon.Folder : FileIcon(e.type);
         var currentFont = ImGuiHost.GetCurrentFont();
         ImGuiHost.UseFont(ImGuiFontStyle.Icon, itemSize * iconScale / ImGuiNet.GetFontSize());
-        
+
         Vector2 winPos = ImGuiNet.GetWindowPos();
-        Vector2 p0Screen = p0;
-        Vector2 p0Local = p0Screen - winPos;
+        Vector2 p0Local = p0 - winPos;
         Vector2 iconTextSize = ImGuiNet.CalcTextSize(icon);
         float iconX = MathF.Floor(p0Local.x + (itemSize - iconTextSize.x) * 0.5f);
         float iconY = MathF.Floor(p0Local.y + (itemSize - iconTextSize.y) * 0.5f);
@@ -534,7 +489,6 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGuiHost.UseFont(currentFont);
         ImGuiNet.SetCursorPos(new Vector2(p0Local.x, p0Local.y + itemSize));
 
-        // Text
         ImGuiNet.PushTextWrapPos(ImGuiNet.GetCursorPosX() + itemSize);
         var textWidth = ImGuiNet.CalcTextSize(e.name).X;
         var currentCursorX = ImGuiNet.GetCursorPosX();
@@ -577,28 +531,20 @@ public sealed class FileBrowserPanel : EditorPanel
 
         ImGuiNet.SetNextItemWidth(sliderW);
 
-        if (ImGuiNet.SliderFloat(
-                "##grid_scale",
-                ref m_gridScale,
-                C_GRID_SCALE_MIN,
-                C_GRID_SCALE_MAX,
-                "%.2fx",
-                ImGuiSliderFlags.NoInput
-            ))
+        if (ImGuiNet.SliderFloat("##grid_scale", ref m_gridScale, C_GRID_SCALE_MIN, C_GRID_SCALE_MAX, "%.2fx",
+                ImGuiSliderFlags.NoInput))
         {
             m_gridScale = Math.Clamp(m_gridScale, C_GRID_SCALE_MIN, C_GRID_SCALE_MAX);
         }
     }
 
-    // List: ONLY Name + Type + Source
     private void DrawList(List<Entry> entries)
     {
-        var tableFlags =
-            ImGuiTableFlags.RowBg |
-            ImGuiTableFlags.BordersInnerV |
-            ImGuiTableFlags.Resizable |
-            ImGuiTableFlags.ScrollY |
-            ImGuiTableFlags.SizingFixedFit;
+        var tableFlags = ImGuiTableFlags.RowBg |
+                         ImGuiTableFlags.BordersInnerV |
+                         ImGuiTableFlags.Resizable |
+                         ImGuiTableFlags.ScrollY |
+                         ImGuiTableFlags.SizingFixedFit;
 
         var avail = ImGuiNet.GetContentRegionAvail();
 
@@ -619,45 +565,46 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.TableSetColumnIndex(0);
 
             bool selected = IsSelected(e.fullPath);
-            string selId = $"##name_{e.fullPath}";
+            string uid = e.guid.HasValue ? e.guid.Value.ToString() : e.fullPath;
+            string selId = $"##name_{uid}";
 
-            // Click
             if (ImGuiNet.Selectable(selId, selected, ImGuiSelectableFlags.SpanAllColumns, new Vector2(0, rowH)))
             {
                 if (e.isDir) SelectFolder(e.fullPath);
                 else SelectFile(e.fullPath);
             }
 
-            // Double Click
             if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
             {
-                if (e.isDir)
-                {
-                    NavigateTo(e.fullPath, pushHistory: true);
-                }
-                else
-                {
-                    TryOpenFile(e.fullPath);
-                }
+                if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+                else TryOpenFile(e.fullPath);
             }
 
-            if (ImGuiNet.BeginPopupContextItem($"##list_ctx_{e.fullPath}"))
+            if (ImGuiNet.BeginPopupContextItem($"##list_ctx_{uid}"))
             {
                 DrawItemContextItems(e);
                 ImGuiNet.EndPopup();
             }
 
-            // Col 0: Name
+            if (e.isDir)
+                EmitFolderDragSource(e.fullPath, e.name);
+            else
+                EmitFileDragSource(e);
+
+            if (e.isDir && BeginMoveDropTarget(e.fullPath, out var srcRel))
+            {
+                string dstFolderRel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(e.fullPath)));
+                TryMoveToFolder(srcRel, dstFolderRel);
+            }
+
             ImGuiNet.SameLine();
             ImGuiNet.SetCursorPosY(ImGuiNet.GetCursorPosY() + ImGuiNet.GetStyle().FramePadding.Y);
             EditorImGuiEx.DrawIconAndText(e.isDir ? ImGuiIcon.Folder : FileIcon(e.type), e.name);
 
-            // Col 1: Type
             ImGuiNet.TableSetColumnIndex(1);
             ImGuiNet.AlignTextToFramePadding();
             ImGuiNet.TextUnformatted(e.isDir ? "FOLDER" : e.type);
 
-            // Col 2: Source
             ImGuiNet.TableSetColumnIndex(2);
             ImGuiNet.AlignTextToFramePadding();
             ImGuiNet.TextUnformatted(e.source);
@@ -703,22 +650,26 @@ public sealed class FileBrowserPanel : EditorPanel
 
     private static void SortCombo(string id, ref SortField field)
     {
-        if (ImGuiNet.BeginCombo(id, field.ToString()))
+        if (!ImGuiNet.BeginCombo(id, field.ToString()))
+            return;
+
+        foreach (SortField v in Enum.GetValues(typeof(SortField)))
         {
-            foreach (SortField v in Enum.GetValues(typeof(SortField)))
-            {
-                bool selected = (v == field);
-                if (ImGuiNet.Selectable(v.ToString(), selected))
-                    field = v;
-                if (selected) ImGuiNet.SetItemDefaultFocus();
-            }
-            ImGuiNet.EndCombo();
+            bool selected = (v == field);
+            if (ImGuiNet.Selectable(v.ToString(), selected))
+                field = v;
+
+            if (selected)
+                ImGuiNet.SetItemDefaultFocus();
         }
+
+        ImGuiNet.EndCombo();
     }
 
-    // ============================
-    // Context Menus
-    // ============================
+    #endregion
+
+    #region Context Menus
+
     private void DrawItemContextItems(Entry e)
     {
         if (e.isDir)
@@ -748,14 +699,14 @@ public sealed class FileBrowserPanel : EditorPanel
             RevealInSystem(targetFolderNormalized);
     }
 
-    // ============================
-    // Navigation / History
-    // ============================
+    #endregion
+
+    #region Navigation
+
     private void NavigateTo(string dirNormalized, bool pushHistory)
     {
         dirNormalized = NormalizePath(dirNormalized);
 
-        // If same as current, do nothing (no history, no refresh)
         if (IsSamePath(dirNormalized, m_currentDir))
             return;
 
@@ -766,7 +717,6 @@ public sealed class FileBrowserPanel : EditorPanel
         m_currentDir = dirNormalized;
         m_currentDirNative = dirNative;
 
-        // Finder-like behavior: entering a folder clears selection
         ClearSelection();
 
         if (pushHistory)
@@ -794,9 +744,10 @@ public sealed class FileBrowserPanel : EditorPanel
         NavigateTo(m_history[m_historyIndex], pushHistory: false);
     }
 
-    // ============================
-    // Snapshot / IO
-    // ============================
+    #endregion
+
+    #region Snapshot
+
     private void RefreshSnapshot(bool force)
     {
         if (!force)
@@ -818,6 +769,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
         m_snapshotTime = DateTime.UtcNow;
         m_snapshot.Clear();
+        m_relByGuid.Clear();
 
         try
         {
@@ -833,7 +785,8 @@ public sealed class FileBrowserPanel : EditorPanel
                     name: Path.GetFileName(d),
                     isDir: true,
                     type: "Folder",
-                    source: "~"
+                    source: "~",
+                    guid: null
                 ));
             }
 
@@ -844,13 +797,20 @@ public sealed class FileBrowserPanel : EditorPanel
 
                 var fi = new FileInfo(f);
 
-                m_snapshot.entries.Add(new Entry(
+                string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(f));
+                Guid? g = TryGetGuidByRel(rel);
+
+                var e = new Entry(
                     fullPath: NormalizePath(f),
                     name: fi.Name,
                     isDir: false,
                     type: ToType(fi.Extension),
-                    source: "~"
-                ));
+                    source: "~",
+                    guid: g
+                );
+
+                CacheGuidMapping(e, rel);
+                m_snapshot.entries.Add(e);
             }
         }
         catch (Exception e)
@@ -869,11 +829,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
             if (!queryChanged)
             {
-                if (changed)
-                {
-                    // AssetManager already coalesces bursts; refresh immediately.
-                }
-                else
+                if (!changed)
                 {
                     var now = DateTime.UtcNow;
                     if ((now - m_searchSnapshotTime).TotalSeconds < C_SNAPSHOT_TTL_SECONDS)
@@ -888,6 +844,7 @@ public sealed class FileBrowserPanel : EditorPanel
         m_assetAppliedVersion = AssetManager.assetDirectoryChangeVersion;
 
         m_searchSnapshot.Clear();
+        m_relByGuid.Clear();
 
         try
         {
@@ -910,7 +867,8 @@ public sealed class FileBrowserPanel : EditorPanel
                     name: string.IsNullOrWhiteSpace(name) ? rel : name,
                     isDir: true,
                     type: "Folder",
-                    source: src
+                    source: src,
+                    guid: null
                 ));
             }
 
@@ -921,16 +879,23 @@ public sealed class FileBrowserPanel : EditorPanel
 
                 var fi = new FileInfo(f);
 
-                string rel = GetRelativeDisplay(m_currentDirNative, f);
-                string src = BuildSourceFromRelative(rel);
+                string relDisplay = GetRelativeDisplay(m_currentDirNative, f);
+                string src = BuildSourceFromRelative(relDisplay);
 
-                m_searchSnapshot.entries.Add(new Entry(
+                string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(f));
+                Guid? g = TryGetGuidByRel(rel);
+
+                var e = new Entry(
                     fullPath: NormalizePath(f),
                     name: fi.Name,
                     isDir: false,
                     type: ToType(fi.Extension),
-                    source: src
-                ));
+                    source: src,
+                    guid: g
+                );
+
+                CacheGuidMapping(e, rel);
+                m_searchSnapshot.entries.Add(e);
             }
         }
         catch (Exception e)
@@ -965,9 +930,65 @@ public sealed class FileBrowserPanel : EditorPanel
         return q.ToList();
     }
 
-    // ============================
-    // Rename / Delete / Create
-    // ============================
+    private static Guid? TryGetGuidByRel(string rel)
+    {
+        try
+        {
+            return AssetManager.GetGuid(rel);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private Guid? TryGetGuidForFileByNativePath(string nativePath)
+    {
+        try
+        {
+            string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(nativePath));
+            if (string.IsNullOrWhiteSpace(rel))
+                return null;
+            return TryGetGuidByRel(rel);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void CacheGuidMapping(in Entry e, string? relOverride = null)
+    {
+        if (!e.guid.HasValue)
+            return;
+
+        string rel;
+        if (!string.IsNullOrWhiteSpace(relOverride))
+        {
+            rel = relOverride;
+        }
+        else
+        {
+            try
+            {
+                rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(e.fullPath)));
+            }
+            catch
+            {
+                return;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(rel))
+            return;
+
+        m_relByGuid[e.guid.Value] = AssetManager.NormalizeRelativePath(rel);
+    }
+
+    #endregion
+
+    #region File Operations
+
     private void BeginRename(string pathNormalized)
     {
         m_renameTargetPath = pathNormalized;
@@ -982,10 +1003,10 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.OpenPopup("Rename##popup");
             m_requestOpenRenamePopup = false;
         }
-        
+
         if (!ImGuiNet.BeginPopupModal("Rename##popup", ImGuiWindowFlags.AlwaysAutoResize))
             return;
-        
+
         ImGuiNet.TextUnformatted("New name:");
         ImGuiNet.SetNextItemWidth(360f);
         ImGuiNet.InputText("##rename", ref m_renameBuffer, 256);
@@ -1024,8 +1045,8 @@ public sealed class FileBrowserPanel : EditorPanel
             if (IsSamePath(oldPathNormalized, newPathNorm))
                 return;
 
-            string oldRel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(oldPathNormalized));
-            string newRel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(newPathNorm));
+            string oldRel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(oldPathNormalized)));
+            string newRel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(newPathNorm)));
 
             if (!AssetManager.RenamePath(oldRel, newRel))
                 return;
@@ -1054,7 +1075,7 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiNet.OpenPopup("Delete##popup");
             m_requestOpenDeletePopup = false;
         }
-        
+
         if (!ImGuiNet.BeginPopupModal("Delete##popup", ImGuiWindowFlags.AlwaysAutoResize))
             return;
 
@@ -1087,7 +1108,7 @@ public sealed class FileBrowserPanel : EditorPanel
     {
         try
         {
-            string rel = AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(pathNormalized));
+            string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(pathNormalized)));
 
             if (!AssetManager.DeletePath(rel))
                 return;
@@ -1120,7 +1141,7 @@ public sealed class FileBrowserPanel : EditorPanel
                 i++;
             }
 
-            string rel = AssetManager.ToRelativePathFromAssetDirectory(candidateNative);
+            string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(candidateNative));
             if (!AssetManager.CreateFolder(rel))
                 return;
 
@@ -1135,34 +1156,113 @@ public sealed class FileBrowserPanel : EditorPanel
             Log.Error(e.Message);
         }
     }
-    
-    // ============================
-    // File Open
-    // ============================
-    
-    private static void TryOpenFile(string fullPathNormalized)
+
+    private void TryMoveToFolder(string srcRel, string dstFolderRel)
     {
-        var ext = Path.GetExtension(fullPathNormalized).ToUpperInvariant();
-        switch (ext)
+        try
         {
-            case ".SCENE":
-            {
-                string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
-                string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
-                EditorSceneAssetIO.OpenScene(rel);
-                break;
-            }
+            srcRel = AssetManager.NormalizeRelativePath(srcRel);
+            dstFolderRel = AssetManager.NormalizeRelativePath(dstFolderRel);
+
+            if (!AssetManager.MovePath(srcRel, dstFolderRel))
+                return;
+
+            RefreshSnapshot(force: true);
+        }
+        catch (Exception e)
+        {
+            Log.Error(e.Message);
         }
     }
 
-    private static void RevealInSystem(string path)
+    #endregion
+
+    #region DragDrop
+
+    private void EmitFileDragSource(in Entry e)
     {
-        throw new NotImplementedException(path);
+        if (e.isDir)
+            return;
+
+        if (!e.guid.HasValue)
+            return;
+
+        if (!ImGuiNet.BeginDragDropSource())
+            return;
+
+        var guid = e.guid.Value;
+        EditorImGuiEx.SetDragPayload(ASSET_GUID_PAYLOAD_TYPE, guid);
+        ImGuiNet.TextUnformatted(e.name);
+
+        ImGuiNet.EndDragDropSource();
     }
 
-    // ============================
-    // Splitter
-    // ============================
+    private void EmitFolderDragSource(string folderNormalized, string displayName)
+    {
+        if (!ImGuiNet.BeginDragDropSource())
+            return;
+
+        try
+        {
+            string rel = AssetManager.NormalizeRelativePath(AssetManager.ToRelativePathFromAssetDirectory(ToNativePath(folderNormalized)));
+            rel = AssetManager.NormalizeRelativePath(rel);
+
+            if (!string.IsNullOrWhiteSpace(rel))
+                EditorImGuiEx.SetDragPayloadObject(MOVE_PATH_PAYLOAD_TYPE, rel);
+        }
+        catch
+        {
+            // Do nothing
+        }
+
+        ImGuiNet.TextUnformatted(displayName);
+        ImGuiNet.EndDragDropSource();
+    }
+
+    private bool BeginMoveDropTarget(string fullPathNormalizedFolder, out string srcRel)
+    {
+        srcRel = "";
+
+        if (!ImGuiNet.BeginDragDropTarget())
+            return false;
+        
+        try
+        {
+            if (!Directory.Exists(ToNativePath(fullPathNormalizedFolder)))
+                return false;
+
+            var guidPayload = EditorImGuiEx.AcceptDragPayload<Guid>(ASSET_GUID_PAYLOAD_TYPE);
+            if (guidPayload != null)
+            {
+                if (!m_relByGuid.TryGetValue(guidPayload.Value, out var rel) || string.IsNullOrWhiteSpace(rel))
+                    return false;
+
+                srcRel = AssetManager.NormalizeRelativePath(rel);
+                return true;
+            }
+            
+            var pathPayload = EditorImGuiEx.AcceptDragPayloadObject<string>(MOVE_PATH_PAYLOAD_TYPE);
+            if (pathPayload != null)
+            {
+                if (string.IsNullOrWhiteSpace(pathPayload))
+                    return false;
+
+                srcRel = AssetManager.NormalizeRelativePath(pathPayload);
+                return true;
+            }
+
+            return false;
+        }
+        finally
+        {
+            ImGuiNet.EndDragDropTarget();
+        }
+    }
+
+    #endregion
+
+    #region Splitter
+
     private static bool DrawSplitter(ref float leftWidth, float minLeft, float maxLeft)
     {
         float height = ImGuiNet.GetContentRegionAvail().Y;
@@ -1185,17 +1285,14 @@ public sealed class FileBrowserPanel : EditorPanel
         return active;
     }
 
-    // ============================
-    // Statusbar (Finder-like path: clickable segments + horizontal scroll)
-    // ============================
+    #endregion
+
+    #region StatusBar
+
     private void DrawStatusBarFinderPath(float height)
     {
-        ImGuiNet.BeginChild(
-            "##FileBrowserStatus",
-            new Vector2(0, height),
-            ImGuiChildFlags.None,
-            ImGuiWindowFlags.HorizontalScrollbar
-        );
+        ImGuiNet.BeginChild("##FileBrowserStatus", new Vector2(0, height), ImGuiChildFlags.None,
+            ImGuiWindowFlags.HorizontalScrollbar);
 
         if (ImGuiNet.SmallButton("Assets##sb_root"))
             NavigateTo(m_rootPath, pushHistory: true);
@@ -1217,9 +1314,10 @@ public sealed class FileBrowserPanel : EditorPanel
         ImGuiNet.EndChild();
     }
 
-    // ============================
-    // Selection API (extensible; no syncing)
-    // ============================
+    #endregion
+
+    #region Selection
+
     private void SelectPath(string? pathNormalized)
     {
         string? n = string.IsNullOrWhiteSpace(pathNormalized) ? null : NormalizePath(pathNormalized);
@@ -1227,8 +1325,6 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         m_selectedPath = n;
-
-        // Ensure tree opens to reveal selection
         BuildRevealOpenPathsForSelection(n);
     }
 
@@ -1240,14 +1336,11 @@ public sealed class FileBrowserPanel : EditorPanel
         if (string.IsNullOrWhiteSpace(selectedNormalized))
             return;
 
-        // If selection is a file, reveal its parent folder chain
         string targetFolderNorm = GetFolderNormalizedForPath(selectedNormalized);
 
-        // Must be inside root to reveal
         if (!IsAncestorOrSelf(m_rootPath, targetFolderNorm))
             return;
 
-        // Build root -> ... -> target chain
         string running = m_rootPath.TrimEnd('/');
         var parts = SplitPathRelativeToRoot(targetFolderNorm, m_rootPath);
 
@@ -1290,17 +1383,8 @@ public sealed class FileBrowserPanel : EditorPanel
         m_revealOpenPaths.Clear();
     }
 
-    private void SelectFile(string filePathNormalized)
-    {
-        // TODO: Future extension point: open inspector, preview, etc.
-        SelectPath(filePathNormalized);
-    }
-
-    private void SelectFolder(string folderPathNormalized)
-    {
-        // TODO: Future extension point: show folder meta, etc.
-        SelectPath(folderPathNormalized);
-    }
+    private void SelectFile(string filePathNormalized) => SelectPath(filePathNormalized);
+    private void SelectFolder(string folderPathNormalized) => SelectPath(folderPathNormalized);
 
     private bool IsSelected(string? pathNormalized)
     {
@@ -1310,9 +1394,10 @@ public sealed class FileBrowserPanel : EditorPanel
         return IsSamePath(pathNormalized, m_selectedPath);
     }
 
-    // ============================
-    // Utility
-    // ============================
+    #endregion
+
+    #region Utility
+
     private static string NormalizePath(string p)
     {
         if (string.IsNullOrWhiteSpace(p)) return "";
@@ -1369,9 +1454,7 @@ public sealed class FileBrowserPanel : EditorPanel
     }
 
     private static bool IsEditorFilteredFile(string file)
-    {
-        return file.EndsWith(AssetManager.C_ASSET_POSTFIX, StringComparison.OrdinalIgnoreCase);
-    }
+        => file.EndsWith(AssetManager.C_ASSET_POSTFIX, StringComparison.OrdinalIgnoreCase);
 
     private static List<string> SplitPathRelativeToRoot(string fullPath, string rootPath)
     {
@@ -1420,6 +1503,25 @@ public sealed class FileBrowserPanel : EditorPanel
         };
     }
 
+    private static void TryOpenFile(string fullPathNormalized)
+    {
+        var ext = Path.GetExtension(fullPathNormalized);
+        if (!ext.Equals(".scene", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
+        string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
+        if (rel.StartsWith("..", StringComparison.Ordinal))
+            return;
+
+        EditorSceneAssetIO.OpenScene(rel);
+    }
+
+    private static void RevealInSystem(string path)
+    {
+        throw new NotImplementedException(path);
+    }
+
     private string GetCurrentFolderDisplayName()
     {
         if (IsSamePath(m_currentDir, m_rootPath))
@@ -1429,9 +1531,6 @@ public sealed class FileBrowserPanel : EditorPanel
         return string.IsNullOrWhiteSpace(name) ? "Assets" : name;
     }
 
-    // Build Finder-like source:
-    // - If item is in current dir => "~"
-    // - Else => "~/<dirRel>" (for a file, dirRel excludes filename; for a dir, dirRel excludes its own name)
     private static string BuildSourceFromRelative(string rel)
     {
         if (string.IsNullOrWhiteSpace(rel))
@@ -1451,4 +1550,6 @@ public sealed class FileBrowserPanel : EditorPanel
 
         return "~/" + parent;
     }
+
+    #endregion
 }

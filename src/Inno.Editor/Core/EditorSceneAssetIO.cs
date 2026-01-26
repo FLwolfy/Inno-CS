@@ -109,12 +109,6 @@ public static class EditorSceneAssetIO
             EditorRuntimeController.Stop();
         }
 
-        if (!AssetManager.Load<SceneAsset>(relativePath))
-        {
-            Log.Error($"Failed to load scene asset: {relativePath}");
-            return false;
-        }
-
         var sceneRef = AssetManager.Get<SceneAsset>(relativePath);
         var sceneAsset = sceneRef.Resolve();
         if (sceneAsset == null)

@@ -114,6 +114,9 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         EditorManager.DrawPanels();
         EditorGUILayout.EndFrame();
         
+        // Clear Caches
+        EditorImGuiEx.ClearDragPayloadCache();
+        
         // End ImGui Layout
         ImGuiHost.EndLayout();
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Inno.Core.Logging;
 
 namespace Inno.Assets.Core;
 
@@ -136,19 +137,19 @@ internal sealed class AssetFileSystem : IDisposable
         => Enqueue(new AssetDirectoryChange(
             AssetDirectoryChangeKind.Created,
             e.FullPath,
-            Path.GetRelativePath(rootDirectory, e.FullPath)));
+            NormalizeRelativePath(Path.GetRelativePath(rootDirectory, e.FullPath))));
 
     private void OnChanged(object sender, FileSystemEventArgs e)
         => Enqueue(new AssetDirectoryChange(
             AssetDirectoryChangeKind.Changed,
             e.FullPath,
-            Path.GetRelativePath(rootDirectory, e.FullPath)));
+            NormalizeRelativePath(Path.GetRelativePath(rootDirectory, e.FullPath))));
 
     private void OnDeleted(object sender, FileSystemEventArgs e)
         => Enqueue(new AssetDirectoryChange(
             AssetDirectoryChangeKind.Deleted,
             e.FullPath,
-            Path.GetRelativePath(rootDirectory, e.FullPath)));
+            NormalizeRelativePath(Path.GetRelativePath(rootDirectory, e.FullPath))));
 
     private void OnRenamed(object sender, RenamedEventArgs e)
         => Enqueue(new AssetDirectoryChange(
@@ -156,7 +157,7 @@ internal sealed class AssetFileSystem : IDisposable
             e.FullPath,
             Path.GetRelativePath(rootDirectory, e.FullPath),
             oldFullPath: e.OldFullPath,
-            oldRelativePath: Path.GetRelativePath(rootDirectory, e.OldFullPath)));
+            oldRelativePath: NormalizeRelativePath(Path.GetRelativePath(rootDirectory, e.OldFullPath))));
 
     private void Enqueue(in AssetDirectoryChange change)
     {
@@ -488,6 +489,7 @@ internal sealed class AssetFileSystem : IDisposable
         }
         catch
         {
+            Log.Warn($"Could not read meta file: {metaAbsPath}");
             return;
         }
 
@@ -504,6 +506,7 @@ internal sealed class AssetFileSystem : IDisposable
         }
         catch
         {
+            Log.Warn($"Could not write meta file to: {metaAbsPath}");
         }
     }
 
@@ -578,16 +581,25 @@ internal sealed class AssetFileSystem : IDisposable
         return Path.Combine(binRoot, relativeDirectory.Replace('/', Path.DirectorySeparatorChar));
     }
 
-    private static string NormalizeRelativePath(string p)
-    {
-        if (string.IsNullOrWhiteSpace(p)) return "";
+    internal static string NormalizeRelativePath(string p)
+{
+    if (string.IsNullOrWhiteSpace(p)) return "";
 
-        p = p.Replace('\\', '/').Trim();
-        while (p.StartsWith("/", StringComparison.Ordinal)) p = p.Substring(1);
-        while (p.EndsWith("/", StringComparison.Ordinal)) p = p.Substring(0, p.Length - 1);
+    p = p.Replace('\\', '/').Trim();
 
-        return p;
-    }
+    // Path.GetRelativePath may return "." for root. Normalize to empty.
+    if (p == "." || p == "./") return "";
+
+    while (p.StartsWith("./", StringComparison.Ordinal)) p = p.Substring(2);
+
+    while (p.StartsWith("/", StringComparison.Ordinal)) p = p.Substring(1);
+    while (p.EndsWith("/", StringComparison.Ordinal)) p = p.Substring(0, p.Length - 1);
+
+    return p;
+}
+
+internal static string CombineRelativePath(string a, string b)
+    => NormalizeRelativePath(Path.Combine(NormalizeRelativePath(a), NormalizeRelativePath(b)));
 
     private static bool IsSameRel(string a, string b)
         => string.Equals(NormalizeRelativePath(a), NormalizeRelativePath(b), StringComparison.OrdinalIgnoreCase);
@@ -626,6 +638,7 @@ internal sealed class AssetFileSystem : IDisposable
         }
         catch
         {
+            Log.Warn($"Could not delete file: {absFile}");
         }
     }
 
@@ -644,16 +657,25 @@ internal sealed class AssetFileSystem : IDisposable
                 }
                 catch
                 {
+                    Log.Warn($"Could not delete file: {f}");
                 }
             }
 
             foreach (var d in Directory.GetDirectories(absDir, "*", SearchOption.AllDirectories).OrderByDescending(s => s.Length))
             {
-                try { Directory.Delete(d, recursive: false); } catch { }
+                try
+                {
+                    Directory.Delete(d, recursive: false);
+                }
+                catch
+                {
+                    Log.Warn($"Could not delete directory: {d}");
+                }
             }
         }
         catch
         {
+            Log.Warn($"Could not delete directory: {absDir}");
         }
     }
 

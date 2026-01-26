@@ -267,6 +267,8 @@ public static class AssetManager
     /// <returns>GUID if tracked; otherwise <see cref="Guid.Empty"/>.</returns>
     public static Guid GetGuid(string relativePath)
     {
+        relativePath = NormalizeRelativePath(relativePath);
+        
         lock (SYNC)
         {
             if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
@@ -285,6 +287,8 @@ public static class AssetManager
     /// <returns>Asset reference.</returns>
     public static AssetRef<T> Get<T>(string relativePath) where T : InnoAsset
     {
+        relativePath = NormalizeRelativePath(relativePath);
+        
         lock (SYNC)
         {
             if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
@@ -372,25 +376,27 @@ public static class AssetManager
         for (int i = 0; i < changes.Count; i++)
         {
             var c = changes[i];
+            var rel = NormalizeRelativePath(c.relativePath);
+            var oldRel = string.IsNullOrEmpty(c.oldRelativePath) ? null : NormalizeRelativePath(c.oldRelativePath);
 
             try
             {
                 switch (c.kind)
                 {
                     case AssetDirectoryChangeKind.Created:
-                        TryLoadNewFile(c.relativePath);
+                        TryLoadNewFile(rel);
                         break;
 
                     case AssetDirectoryChangeKind.Changed:
-                        ReloadIfLoadedOrLoadNew(c.relativePath);
+                        ReloadIfLoadedOrLoadNew(rel);
                         break;
 
                     case AssetDirectoryChangeKind.Deleted:
-                        RemoveIfLoaded(c.relativePath);
+                        RemoveIfLoaded(rel);
                         break;
 
                     case AssetDirectoryChangeKind.Renamed:
-                        HandleRename(c.oldRelativePath, c.relativePath);
+                        HandleRename(oldRel, rel);
                         break;
                 }
             }
@@ -538,6 +544,8 @@ public static class AssetManager
 
     private static void RegisterLoaded(string relativePath, InnoAsset asset)
     {
+        relativePath = NormalizeRelativePath(relativePath);
+        
         lock (SYNC)
         {
             PATH_TO_GUID[relativePath] = asset.guid;
@@ -663,13 +671,13 @@ public static class AssetManager
 
         using var _ = SuppressAutoReload();
 
-        string sourceNorm = NormalizeRel(sourceRelativePath);
-        string destDirNorm = NormalizeRel(destinationRelativeDirectory);
+        string sourceNorm = NormalizeRelativePath(sourceRelativePath);
+        string destDirNorm = NormalizeRelativePath(destinationRelativeDirectory);
 
         string name = Path.GetFileName(sourceNorm.TrimEnd('/'));
         if (string.IsNullOrWhiteSpace(name)) return false;
 
-        string destPathNorm = NormalizeRel(Path.Combine(destDirNorm, name));
+        string destPathNorm = NormalizeRelativePath(Path.Combine(destDirNorm, name));
 
         bool ok = m_fs.MovePath(sourceNorm, destDirNorm);
         if (!ok) return false;
@@ -705,7 +713,7 @@ public static class AssetManager
 
     private static void RemoveCacheByPrefix(string relativePath)
     {
-        relativePath = NormalizeRel(relativePath);
+        relativePath = NormalizeRelativePath(relativePath);
 
         lock (SYNC)
         {
@@ -735,8 +743,8 @@ public static class AssetManager
 
     private static void UpdateCacheByRename(string oldRelativePath, string newRelativePath)
     {
-        oldRelativePath = NormalizeRel(oldRelativePath);
-        newRelativePath = NormalizeRel(newRelativePath);
+        oldRelativePath = NormalizeRelativePath(oldRelativePath);
+        newRelativePath = NormalizeRelativePath(newRelativePath);
 
         lock (SYNC)
         {
@@ -777,14 +785,19 @@ public static class AssetManager
         }
     }
 
-    private static string NormalizeRel(string p)
-    {
-        if (string.IsNullOrWhiteSpace(p)) return "";
-        p = p.Replace('\\', '/').Trim();
-        while (p.StartsWith("/", StringComparison.Ordinal)) p = p.Substring(1);
-        while (p.EndsWith("/", StringComparison.Ordinal)) p = p.Substring(0, p.Length - 1);
-        return p;
-    }
+    /// <summary>
+    /// Normalizes a relative path under <see cref="assetDirectory"/>:
+    /// '/' separators, no leading '/', no trailing '/', and treats '.' as root.
+    /// </summary>
+    public static string NormalizeRelativePath(string relativePath)
+        => AssetFileSystem.NormalizeRelativePath(relativePath);
+
+    /// <summary>
+    /// Combines two relative paths and normalizes the result.
+    /// </summary>
+    public static string CombineRelativePath(string a, string b)
+        => AssetFileSystem.CombineRelativePath(a, b);
+
 
     #endregion
 }

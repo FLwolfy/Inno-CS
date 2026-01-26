@@ -963,7 +963,7 @@ $value:
                                       P:guid:
                                         $kind: prim
                                         $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                                        $value: 6d456bee-e80c-4653-8d53-57f521c408d0
+                                        $value: 917612c1-4c26-4285-9660-c4ca5cac3c0d
                                       P:isEmbedded:
                                         $kind: prim
                                         $type: System.Boolean, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e

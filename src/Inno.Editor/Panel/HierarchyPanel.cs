@@ -19,7 +19,7 @@ public class HierarchyPanel : EditorPanel
 {
     public override string title => "Hierarchy";
 
-    private const string C_GAMEOBJECT_GUID_TYPE = "GameObjectGUID";
+    private const string GAMEOBJECT_GUID_PAYLOAD_TYPE = "PAYLOAD:GameObjectGuid";
     private readonly Queue<Action> m_pendingGuiUpdateAction = new();
     private readonly Stack<BranchInfo> m_branch = new();
     private int m_row;
@@ -85,7 +85,7 @@ public class HierarchyPanel : EditorPanel
 
         if (!ImGuiNet.BeginDragDropTarget()) return;
 
-        var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+        var payload = EditorImGuiEx.AcceptDragPayload<Guid>(GAMEOBJECT_GUID_PAYLOAD_TYPE);
         if (payload != null)
         {
             var obj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
@@ -129,14 +129,14 @@ public class HierarchyPanel : EditorPanel
 
         if (ImGuiNet.BeginDragDropSource())
         {
-            EditorImGuiEx.SetDragPayload(C_GAMEOBJECT_GUID_TYPE, obj.id);
+            EditorImGuiEx.SetDragPayload(GAMEOBJECT_GUID_PAYLOAD_TYPE, obj.id);
             ImGuiNet.Text($"Dragging {obj.name}");
             ImGuiNet.EndDragDropSource();
         }
 
         if (ImGuiNet.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(C_GAMEOBJECT_GUID_TYPE);
+            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(GAMEOBJECT_GUID_PAYLOAD_TYPE);
             if (payload != null && payload != obj.id)
             {
                 var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
