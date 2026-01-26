@@ -41,9 +41,7 @@ public delegate void AssetDirectoryChangedHandler(in AssetDirectoryChange change
 public delegate void AssetDirectoryChangesFlushedHandler(IReadOnlyList<AssetDirectoryChange> changes);
 
 /// <summary>
-/// Centralized file-system observation for Asset directory.
-/// Owns FileSystemWatcher, coalescing/batching and versioning.
-/// Also provides asset-aware file operations (create/rename/delete).
+/// Observes the asset directory (watcher + coalescing) and provides asset-aware file operations.
 /// </summary>
 internal sealed class AssetFileSystem : IDisposable
 {
@@ -75,6 +73,13 @@ internal sealed class AssetFileSystem : IDisposable
     private Timer? m_flushTimer;
     private bool m_flushScheduled;
 
+    /// <summary>
+    /// Creates a watcher rooted at <paramref name="assetDirectory"/> and a bin mirror rooted at <paramref name="binDirectory"/>.
+    /// </summary>
+    /// <param name="assetDirectory">Absolute asset directory path.</param>
+    /// <param name="binDirectory">Absolute bin directory path.</param>
+    /// <param name="flushDelayMs">Coalescing delay.</param>
+    /// <param name="internalBufferSizeBytes">Watcher internal buffer size.</param>
     public AssetFileSystem(
         string assetDirectory,
         string binDirectory,
@@ -104,6 +109,9 @@ internal sealed class AssetFileSystem : IDisposable
         m_watcher.EnableRaisingEvents = true;
     }
 
+    /// <summary>
+    /// Stops watching and releases resources.
+    /// </summary>
     public void Dispose()
     {
         m_watcher.EnableRaisingEvents = false;
@@ -174,9 +182,7 @@ internal sealed class AssetFileSystem : IDisposable
         string key = change.relativePath;
 
         if (change.kind == AssetDirectoryChangeKind.Renamed && !string.IsNullOrEmpty(change.oldRelativePath))
-        {
             m_pending.Remove(change.oldRelativePath!);
-        }
 
         if (!m_pending.TryGetValue(key, out var existing))
         {
@@ -232,6 +238,11 @@ internal sealed class AssetFileSystem : IDisposable
 
     #region Asset-aware file operations
 
+    /// <summary>
+    /// Creates a directory under the asset root (also creates parents).
+    /// </summary>
+    /// <param name="relativeDirectory">Path relative to asset root.</param>
+    /// <returns>True if created (or already exists); otherwise false.</returns>
     public bool CreateDirectory(string relativeDirectory)
     {
         relativeDirectory = NormalizeRelativePath(relativeDirectory);
@@ -247,6 +258,11 @@ internal sealed class AssetFileSystem : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes a file or directory under the asset root, including .asset meta and .bin mirror content.
+    /// </summary>
+    /// <param name="relativePath">Path relative to asset root.</param>
+    /// <returns>True if deleted; otherwise false.</returns>
     public bool DeletePath(string relativePath)
     {
         relativePath = NormalizeRelativePath(relativePath);
@@ -269,6 +285,11 @@ internal sealed class AssetFileSystem : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes a single file and its associated meta/bin files.
+    /// </summary>
+    /// <param name="relativeFilePath">File path relative to asset root.</param>
+    /// <returns>True if deleted; otherwise false.</returns>
     public bool DeleteFile(string relativeFilePath)
     {
         relativeFilePath = NormalizeRelativePath(relativeFilePath);
@@ -286,6 +307,11 @@ internal sealed class AssetFileSystem : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes a directory recursively under the asset root, including the mirrored bin directory.
+    /// </summary>
+    /// <param name="relativeDirectory">Directory path relative to asset root.</param>
+    /// <returns>True if deleted; otherwise false.</returns>
     public bool DeleteDirectory(string relativeDirectory)
     {
         relativeDirectory = NormalizeRelativePath(relativeDirectory);
@@ -314,6 +340,12 @@ internal sealed class AssetFileSystem : IDisposable
         }
     }
 
+    /// <summary>
+    /// Renames/moves a file or directory under the asset root, including meta/bin and meta sourcePath rewrites.
+    /// </summary>
+    /// <param name="oldRelativePath">Old path relative to asset root.</param>
+    /// <param name="newRelativePath">New path relative to asset root.</param>
+    /// <returns>True if renamed; otherwise false.</returns>
     public bool RenamePath(string oldRelativePath, string newRelativePath)
     {
         oldRelativePath = NormalizeRelativePath(oldRelativePath);
@@ -331,7 +363,6 @@ internal sealed class AssetFileSystem : IDisposable
 
                 Directory.Move(absOld, absNew);
 
-                // move bin mirror folder
                 string absOldBinDir = AbsBinDir(oldRelativePath);
                 string absNewBinDir = AbsBinDir(newRelativePath);
 
@@ -345,7 +376,6 @@ internal sealed class AssetFileSystem : IDisposable
                     Directory.Move(absOldBinDir, absNewBinDir);
                 }
 
-                // rewrite all meta sourcePath prefix under moved folder
                 UpdateMetaSourcePathPrefix(absNew, oldRelativePath, newRelativePath);
                 return true;
             }
@@ -357,7 +387,6 @@ internal sealed class AssetFileSystem : IDisposable
 
                 File.Move(absOld, absNew);
 
-                // move meta
                 string absOldMeta = AbsMeta(oldRelativePath);
                 string absNewMeta = AbsMeta(newRelativePath);
                 if (File.Exists(absOldMeta))
@@ -367,7 +396,6 @@ internal sealed class AssetFileSystem : IDisposable
                     UpdateMetaSourcePathExact(absNewMeta, oldRelativePath, newRelativePath);
                 }
 
-                // move bin
                 string absOldBin = AbsBin(oldRelativePath);
                 string absNewBin = AbsBin(newRelativePath);
                 if (File.Exists(absOldBin))
@@ -380,6 +408,39 @@ internal sealed class AssetFileSystem : IDisposable
             }
 
             return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Moves a file or directory into an existing destination directory, preserving the source name.
+    /// </summary>
+    /// <param name="sourceRelativePath">Source path relative to asset root.</param>
+    /// <param name="destinationRelativeDirectory">Destination directory relative to asset root.</param>
+    /// <returns>True if moved; otherwise false.</returns>
+    public bool MovePath(string sourceRelativePath, string destinationRelativeDirectory)
+    {
+        sourceRelativePath = NormalizeRelativePath(sourceRelativePath);
+        destinationRelativeDirectory = NormalizeRelativePath(destinationRelativeDirectory);
+
+        try
+        {
+            string absDestDir = AbsAsset(destinationRelativeDirectory);
+            if (!Directory.Exists(absDestDir)) return false;
+
+            string absSource = AbsAsset(sourceRelativePath);
+            string name = Path.GetFileName(absSource.TrimEnd(Path.DirectorySeparatorChar, '/', '\\'));
+            if (string.IsNullOrWhiteSpace(name)) return false;
+
+            string destRelativePath = NormalizeRelativePath(Path.Combine(destinationRelativeDirectory, name));
+
+            if (IsSameRel(sourceRelativePath, destRelativePath)) return false;
+            if (IsAncestorRel(sourceRelativePath, destRelativePath)) return false;
+
+            return RenamePath(sourceRelativePath, destRelativePath);
         }
         catch
         {
@@ -414,123 +475,196 @@ internal sealed class AssetFileSystem : IDisposable
             UpdateMetaSourcePath(metaFiles[i], oldPrefix, newPrefix, isPrefix: true);
     }
 
-    private static void UpdateMetaSourcePathExact(string metaAbsPath, string oldRel, string newRel)
-        => UpdateMetaSourcePath(metaAbsPath, oldRel, newRel, isPrefix: false);
+    private static void UpdateMetaSourcePathExact(string metaAbsPath, string oldPath, string newPath)
+        => UpdateMetaSourcePath(metaAbsPath, oldPath, newPath, isPrefix: false);
 
-    private static void UpdateMetaSourcePath(string metaAbsPath, string oldRel, string newRel, bool isPrefix)
+    private static void UpdateMetaSourcePath(string metaAbsPath, string oldValue, string newValue, bool isPrefix)
     {
+        string text;
+
         try
         {
-            string yaml = File.ReadAllText(metaAbsPath);
-            var state = AssetYamlSerializer.DeserializeStateFromYaml(yaml);
-
-            if (!state.TryGetValue("sourcePath", out var v)) return;
-            if (v is not string s) return;
-
-            string updated;
-
-            if (isPrefix)
-            {
-                if (s.Equals(oldRel, StringComparison.OrdinalIgnoreCase))
-                    updated = newRel;
-                else if (s.StartsWith(oldRel + "/", StringComparison.OrdinalIgnoreCase))
-                    updated = newRel + s.Substring(oldRel.Length);
-                else
-                    return;
-            }
-            else
-            {
-                if (!s.Equals(oldRel, StringComparison.OrdinalIgnoreCase)) return;
-                updated = newRel;
-            }
-
-            var dict = new Dictionary<string, object?>(state.values, StringComparer.OrdinalIgnoreCase)
-            {
-                ["sourcePath"] = updated
-            };
-
-            var newYaml = AssetYamlSerializer.SerializeStateToYaml(
-                new Inno.Core.Serialization.SerializingState(dict));
-
-            File.WriteAllText(metaAbsPath, newYaml);
+            text = File.ReadAllText(metaAbsPath);
         }
         catch
         {
-            // ignored
+            return;
         }
+
+        string replaced = isPrefix
+            ? ReplaceYamlSourcePathPrefix(text, oldValue, newValue)
+            : ReplaceYamlSourcePathExact(text, oldValue, newValue);
+
+        if (string.Equals(text, replaced, StringComparison.Ordinal))
+            return;
+
+        try
+        {
+            File.WriteAllText(metaAbsPath, replaced);
+        }
+        catch
+        {
+        }
+    }
+
+    private static string ReplaceYamlSourcePathExact(string text, string oldValue, string newValue)
+    {
+        string needle = "sourcePath:";
+        int idx = text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return text;
+
+        int lineStart = idx;
+        int lineEnd = text.IndexOf('\n', idx);
+        if (lineEnd < 0) lineEnd = text.Length;
+
+        string line = text.Substring(lineStart, lineEnd - lineStart);
+        if (!line.Contains(oldValue, StringComparison.OrdinalIgnoreCase)) return text;
+
+        string replacedLine = line.Replace(oldValue, newValue, StringComparison.OrdinalIgnoreCase);
+        return text.Substring(0, lineStart) + replacedLine + text.Substring(lineEnd);
+    }
+
+    private static string ReplaceYamlSourcePathPrefix(string text, string oldPrefix, string newPrefix)
+    {
+        string needle = "sourcePath:";
+        int idx = text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return text;
+
+        int lineStart = idx;
+        int lineEnd = text.IndexOf('\n', idx);
+        if (lineEnd < 0) lineEnd = text.Length;
+
+        string line = text.Substring(lineStart, lineEnd - lineStart);
+
+        int q1 = line.IndexOf('"');
+        int q2 = q1 >= 0 ? line.IndexOf('"', q1 + 1) : -1;
+
+        if (q1 < 0 || q2 < 0) return text;
+
+        string value = line.Substring(q1 + 1, q2 - q1 - 1);
+        string normalizedValue = value.Replace('\\', '/');
+
+        oldPrefix = oldPrefix.Replace('\\', '/').TrimEnd('/');
+        newPrefix = newPrefix.Replace('\\', '/').TrimEnd('/');
+
+        if (!normalizedValue.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+            return text;
+
+        string replacedValue = newPrefix + normalizedValue.Substring(oldPrefix.Length);
+        string replacedLine = line.Substring(0, q1 + 1) + replacedValue + line.Substring(q2);
+
+        return text.Substring(0, lineStart) + replacedLine + text.Substring(lineEnd);
     }
 
     #endregion
 
-    #region Helpers
+    #region Paths
 
-    private string AbsAsset(string rel) => Path.Combine(rootDirectory, rel);
+    private string AbsAsset(string relativePath)
+        => Path.Combine(rootDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
-    private string AbsMeta(string rel) => Path.Combine(
-        rootDirectory,
-        rel + AssetManager.C_ASSET_POSTFIX);
+    private string AbsMeta(string relativeFilePath)
+        => AbsAsset(relativeFilePath) + AssetManager.C_ASSET_POSTFIX;
 
-    private string AbsBin(string rel)
+    private string AbsBin(string relativeFilePath)
+        => Path.Combine(AbsBinDir(Path.GetDirectoryName(relativeFilePath) ?? ""), Path.GetFileName(relativeFilePath) + AssetManager.C_BINARY_ASSET_POSTFIX);
+
+    private string AbsBinDir(string relativeDirectory)
     {
-        if (binRootDirectory == null) return string.Empty;
-        return Path.Combine(binRootDirectory, rel + AssetManager.C_BINARY_ASSET_POSTFIX);
+        string binRoot = binRootDirectory ?? "";
+        if (string.IsNullOrWhiteSpace(binRoot)) return "";
+
+        relativeDirectory = NormalizeRelativePath(relativeDirectory);
+        return Path.Combine(binRoot, relativeDirectory.Replace('/', Path.DirectorySeparatorChar));
     }
 
-    private string AbsBinDir(string relDir)
+    private static string NormalizeRelativePath(string p)
     {
-        if (binRootDirectory == null) return string.Empty;
-        return Path.Combine(binRootDirectory, relDir);
+        if (string.IsNullOrWhiteSpace(p)) return "";
+
+        p = p.Replace('\\', '/').Trim();
+        while (p.StartsWith("/", StringComparison.Ordinal)) p = p.Substring(1);
+        while (p.EndsWith("/", StringComparison.Ordinal)) p = p.Substring(0, p.Length - 1);
+
+        return p;
     }
+
+    private static bool IsSameRel(string a, string b)
+        => string.Equals(NormalizeRelativePath(a), NormalizeRelativePath(b), StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsAncestorRel(string ancestor, string path)
+    {
+        ancestor = NormalizeRelativePath(ancestor);
+        path = NormalizeRelativePath(path);
+
+        if (ancestor.Length == 0) return false;
+        if (IsSameRel(ancestor, path)) return true;
+
+        string prefix = ancestor.TrimEnd('/') + "/";
+        return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
+
+    #region Safe IO
 
     private static void SafeEnsureParentDirectory(string absPath)
     {
-        var parent = Path.GetDirectoryName(absPath);
+        string? parent = Path.GetDirectoryName(absPath);
         if (!string.IsNullOrWhiteSpace(parent))
             Directory.CreateDirectory(parent);
     }
 
-    private static void SafeDeleteFile(string absPath)
+    private static void SafeDeleteFile(string absFile)
     {
-        if (string.IsNullOrWhiteSpace(absPath)) return;
+        if (string.IsNullOrWhiteSpace(absFile)) return;
 
         try
         {
-            if (File.Exists(absPath))
-                File.Delete(absPath);
+            if (File.Exists(absFile))
+                File.Delete(absFile);
         }
         catch
         {
-            // ignored
         }
     }
 
-    private static void SafeDeleteDirectoryRecursive(string absDirectory)
+    private static void SafeDeleteDirectoryRecursive(string absDir)
     {
         try
         {
-            if (!Directory.Exists(absDirectory)) return;
+            if (!Directory.Exists(absDir)) return;
 
-            foreach (var file in Directory.GetFiles(absDirectory, "*", SearchOption.AllDirectories))
-                SafeDeleteFile(file);
+            foreach (var f in Directory.GetFiles(absDir, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    File.SetAttributes(f, FileAttributes.Normal);
+                    File.Delete(f);
+                }
+                catch
+                {
+                }
+            }
+
+            foreach (var d in Directory.GetDirectories(absDir, "*", SearchOption.AllDirectories).OrderByDescending(s => s.Length))
+            {
+                try { Directory.Delete(d, recursive: false); } catch { }
+            }
         }
         catch
         {
-            // ignored
         }
     }
 
-    private static void SafeDeleteDirectoryWithRetry(string absDirectory)
+    private static void SafeDeleteDirectoryWithRetry(string absDir, int retries = 8, int sleepMs = 25)
     {
-        const int retries = 10;
-        const int sleepMs = 30;
-
         for (int i = 0; i < retries; i++)
         {
             try
             {
-                if (!Directory.Exists(absDirectory)) return;
-
-                Directory.Delete(absDirectory, recursive: false);
+                if (!Directory.Exists(absDir)) return;
+                Directory.Delete(absDir, recursive: false);
                 return;
             }
             catch
@@ -538,29 +672,6 @@ internal sealed class AssetFileSystem : IDisposable
                 Thread.Sleep(sleepMs);
             }
         }
-
-        try
-        {
-            if (Directory.Exists(absDirectory))
-                Directory.Delete(absDirectory, recursive: true);
-        }
-        catch
-        {
-            // ignored
-        }
-    }
-
-    private static string NormalizeRelativePath(string relativePath)
-    {
-        relativePath = (relativePath ?? string.Empty).Replace('\\', '/').Trim();
-        relativePath = relativePath.TrimStart('/');
-
-        while (relativePath.Contains("//", StringComparison.Ordinal))
-            relativePath = relativePath.Replace("//", "/", StringComparison.Ordinal);
-
-        relativePath = relativePath.TrimEnd('/');
-
-        return relativePath;
     }
 
     #endregion

@@ -1135,6 +1135,30 @@ public sealed class FileBrowserPanel : EditorPanel
             Log.Error(e.Message);
         }
     }
+    
+    // ============================
+    // File Open
+    // ============================
+    
+    private static void TryOpenFile(string fullPathNormalized)
+    {
+        var ext = Path.GetExtension(fullPathNormalized).ToUpperInvariant();
+        switch (ext)
+        {
+            case ".SCENE":
+            {
+                string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
+                string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
+                EditorSceneAssetIO.OpenScene(rel);
+                break;
+            }
+        }
+    }
+
+    private static void RevealInSystem(string path)
+    {
+        throw new NotImplementedException(path);
+    }
 
     // ============================
     // Splitter
@@ -1394,27 +1418,6 @@ public sealed class FileBrowserPanel : EditorPanel
             "SCENE" => ImGuiIcon.ObjectGroup,
             _ => ImGuiIcon.File
         };
-    }
-
-    private static void TryOpenFile(string fullPathNormalized)
-    {
-        // TODO: Add more types
-        var ext = Path.GetExtension(fullPathNormalized);
-        if (!ext.Equals(".scene", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        // Convert normalized path (/) back into a native path so Path APIs behave.
-        string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
-        string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
-        if (rel.StartsWith("..", StringComparison.Ordinal))
-            return;
-
-        EditorSceneAssetIO.OpenScene(rel);
-    }
-
-    private static void RevealInSystem(string path)
-    {
-        throw new NotImplementedException(path);
     }
 
     private string GetCurrentFolderDisplayName()
