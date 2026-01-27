@@ -1,4 +1,6 @@
 using System;
+
+using Inno.Core.Math;
 using Inno.Platform.Graphics;
 
 namespace Inno.ImGui;
@@ -50,16 +52,6 @@ internal interface IImGuiBackend : IDisposable
     void ZoomImpl(float zoomRate);
     
     /// <summary>
-    /// Gets the pointer to the main ImGui context.
-    /// </summary>
-    IntPtr mainMainContextPtrImpl { get; }
-    
-    /// <summary>
-    /// Gets the pointer to the virtual ImGui context.
-    /// </summary>
-    IntPtr virtualContextPtrImpl { get; }
-    
-    /// <summary>
     /// Sets the UI storage data into ImGui.ini.
     /// </summary>
     void SetStorageDataImpl(string key, object? value);
@@ -80,4 +72,21 @@ internal interface IImGuiBackend : IDisposable
     /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
     /// </summary>
     bool TryAcceptDragPayloadImpl<T>(string type, out T value);
+    
+    /// <summary>
+    /// Begins an invisible drawing area.
+    /// This is extremely useful for measuring before drawing. <br/>
+    /// Note: Do NOT switch context inside the invisible scope.
+    /// </summary>
+    void BeginInvisibleImpl();
+
+    /// <summary>
+    /// Ends the current invisible drawing scope.
+    /// </summary>
+    void EndInvisibleImpl();
+    
+    /// <summary>
+    /// Get the current invisible item size.
+    /// </summary>
+    Vector2 GetInvisibleItemSizeImpl();
 }

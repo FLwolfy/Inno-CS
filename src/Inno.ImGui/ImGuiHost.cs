@@ -1,5 +1,6 @@
 using System;
 
+using Inno.Core.Math;
 using Inno.ImGui.Backend;
 using Inno.Platform.Display;
 using Inno.Platform.Graphics;
@@ -112,16 +113,6 @@ public static class ImGuiHost
     public static void Zoom(float zoomRate) => impl.ZoomImpl(zoomRate);
     
     /// <summary>
-    /// Gets the pointer to the main ImGui context.
-    /// </summary>
-    public static IntPtr mainMainContextPtr => impl.mainMainContextPtrImpl;
-    
-    /// <summary>
-    /// Gets the pointer to the virtual ImGui context.
-    /// </summary>
-    public static IntPtr virtualContextPtr => impl.virtualContextPtrImpl;
-    
-    /// <summary>
     /// Sets the UI storage data into ImGui.ini.
     /// </summary>
     public static void SetStorageData(string key, object? value) => impl.SetStorageDataImpl(key, value);
@@ -142,6 +133,23 @@ public static class ImGuiHost
     /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
     /// </summary>
     public static bool TryAcceptDragPayload<T>(string type, out T value) => impl.TryAcceptDragPayloadImpl(type, out value);
+
+    /// <summary>
+    /// Begins an invisible drawing area.
+    /// This is extremely useful for measuring before drawing. <br/>
+    /// Note: Do NOT switch context inside the invisible scope.
+    /// </summary>
+    public static void BeginInvisible() => impl.BeginInvisibleImpl();
+
+    /// <summary>
+    /// Ends the current invisible drawing scope.
+    /// </summary>
+    public static void EndInvisible() => impl.EndInvisibleImpl();
+    
+    /// <summary>
+    /// Get the current invisible item size.
+    /// </summary>
+    public static Vector2 GetInvisibleItemSize() => impl.GetInvisibleItemSizeImpl();
     
     /// <summary>
     /// Dispose the implementation of ImGui.

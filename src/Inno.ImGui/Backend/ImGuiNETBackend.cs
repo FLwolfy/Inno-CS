@@ -25,9 +25,9 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
     private readonly ICommandList m_commandList;
     private readonly ImGuiNETController m_controller;
 
-    // Contexts 
-    public IntPtr mainMainContextPtrImpl { get; }
-    public IntPtr virtualContextPtrImpl { get; }
+    // Contexts
+    private readonly IntPtr m_mainMainContextPtrImpl;
+    private readonly IntPtr m_virtualContextPtrImpl;
 
     // Fonts
     private float m_zoomRate;
@@ -47,6 +47,10 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
     // Payloads
     private readonly Dictionary<int, object> m_payloadObjects = new();
     private int m_nextPayloadId = 1;
+    
+    // Invisible
+    private bool m_inInvisible = false;
+    private Vector2 m_invisibleSizeCache = Vector2.ZERO;
 
     #region Inits
     public ImGuiNETBackend(
@@ -73,8 +77,8 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
         m_controller.RebuildFontTexture();
 
         // Main Context
-        mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
-        ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+        m_mainMainContextPtrImpl = ImGuiNET.ImGui.GetCurrentContext();
+        ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
         ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
         SetupStyle();
         
@@ -87,8 +91,8 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 		// Virtual Context
 		unsafe
 		{
-			virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
-			ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+			m_virtualContextPtrImpl = ImGuiNET.ImGui.CreateContext(ImGuiNET.ImGui.GetIO().Fonts.NativePtr);
+			ImGuiNET.ImGui.SetCurrentContext(m_virtualContextPtrImpl);
 			ImGuiNET.ImGui.GetIO().FontGlobalScale = 1f / m_dpiScale;
 			SetupStyle();
 		}
@@ -101,7 +105,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 			vio.NativePtr->IniFilename = null;
 		}
 
-		ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+		ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
     }
     
 	private void SetupStyle()
@@ -220,13 +224,13 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    m_commandList.SetFrameBuffer(m_graphicsDevice.swapchainFrameBuffer);
 	    
 	    // Virtual Context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_virtualContextPtrImpl);
 	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowSystem.mainWindow.size.x, m_windowSystem.mainWindow.size.y);
 	    ImGuiNET.ImGui.NewFrame();
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
 	    // Main Context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
 	    m_controller.Update(deltaTime, m_windowSystem.mainWindow.GetPumpedEvents());
 	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
 
@@ -240,12 +244,12 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    ClearDragPayloadCache();
 		    
 	    // Virtual Context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_virtualContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.EndFrame();
 	    
 	    // Main Context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    
 		// Render
@@ -324,13 +328,13 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    var font = family[nearest];
 
 	    // 4. Apply to virtual context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_virtualContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
 	    ImGuiNET.ImGui.PushFont(font);
 
 	    // 5. Apply to main context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
 	    ImGuiNET.ImGui.PopFont();
 	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
 	    ImGuiNET.ImGui.PushFont(font);
@@ -505,6 +509,38 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 
 	#endregion
 
+	#region Invisible
+
+	public void BeginInvisibleImpl()
+	{
+		if (m_inInvisible) throw new InvalidOperationException("Cannot nest invisible groups.");
+		m_inInvisible = true;
+
+		var currentAvailSize = ImGuiNET.ImGui.GetContentRegionAvail();
+        
+		ImGuiNET.ImGui.SetCurrentContext(m_virtualContextPtrImpl);
+		ImGuiNET.ImGui.PushID("INVISIBLE_ID");
+		ImGuiNET.ImGui.BeginChild("INVISIBLE_GROUP", currentAvailSize);
+		ImGuiNET.ImGui.BeginGroup();
+	}
+
+	public void EndInvisibleImpl()
+	{
+		ImGuiNET.ImGui.EndGroup();
+		m_invisibleSizeCache = new Vector2(ImGuiNET.ImGui.GetItemRectSize().X, ImGuiNET.ImGui.GetItemRectSize().Y);
+		ImGuiNET.ImGui.EndChild();
+		ImGuiNET.ImGui.PopID();
+		ImGuiNET.ImGui.SetCurrentContext(m_mainMainContextPtrImpl);
+        
+		m_inInvisible = false;
+	}
+
+	public Vector2 GetInvisibleItemSizeImpl()
+	{
+		return m_invisibleSizeCache;
+	}
+
+	#endregion
 
     public void Dispose()
     {

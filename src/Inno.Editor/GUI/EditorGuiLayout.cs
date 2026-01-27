@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 
 using Inno.Core.Math;
+using Inno.ImGui;
 
 using ImGuiNET;
-using Inno.Core.Logging;
-using Inno.ImGui;
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.GUI;
@@ -13,7 +12,7 @@ namespace Inno.Editor.GUI;
 /// <summary>
 /// Minimal editor layout helpers built on top of ImGui.
 /// </summary>
-public static class EditorGUILayout
+public static class EditorGuiLayout
 {
     public enum LayoutAlign { Front, Center, Back }
     [Flags] public enum FontStyle { None, Bold, Italic }
@@ -36,7 +35,7 @@ public static class EditorGUILayout
     #region Lifecycles
 
     /// <summary>
-    /// Begins a UI frame for EditorGUILayout validation.
+    /// Begins a UI frame for EditorGuiLayout validation.
     /// </summary>
     public static void BeginFrame()
     {
@@ -305,13 +304,13 @@ public static class EditorGUILayout
 
     private static float MeasureWidth(Action onMeasure)
     {
-        EditorImGuiEx.BeginInvisible();
+        ImGuiHost.BeginInvisible();
         ImGuiNet.PushID("__measure__");
         onMeasure.Invoke();
         ImGuiNet.PopID();
-        EditorImGuiEx.EndInvisible();
+        ImGuiHost.EndInvisible();
 
-        return EditorImGuiEx.GetInvisibleItemRectSize().x;
+        return ImGuiHost.GetInvisibleItemSize().x;
     }
 
     private static void BeginPropertyRow(string label)

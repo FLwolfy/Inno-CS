@@ -113,9 +113,9 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         EditorPlayBar.Draw();
 
         // Layout GUI
-        EditorGUILayout.BeginFrame();
+        EditorGuiLayout.BeginFrame();
         EditorManager.DrawPanels();
-        EditorGUILayout.EndFrame();
+        EditorGuiLayout.EndFrame();
         
         // End ImGui Layout
         ImGuiHost.EndLayout();

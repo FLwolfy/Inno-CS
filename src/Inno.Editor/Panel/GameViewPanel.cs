@@ -127,9 +127,9 @@ public class GameViewPanel : EditorPanel
 
             if (SceneManager.GetActiveScene()?.GetMainCamera() == null)
             {
-                EditorGUILayout.BeginAlignment(EditorGUILayout.LayoutAlign.Center);
-                EditorGUILayout.Label("No Main Camera Set!");
-                EditorGUILayout.EndAlignment();
+                EditorGuiLayout.BeginAlignment(EditorGuiLayout.LayoutAlign.Center);
+                EditorGuiLayout.Label("No Main Camera Set!");
+                EditorGuiLayout.EndAlignment();
                 return;
             }
             

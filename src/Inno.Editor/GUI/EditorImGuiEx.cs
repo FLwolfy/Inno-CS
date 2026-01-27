@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Inno.Core.Math;
+using Inno.ImGui;
 
 using ImGuiNET;
-using Inno.ImGui;
 using ImGuiNet = ImGuiNET.ImGui;
-
 
 namespace Inno.Editor.GUI;
 
@@ -67,32 +63,4 @@ public static class EditorImGuiEx
         var drawList = ImGuiNet.GetWindowDrawList();
         drawList.AddText(new Vector2(pos.x, pos.y), color.ToUInt32ARGB(), text);
     }
-    
-    // Invisible
-    private static bool m_inInvisible = false;
-    private static Vector2 m_invisibleSizeCache = Vector2.ZERO;
-    
-    public static void BeginInvisible()
-    {
-        if (m_inInvisible) throw new InvalidOperationException("Cannot nest invisible groups.");
-        m_inInvisible = true;
-
-        System.Numerics.Vector2 currentAvailSize = ImGuiNet.GetContentRegionAvail();
-        
-        ImGuiNet.SetCurrentContext(ImGuiHost.virtualContextPtr);
-        ImGuiNet.PushID("INVISIBLE_ID");
-        ImGuiNet.BeginChild("INVISIBLE_GROUP", currentAvailSize);
-        ImGuiNet.BeginGroup();
-    }
-    public static void EndInvisible()
-    {
-        ImGuiNet.EndGroup();
-        m_invisibleSizeCache = new Vector2(ImGuiNet.GetItemRectSize().X, ImGuiNet.GetItemRectSize().Y);
-        ImGuiNet.EndChild();
-        ImGuiNet.PopID();
-        ImGuiNet.SetCurrentContext(ImGuiHost.mainMainContextPtr);
-        
-        m_inInvisible = false;
-    }
-    public static Vector2 GetInvisibleItemRectSize() => m_invisibleSizeCache;
 }

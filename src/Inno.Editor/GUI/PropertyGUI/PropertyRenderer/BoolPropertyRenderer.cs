@@ -7,7 +7,7 @@ public class BoolPropertyRenderer : PropertyRenderer<bool>
     protected override void Bind(string name, Func<bool> getter, Action<bool> setter, bool enabled)
     {
         bool value = getter.Invoke();
-        if (EditorGUILayout.Checkbox(name, ref value, enabled))
+        if (EditorGuiLayout.Checkbox(name, ref value, enabled))
         {
             setter.Invoke(value);
         }

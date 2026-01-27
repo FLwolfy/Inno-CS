@@ -14,7 +14,7 @@ public class TransformEditor : ComponentEditor
         
         string compName = comp.GetType().Name;
         
-        if (EditorGUILayout.CollapsingHeader(compName))
+        if (EditorGuiLayout.CollapsingHeader(compName))
         {
             var serializedProps = ((ISerializable)comp).GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
             
