@@ -6,16 +6,28 @@ using Inno.Assets.AssetType;
 using Inno.Core.ECS;
 using Inno.Core.Logging;
 using Inno.Core.Serialization;
+using Inno.ImGui;
 
 namespace Inno.Editor.Core;
 
 public static class EditorSceneAssetIO
 {
+    private const string LOADED_SCENE_STORAGE_KEY = "SceneLoaded";
+    
     /// <summary>
     /// Relative path (to AssetManager.assetDirectory) of the currently opened scene.
     /// Null when the active scene has never been opened from disk (or has no bound asset path).
     /// </summary>
     public static string? currentScenePath { get; private set; }
+
+    public static void Initialize()
+    {
+        var loadedScenePath = ImGuiHost.GetStorageData<string>(LOADED_SCENE_STORAGE_KEY);
+        if (loadedScenePath != null)
+        {
+            OpenScene(loadedScenePath);
+        }
+    }
 
     /// <summary>
     /// Save the currently opened scene to its bound asset path.
@@ -77,7 +89,7 @@ public static class EditorSceneAssetIO
             return false;
         }
 
-        relativePath = NormalizeRelativePath(relativePath);
+        relativePath = AssetManager.NormalizeRelativePath(relativePath);
         if (!relativePath.EndsWith(".scene", StringComparison.OrdinalIgnoreCase))
             relativePath += ".scene";
 
@@ -101,7 +113,7 @@ public static class EditorSceneAssetIO
 
     public static bool OpenScene(string relativePath)
     {
-        relativePath = NormalizeRelativePath(relativePath);
+        relativePath = AssetManager.NormalizeRelativePath(relativePath);
 
         // If user is playing, stop first.
         if (EditorManager.mode != EditorMode.Edit)
@@ -125,15 +137,12 @@ public static class EditorSceneAssetIO
 
         EditorManager.selection.Deselect();
 
-        currentScenePath = relativePath; // bind path after successful open
+        // bind path after successful open
+        currentScenePath = relativePath;
+        ImGuiHost.SetStorageData(LOADED_SCENE_STORAGE_KEY, relativePath);
         Log.Info($"Scene opened: {relativePath}");
+        
         return true;
-    }
-
-    private static string NormalizeRelativePath(string rel)
-    {
-        rel = rel.Replace('\\', '/').TrimStart('/');
-        return rel;
     }
 
     private static string SanitizeFileName(string name)

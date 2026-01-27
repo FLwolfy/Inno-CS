@@ -47,6 +47,9 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         EditorManager.RegisterPanel(new LogPanel());
         EditorManager.RegisterPanel(new HierarchyPanel());
         EditorManager.RegisterPanel(new InspectorPanel());
+        
+        // IO Loaded
+        EditorSceneAssetIO.Initialize();
     }
 
     public override void OnEvent(Event e)

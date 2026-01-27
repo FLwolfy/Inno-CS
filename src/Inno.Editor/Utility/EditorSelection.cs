@@ -1,5 +1,3 @@
-using System.Runtime.Serialization;
-using Inno.Core.Serialization;
 using ISerializable = Inno.Core.Serialization.ISerializable;
 
 namespace Inno.Editor.Utility;
