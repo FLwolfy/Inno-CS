@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 using Inno.Assets;
 using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.GUI;
+using Inno.ImGui;
 
 using ImGuiNET;
-using Inno.ImGui;
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Panel;
@@ -678,7 +680,7 @@ public sealed class FileBrowserPanel : EditorPanel
                 NavigateTo(e.fullPath, pushHistory: true);
         }
 
-        if (ImGuiNet.MenuItem("Reveal in Finder/Explorer"))
+        if (ImGuiNet.MenuItem("Reveal in Explorer"))
             RevealInSystem(e.fullPath);
 
         ImGuiNet.Separator();
@@ -1503,21 +1505,103 @@ public sealed class FileBrowserPanel : EditorPanel
 
     private static void TryOpenFile(string fullPathNormalized)
     {
-        var ext = Path.GetExtension(fullPathNormalized);
-        if (!ext.Equals(".scene", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
-        string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
-        if (rel.StartsWith("..", StringComparison.Ordinal))
-            return;
-
-        EditorSceneAssetIO.OpenScene(rel);
+        var ext = Path.GetExtension(fullPathNormalized).ToUpperInvariant();
+        switch (ext)
+        {
+            case ".SCENE":
+            {
+                string fullNative = fullPathNormalized.Replace('/', Path.DirectorySeparatorChar);
+                string rel = GetRelativeDisplay(AssetManager.assetDirectory, fullNative);
+                EditorSceneAssetIO.OpenScene(rel);
+                break;
+            }
+        }
     }
 
-    private static void RevealInSystem(string path)
+    private void RevealInSystem(string path)
     {
-        throw new NotImplementedException(path);
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        string native = ToNativePath(path);
+
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                if (File.Exists(native))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"/select,\"{native}\"",
+                        UseShellExecute = true
+                    });
+                }
+                else
+                {
+                    string dir = Directory.Exists(native) ? native : (Path.GetDirectoryName(native) ?? native);
+                    if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"\"{dir}\"",
+                            UseShellExecute = true
+                        });
+                    }
+                }
+
+                return;
+            }
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                if (File.Exists(native) || Directory.Exists(native))
+                {
+                    // Reveal (select) in Finder; works for files and folders.
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "open",
+                        Arguments = $"-R \"{native}\"",
+                        UseShellExecute = false
+                    });
+                }
+                else
+                {
+                    string dir = Path.GetDirectoryName(native) ?? native;
+                    if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "open",
+                            Arguments = $"\"{dir}\"",
+                            UseShellExecute = false
+                        });
+                    }
+                }
+
+                return;
+            }
+
+            // Linux / other UNIX
+            {
+                string dir = Directory.Exists(native) ? native : (Path.GetDirectoryName(native) ?? native);
+                if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+                    return;
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "xdg-open",
+                    Arguments = $"\"{dir}\"",
+                    UseShellExecute = false
+                });
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error($"RevealInSystem failed: {e.Message}");
+        }
     }
 
     private string GetCurrentFolderDisplayName()
