@@ -37,7 +37,7 @@ public enum ImGuiColorSpaceHandling
 public static class ImGuiHost
 {
     internal const ImGuiFontSize C_DEFAULT_FONT_SIZE = ImGuiFontSize.Medium;
-    private static ImGuiNETBackend impl { get; set; } = null!;
+    private static IImGuiBackend impl { get; set; } = null!;
     
     /// <summary>
     /// Create the imGui backend with given windowFactory and specified imguiBackend
@@ -131,6 +131,18 @@ public static class ImGuiHost
     /// </summary>
     public static T? GetStorageData<T>(string key, T? defaultValue = default) => impl.GetStorageDataImpl(key, defaultValue);
 
+    /// <summary>
+    /// Sets a drag-drop payload for the current drag source.
+    /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
+    /// </summary>
+    public static void SetDragPayload<T>(string type, in T data) => impl.SetDragPayloadImpl(type, in data);
+    
+    /// <summary>
+    /// Tries to accept a drag-drop payload.
+    /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
+    /// </summary>
+    public static bool TryAcceptDragPayload<T>(string type, out T value) => impl.TryAcceptDragPayloadImpl(type, out value);
+    
     /// <summary>
     /// Dispose the implementation of ImGui.
     /// </summary>

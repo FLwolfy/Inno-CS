@@ -114,9 +114,6 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
         EditorManager.DrawPanels();
         EditorGUILayout.EndFrame();
         
-        // Clear Caches
-        EditorImGuiEx.ClearDragPayloadCache();
-        
         // End ImGui Layout
         ImGuiHost.EndLayout();
     }
@@ -125,5 +122,10 @@ public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
     {
         // Run scene simulation only in Play mode.
         EditorRuntimeController.Update();
+    }
+
+    public override void OnDetach()
+    {
+        ImGuiHost.DisposeImpl();
     }
 }

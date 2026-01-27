@@ -68,4 +68,16 @@ internal interface IImGuiBackend : IDisposable
     /// Gets the UI storage data from ImGui.ini.
     /// </summary>
     T? GetStorageDataImpl<T>(string key, T? defaultValue);
+
+    /// <summary>
+    /// Sets a drag-drop payload for the current drag source.
+    /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
+    /// </summary>
+    void SetDragPayloadImpl<T>(string type, in T data);
+
+    /// <summary>
+    /// Tries to accept a drag-drop payload.
+    /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
+    /// </summary>
+    bool TryAcceptDragPayloadImpl<T>(string type, out T value);
 }

@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 using Inno.Core.Math;
 using Inno.Platform.Graphics;
 using Inno.Platform.Window;
+using Inno.Platform.Display;
 
 using ImGuiNET;
-using Inno.Platform.Display;
 
 namespace Inno.ImGui.Backend;
 
@@ -42,7 +43,12 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
     // Ini
     private readonly string m_iniPath;
     private DateTime m_lastIniWriteUtc;
+    
+    // Payloads
+    private readonly Dictionary<int, object> m_payloadObjects = new();
+    private int m_nextPayloadId = 1;
 
+    #region Inits
     public ImGuiNETBackend(
 	    IWindowSystem windowSystem, 
 	    IDisplaySystem displaySystem, 
@@ -97,171 +103,8 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 
 		ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
     }
-
-    public void BeginLayoutImpl(float deltaTime)
-    {
-	    // Begin Render
-	    m_commandList.Begin();
-	    m_commandList.SetFrameBuffer(m_graphicsDevice.swapchainFrameBuffer);
-	    
-	    // Virtual Context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowSystem.mainWindow.size.x, m_windowSystem.mainWindow.size.y);
-	    ImGuiNET.ImGui.NewFrame();
-	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
-
-	    // Main Context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    m_controller.Update(deltaTime, m_windowSystem.mainWindow.GetPumpedEvents());
-	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
-
-        // Default font
-        UseFontImpl(ImGuiFontStyle.Regular, (float)ImGuiHost.C_DEFAULT_FONT_SIZE);
-    }
-
-    public void EndLayoutImpl()
-    {
-	    // Virtual Context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    ImGuiNET.ImGui.EndFrame();
-	    
-	    // Main Context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    
-		// Render
-	    m_controller.Render(m_commandList);
-
-        // Ini self-heal
-        if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
-        {
-            var writeUtc = File.GetLastWriteTimeUtc(m_iniPath);
-            if (writeUtc != m_lastIniWriteUtc)
-            {
-                ImGuiIniDataFile.EnsureSectionPresent(m_iniPath);
-                m_lastIniWriteUtc = File.GetLastWriteTimeUtc(m_iniPath);
-            }
-        }
-
-        m_commandList.End();
-        m_graphicsDevice.Submit(m_commandList);
-    }
-
-    public IntPtr GetOrBindTextureImpl(ITexture texture) => m_controller.GetOrBindTexture(texture);
-
-    public void UnbindTextureImpl(ITexture texture) => m_controller.UnbindTexture(texture);
-
-    public void UseFontImpl(ImGuiFontStyle style, float? size)
-    {
-	    m_currentFont = size == null ? new ImGuiAlias(style, m_currentFont.size) : new ImGuiAlias(style, (float)size);
-	    var sizeInFloat = m_currentFont.size * m_zoomRate;
-	    
-	    // 1. Select font family by style
-	    var family = style switch
-	    {
-		    ImGuiFontStyle.Bold       => m_fontBold,
-		    ImGuiFontStyle.Italic     => m_fontItalic,
-		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
-		    
-		    ImGuiFontStyle.Icon		  => m_icon,
-		    _                         => m_fontRegular
-	    };
-
-	    // 3. Iterate enum to find exact or nearest
-	    ImGuiFontSize nearest = default;
-	    float nearestDist = float.MaxValue;
-	    bool exactMatch = false;
-
-	    foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
-	    {
-		    float enumSize = (float)s;
-		    float dist = MathF.Abs(sizeInFloat - enumSize);
-
-		    // exact hit (with tolerance)
-		    if (MathHelper.AlmostEquals(sizeInFloat, enumSize))
-		    {
-			    nearest = s;
-			    exactMatch = true;
-			    break;
-		    }
-
-		    // nearest
-		    if (dist < nearestDist)
-		    {
-			    nearestDist = dist;
-			    nearest = s;
-		    }
-	    }
-
-	    float scale = exactMatch ? 1f : sizeInFloat / (float)nearest;
-	    var font = family[nearest];
-
-	    // 4. Apply to virtual context
-	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
-	    ImGuiNET.ImGui.PushFont(font);
-
-	    // 5. Apply to main context
-	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
-	    ImGuiNET.ImGui.PopFont();
-	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
-	    ImGuiNET.ImGui.PushFont(font);
-	    
-	    // 6. Apply to default font
-	    unsafe
-	    {
-		    ImGuiNET.ImGui.GetIO().NativePtr->FontDefault = font;
-	    }
-    }
     
-    public ImGuiAlias GetCurrentFontImpl() => m_currentFont;
-
-    public void ZoomImpl(float zoomRate) => m_zoomRate = zoomRate;
-
-    public void SetStorageDataImpl(string key, object? value)
-    {
-        ImGuiDataStore.DATA[key] = ImGuiDataCodec.Encode(value);
-        ImGuiNET.ImGui.GetIO().WantSaveIniSettings = true;
-    }
-
-    public T? GetStorageDataImpl<T>(string key, T? defaultValue)
-    {
-        return ImGuiDataStore.DATA.TryGetValue(key, out var payload)
-            ? ImGuiDataCodec.Decode(payload, defaultValue)
-            : defaultValue;
-    }
-
-    private void SetupFonts(float scale)
-    {
-        foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
-        {
-            var sizePixels = (float)fontSize * scale;
-
-            m_fontRegular[fontSize] = m_controller.AddFontBase("JetBrainsMono-Regular.ttf", sizePixels);
-            m_fontBold[fontSize] = m_controller.AddFontBase("JetBrainsMono-Bold.ttf", sizePixels);
-            m_fontItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-Italic.ttf", sizePixels);
-            m_fontBoldItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-BoldItalic.ttf", sizePixels);
-        }
-    }
-    
-    private void SetupIcons(float scale)
-    {
-        const float c_iconScaleMultiplier = 0.8f;
-		
-        foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
-        {
-            var sizePixels = (float)fontSize * scale;
-		    
-            m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
-            m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
-
-            m_icon[fontSize] = m_controller.AddIcons();
-        }
-    }
-
-    private void SetupStyle()
+	private void SetupStyle()
 	{
 	    var style = ImGuiNET.ImGui.GetStyle();
 
@@ -365,6 +208,303 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    style.Colors[(int)ImGuiCol.ModalWindowDimBg] = new Vector4(0.8f, 0.8f, 0.8f, 0.35f);
 	    style.Colors[(int)ImGuiCol.DockingPreview] = new Vector4(0.8156863f, 0.77254903f, 0.9647059f, 0.54901963f);
 	}
+    
+    #endregion
+
+    #region Life Cycle
+    
+    public void BeginLayoutImpl(float deltaTime)
+    {
+	    // Begin Render
+	    m_commandList.Begin();
+	    m_commandList.SetFrameBuffer(m_graphicsDevice.swapchainFrameBuffer);
+	    
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.GetIO().DisplaySize = new Vector2(m_windowSystem.mainWindow.size.x, m_windowSystem.mainWindow.size.y);
+	    ImGuiNET.ImGui.NewFrame();
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
+
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    m_controller.Update(deltaTime, m_windowSystem.mainWindow.GetPumpedEvents());
+	    ImGuiNET.ImGui.PushFont(m_fontRegular[ImGuiHost.C_DEFAULT_FONT_SIZE]);
+
+        // Default font
+        UseFontImpl(ImGuiFontStyle.Regular, (float)ImGuiHost.C_DEFAULT_FONT_SIZE);
+    }
+
+    public void EndLayoutImpl()
+    {
+	    // Clear Cache
+	    ClearDragPayloadCache();
+		    
+	    // Virtual Context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.EndFrame();
+	    
+	    // Main Context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    
+		// Render
+	    m_controller.Render(m_commandList);
+
+        // Ini self-heal
+        if (!string.IsNullOrWhiteSpace(m_iniPath) && File.Exists(m_iniPath))
+        {
+            var writeUtc = File.GetLastWriteTimeUtc(m_iniPath);
+            if (writeUtc != m_lastIniWriteUtc)
+            {
+                ImGuiIniDataFile.EnsureSectionPresent(m_iniPath);
+                m_lastIniWriteUtc = File.GetLastWriteTimeUtc(m_iniPath);
+            }
+        }
+
+        m_commandList.End();
+        m_graphicsDevice.Submit(m_commandList);
+    }
+    
+    #endregion
+    
+    #region Texture
+
+    public IntPtr GetOrBindTextureImpl(ITexture texture) => m_controller.GetOrBindTexture(texture);
+
+    public void UnbindTextureImpl(ITexture texture) => m_controller.UnbindTexture(texture);
+
+    #endregion
+    
+    #region Fonts
+    
+    public void UseFontImpl(ImGuiFontStyle style, float? size)
+    {
+	    m_currentFont = size == null ? new ImGuiAlias(style, m_currentFont.size) : new ImGuiAlias(style, (float)size);
+	    var sizeInFloat = m_currentFont.size * m_zoomRate;
+	    
+	    // 1. Select font family by style
+	    var family = style switch
+	    {
+		    ImGuiFontStyle.Bold       => m_fontBold,
+		    ImGuiFontStyle.Italic     => m_fontItalic,
+		    ImGuiFontStyle.BoldItalic => m_fontBoldItalic,
+		    
+		    ImGuiFontStyle.Icon		  => m_icon,
+		    _                         => m_fontRegular
+	    };
+
+	    // 3. Iterate enum to find exact or nearest
+	    ImGuiFontSize nearest = default;
+	    float nearestDist = float.MaxValue;
+	    bool exactMatch = false;
+
+	    foreach (ImGuiFontSize s in Enum.GetValues(typeof(ImGuiFontSize)))
+	    {
+		    float enumSize = (float)s;
+		    float dist = MathF.Abs(sizeInFloat - enumSize);
+
+		    // exact hit (with tolerance)
+		    if (MathHelper.AlmostEquals(sizeInFloat, enumSize))
+		    {
+			    nearest = s;
+			    exactMatch = true;
+			    break;
+		    }
+
+		    // nearest
+		    if (dist < nearestDist)
+		    {
+			    nearestDist = dist;
+			    nearest = s;
+		    }
+	    }
+
+	    float scale = exactMatch ? 1f : sizeInFloat / (float)nearest;
+	    var font = family[nearest];
+
+	    // 4. Apply to virtual context
+	    ImGuiNET.ImGui.SetCurrentContext(virtualContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+	    ImGuiNET.ImGui.PushFont(font);
+
+	    // 5. Apply to main context
+	    ImGuiNET.ImGui.SetCurrentContext(mainMainContextPtrImpl);
+	    ImGuiNET.ImGui.PopFont();
+	    ImGuiNET.ImGui.GetIO().FontGlobalScale = scale / m_dpiScale;
+	    ImGuiNET.ImGui.PushFont(font);
+	    
+	    // 6. Apply to default font
+	    unsafe
+	    {
+		    ImGuiNET.ImGui.GetIO().NativePtr->FontDefault = font;
+	    }
+    }
+    
+    public ImGuiAlias GetCurrentFontImpl() => m_currentFont;
+    
+    public void ZoomImpl(float zoomRate) => m_zoomRate = zoomRate;
+    
+    private void SetupFonts(float scale)
+    {
+	    foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
+	    {
+		    var sizePixels = (float)fontSize * scale;
+
+		    m_fontRegular[fontSize] = m_controller.AddFontBase("JetBrainsMono-Regular.ttf", sizePixels);
+		    m_fontBold[fontSize] = m_controller.AddFontBase("JetBrainsMono-Bold.ttf", sizePixels);
+		    m_fontItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-Italic.ttf", sizePixels);
+		    m_fontBoldItalic[fontSize] = m_controller.AddFontBase("JetBrainsMono-BoldItalic.ttf", sizePixels);
+	    }
+    }
+    
+    private void SetupIcons(float scale)
+    {
+	    const float c_iconScaleMultiplier = 0.8f;
+		
+	    foreach (var fontSize in Enum.GetValues<ImGuiFontSize>())
+	    {
+		    var sizePixels = (float)fontSize * scale;
+		    
+		    m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAR, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+		    m_controller.RegisterFontIcon(ImGuiIcon.FontIconFileNameFAS, sizePixels * c_iconScaleMultiplier, (ImGuiIcon.IconMin, ImGuiIcon.IconMax));
+
+		    m_icon[fontSize] = m_controller.AddIcons();
+	    }
+    }
+    
+    #endregion
+
+    #region Storage
+
+    public void SetStorageDataImpl(string key, object? value)
+    {
+        ImGuiDataStore.DATA[key] = ImGuiDataCodec.Encode(value);
+        ImGuiNET.ImGui.GetIO().WantSaveIniSettings = true;
+    }
+
+    public T? GetStorageDataImpl<T>(string key, T? defaultValue)
+    {
+        return ImGuiDataStore.DATA.TryGetValue(key, out var payload)
+            ? ImGuiDataCodec.Decode(payload, defaultValue)
+            : defaultValue;
+    }
+    
+    #endregion
+    
+	#region Payload
+
+	public void SetDragPayloadImpl<T>(string type, in T data)
+	{
+	    ClearDragPayloadCache();
+
+	#if DEBUG
+	    if (typeof(T).IsByRefLike)
+	        throw new NotSupportedException($"Drag payload does not support ref-like type: {typeof(T)}");
+	#else
+	    if (typeof(T).IsByRefLike)
+	        return;
+	#endif
+
+	    if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+	    {
+	        SetDragPayloadRaw(type, in data);
+	        return;
+	    }
+
+	    SetDragPayloadObject(type, data!);
+	}
+
+	public bool TryAcceptDragPayloadImpl<T>(string type, out T value)
+	{
+	    ClearDragPayloadCache();
+
+	#if DEBUG
+	    if (typeof(T).IsByRefLike)
+	        throw new NotSupportedException($"Drag payload does not support ref-like type: {typeof(T)}");
+	#else
+	    if (typeof(T).IsByRefLike)
+	    {
+	        value = default!;
+	        return false;
+	    }
+	#endif
+
+	    if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+	        return TryAcceptDragPayloadRaw(type, out value);
+
+	    if (TryAcceptDragPayloadObject(type, out var obj) && obj is T t)
+	    {
+	        value = t;
+	        return true;
+	    }
+
+	    value = default!;
+	    return false;
+	}
+
+	private unsafe void SetDragPayloadRaw<T>(string type, in T data)
+	{
+	    int size = Unsafe.SizeOf<T>();
+	    byte* buf = stackalloc byte[size];
+	    Unsafe.CopyBlockUnaligned(buf, Unsafe.AsPointer(ref Unsafe.AsRef(in data)), (uint)size);
+	    ImGuiNET.ImGui.SetDragDropPayload(type, (IntPtr)buf, (uint)size);
+	}
+
+	private unsafe bool TryAcceptDragPayloadRaw<T>(string type, out T value)
+	{
+	    var payload = ImGuiNET.ImGui.AcceptDragDropPayload(type);
+	    if (payload.NativePtr == null || payload.Data == IntPtr.Zero || payload.DataSize <= 0)
+	    {
+	        value = default!;
+	        return false;
+	    }
+
+	    int size = Unsafe.SizeOf<T>();
+	    if (payload.DataSize < size)
+	    {
+	        value = default!;
+	        return false;
+	    }
+
+	    value = Unsafe.ReadUnaligned<T>(payload.Data.ToPointer());
+	    return true;
+	}
+
+	private void SetDragPayloadObject(string type, object obj)
+	{
+	    int id = m_nextPayloadId++;
+	    m_payloadObjects[id] = obj;
+	    SetDragPayloadRaw(type, id);
+	}
+
+	private bool TryAcceptDragPayloadObject(string type, out object obj)
+	{
+	    if (TryAcceptDragPayloadRaw(type, out int pid) && m_payloadObjects.TryGetValue(pid, out obj!))
+	    {
+	        // one-shot consume to avoid unbounded growth
+	        m_payloadObjects.Remove(pid);
+	        return true;
+	    }
+
+	    obj = null!;
+	    return false;
+	}
+
+	private void ClearDragPayloadCache()
+	{
+	    if (m_payloadObjects.Count == 0) return;
+
+	    unsafe
+	    {
+	        if (ImGuiNET.ImGui.GetDragDropPayload().NativePtr == null)
+	            m_payloadObjects.Clear();
+	    }
+	}
+
+	#endregion
+
 
     public void Dispose()
     {

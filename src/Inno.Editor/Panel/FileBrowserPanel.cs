@@ -1191,7 +1191,7 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         var guid = e.guid.Value;
-        EditorImGuiEx.SetDragPayload(ASSET_GUID_PAYLOAD_TYPE, guid);
+        ImGuiHost.SetDragPayload(ASSET_GUID_PAYLOAD_TYPE, guid);
         ImGuiNet.TextUnformatted(e.name);
 
         ImGuiNet.EndDragDropSource();
@@ -1208,7 +1208,7 @@ public sealed class FileBrowserPanel : EditorPanel
             rel = AssetManager.NormalizeRelativePath(rel);
 
             if (!string.IsNullOrWhiteSpace(rel))
-                EditorImGuiEx.SetDragPayloadObject(MOVE_PATH_PAYLOAD_TYPE, rel);
+                ImGuiHost.SetDragPayload(MOVE_PATH_PAYLOAD_TYPE, rel);
         }
         catch
         {
@@ -1231,18 +1231,16 @@ public sealed class FileBrowserPanel : EditorPanel
             if (!Directory.Exists(ToNativePath(fullPathNormalizedFolder)))
                 return false;
 
-            var guidPayload = EditorImGuiEx.AcceptDragPayload<Guid>(ASSET_GUID_PAYLOAD_TYPE);
-            if (guidPayload != null)
+            if (ImGuiHost.TryAcceptDragPayload(ASSET_GUID_PAYLOAD_TYPE, out Guid guidPayload))
             {
-                if (!m_relByGuid.TryGetValue(guidPayload.Value, out var rel) || string.IsNullOrWhiteSpace(rel))
+                if (!m_relByGuid.TryGetValue(guidPayload, out var rel) || string.IsNullOrWhiteSpace(rel))
                     return false;
 
                 srcRel = AssetManager.NormalizeRelativePath(rel);
                 return true;
             }
             
-            var pathPayload = EditorImGuiEx.AcceptDragPayloadObject<string>(MOVE_PATH_PAYLOAD_TYPE);
-            if (pathPayload != null)
+            if (ImGuiHost.TryAcceptDragPayload(MOVE_PATH_PAYLOAD_TYPE, out string pathPayload))
             {
                 if (string.IsNullOrWhiteSpace(pathPayload))
                     return false;

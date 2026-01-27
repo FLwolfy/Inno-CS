@@ -9,6 +9,7 @@ using Inno.Editor.GUI;
 
 using ImGuiNET;
 using Inno.Core.Events;
+using Inno.ImGui;
 using ImGuiNet = ImGuiNET.ImGui;
 
 using BranchInfo = (float, uint);
@@ -85,10 +86,9 @@ public class HierarchyPanel : EditorPanel
 
         if (!ImGuiNet.BeginDragDropTarget()) return;
 
-        var payload = EditorImGuiEx.AcceptDragPayload<Guid>(GAMEOBJECT_GUID_PAYLOAD_TYPE);
-        if (payload != null)
+        if (ImGuiHost.TryAcceptDragPayload(GAMEOBJECT_GUID_PAYLOAD_TYPE, out Guid payload))
         {
-            var obj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
+            var obj = SceneManager.GetActiveScene()!.FindGameObject(payload);
             m_pendingGuiUpdateAction.Enqueue(() => obj?.transform.SetParent(null));
         }
 
@@ -129,17 +129,16 @@ public class HierarchyPanel : EditorPanel
 
         if (ImGuiNet.BeginDragDropSource())
         {
-            EditorImGuiEx.SetDragPayload(GAMEOBJECT_GUID_PAYLOAD_TYPE, obj.id);
+            ImGuiHost.SetDragPayload(GAMEOBJECT_GUID_PAYLOAD_TYPE, obj.id);
             ImGuiNet.Text($"Dragging {obj.name}");
             ImGuiNet.EndDragDropSource();
         }
 
         if (ImGuiNet.BeginDragDropTarget())
         {
-            var payload = EditorImGuiEx.AcceptDragPayload<Guid>(GAMEOBJECT_GUID_PAYLOAD_TYPE);
-            if (payload != null && payload != obj.id)
+            if (ImGuiHost.TryAcceptDragPayload(GAMEOBJECT_GUID_PAYLOAD_TYPE, out Guid payload) && payload != obj.id)
             {
-                var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload.Value);
+                var payloadObj = SceneManager.GetActiveScene()!.FindGameObject(payload);
                 m_pendingGuiUpdateAction.Enqueue(() => payloadObj?.transform.SetParent(obj.transform));
             }
             ImGuiNet.EndDragDropTarget();

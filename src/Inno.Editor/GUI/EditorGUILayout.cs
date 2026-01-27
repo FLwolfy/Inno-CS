@@ -881,11 +881,9 @@ public static class EditorGUILayout
 
             if (enabled && ImGuiNet.BeginDragDropTarget())
             {
-                Guid? incoming = EditorImGuiEx.AcceptDragPayload<Guid>(payloadType);
-
-                if (incoming.HasValue)
+                if (ImGuiHost.TryAcceptDragPayload(payloadType, out Guid incoming))
                 {
-                    value = incoming.Value;
+                    value = incoming;
                     changed = true;
                 }
 

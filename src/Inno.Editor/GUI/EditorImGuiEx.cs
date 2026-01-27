@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Inno.Core.Math;
 
 using ImGuiNET;
@@ -94,54 +95,4 @@ public static class EditorImGuiEx
         m_inInvisible = false;
     }
     public static Vector2 GetInvisibleItemRectSize() => m_invisibleSizeCache;
-    
-    // Drag & Drop Payload
-    private static int m_nextPayloadId = 1;
-    private static readonly Dictionary<int, object> PAYLOAD_OBJECTS = new();
-
-    public static unsafe void SetDragPayload<T>(string type, T data) where T : unmanaged
-    {
-        byte* buf = stackalloc byte[sizeof(T)];
-        *(T*)buf = data;
-        ImGuiNet.SetDragDropPayload(type, (IntPtr)buf, (uint)sizeof(T));
-    }
-
-    public static unsafe T? AcceptDragPayload<T>(string type) where T : unmanaged
-    {
-        var payload = ImGuiNet.AcceptDragDropPayload(type);
-        if (payload.NativePtr == null || payload.Data == IntPtr.Zero || payload.DataSize <= 0)
-            return null;
-
-        if ((uint)payload.DataSize < (uint)sizeof(T))
-            return null;
-
-        return *(T*)payload.Data.ToPointer();
-    }
-
-    public static void SetDragPayloadObject(string type, object obj)
-    {
-        int id = m_nextPayloadId++;
-        PAYLOAD_OBJECTS[id] = obj;
-        SetDragPayload(type, id);
-    }
-
-    public static T? AcceptDragPayloadObject<T>(string type) where T : class
-    {
-        var pid = AcceptDragPayload<int>(type);
-        return pid.HasValue && PAYLOAD_OBJECTS.TryGetValue(pid.Value, out var obj)
-            ? obj as T
-            : null;
-    }
-
-    public static void ClearDragPayloadCache()
-    {
-        if (PAYLOAD_OBJECTS.Count == 0) return;
-        unsafe
-        {
-            if (ImGuiNet.GetDragDropPayload().NativePtr == null)
-            {
-                PAYLOAD_OBJECTS.Clear();
-            }
-        }
-    }
 }
