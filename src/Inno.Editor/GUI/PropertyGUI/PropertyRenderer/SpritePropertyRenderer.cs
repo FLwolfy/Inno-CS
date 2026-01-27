@@ -23,6 +23,12 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
             EditorGUILayout.Indent(16);
             if (EditorGUILayout.GuidRef("source", FileBrowserPanel.ASSET_GUID_PAYLOAD_TYPE, ref spriteGuid, displayName, enabled))
             {
+                if (spriteGuid == Guid.Empty)
+                {
+                    setter(Sprite.SolidColor(Vector2.ONE));
+                    return;
+                }
+                
                 var assetRef = AssetManager.Get<TextureAsset>(spriteGuid);
                 if (!assetRef.isValid)
                 {

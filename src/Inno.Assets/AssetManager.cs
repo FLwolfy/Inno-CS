@@ -260,15 +260,10 @@ public static class AssetManager
 
     #region Get (AssetRef)
 
-    /// <summary>
-    /// Gets a loaded asset GUID by relative path.
-    /// </summary>
-    /// <param name="relativePath">Path relative to <see cref="assetDirectory"/>.</param>
-    /// <returns>GUID if tracked; otherwise <see cref="Guid.Empty"/>.</returns>
     public static Guid GetGuid(string relativePath)
     {
         relativePath = NormalizeRelativePath(relativePath);
-        
+
         lock (SYNC)
         {
             if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
@@ -279,52 +274,67 @@ public static class AssetManager
         return Guid.Empty;
     }
 
-    /// <summary>
-    /// Gets an <see cref="AssetRef{T}"/> from a relative path.
-    /// </summary>
-    /// <typeparam name="T">Asset type.</typeparam>
-    /// <param name="relativePath">Path relative to <see cref="assetDirectory"/>.</param>
-    /// <returns>Asset reference.</returns>
     public static AssetRef<T> Get<T>(string relativePath) where T : InnoAsset
     {
         relativePath = NormalizeRelativePath(relativePath);
-        
+
+        Guid guid;
+        InnoAsset? asset;
+
         lock (SYNC)
         {
-            if (PATH_TO_GUID.TryGetValue(relativePath, out var guid))
-                return Get<T>(guid);
+            if (!PATH_TO_GUID.TryGetValue(relativePath, out guid))
+            {
+                guid = Guid.Empty;
+                asset = null;
+            }
+            else
+            {
+                if (!LOADED_ASSETS.TryGetValue(guid, out asset))
+                    asset = null;
+            }
         }
 
-        Log.Warn($"Could not find asset from path: {Path.GetFullPath(Path.Combine(assetDirectory, relativePath))}");
-        return new AssetRef<T>(Guid.Empty, false);
+        if (guid == Guid.Empty || asset == null)
+        {
+            Log.Warn($"Could not find asset from path: {Path.GetFullPath(Path.Combine(assetDirectory, relativePath))}");
+            return new AssetRef<T>(Guid.Empty, false);
+        }
+
+        if (asset is not T)
+        {
+            Log.Warn($"Asset type mismatch for path '{relativePath}': expected {typeof(T).Name}, actual {asset.GetType().Name} (guid: {guid}).");
+            return new AssetRef<T>(Guid.Empty, false);
+        }
+
+        return new AssetRef<T>(guid, false);
     }
 
-    /// <summary>
-    /// Gets an <see cref="AssetRef{T}"/> from a GUID.
-    /// </summary>
-    /// <typeparam name="T">Asset type.</typeparam>
-    /// <param name="guid">Asset GUID.</param>
-    /// <returns>Asset reference.</returns>
     public static AssetRef<T> Get<T>(Guid guid) where T : InnoAsset
     {
+        InnoAsset? asset;
+
         lock (SYNC)
         {
-            if (LOADED_ASSETS.TryGetValue(guid, out var asset))
-                return new AssetRef<T>(asset.guid, false);
+            if (!LOADED_ASSETS.TryGetValue(guid, out asset))
+                asset = null;
         }
 
-        Log.Warn($"Could not find asset with guid: '{guid}'.");
-        return new AssetRef<T>(Guid.Empty, false);
+        if (asset == null)
+        {
+            Log.Warn($"Could not find asset with guid: '{guid}'.");
+            return new AssetRef<T>(Guid.Empty, false);
+        }
+
+        if (asset is not T)
+        {
+            Log.Warn($"Asset type mismatch for guid '{guid}': expected {typeof(T).Name}, actual {asset.GetType().Name}.");
+            return new AssetRef<T>(Guid.Empty, false);
+        }
+
+        return new AssetRef<T>(guid, false);
     }
 
-    /// <summary>
-    /// Gets an embedded asset reference.
-    /// </summary>
-    /// <typeparam name="T">Asset type.</typeparam>
-    /// <param name="nameOrSuffix">Manifest name or suffix.</param>
-    /// <param name="comparison">String comparison rule.</param>
-    /// <param name="endsWithMatch">True to match by suffix; false for exact.</param>
-    /// <returns>Embedded asset reference.</returns>
     public static AssetRef<T> GetEmbedded<T>(
         string nameOrSuffix,
         StringComparison comparison = StringComparison.OrdinalIgnoreCase,
@@ -335,14 +345,27 @@ public static class AssetManager
         var embeddedKey = $"{asm.FullName}|{manifestName}";
         var embeddedGuid = GenerateGuidFromEmbeddedKey(embeddedKey);
 
+        InnoAsset? asset;
+
         lock (SYNC)
         {
-            if (EMBEDDED_ASSETS.TryGetValue(embeddedGuid, out _))
-                return new AssetRef<T>(embeddedGuid, true);
+            if (!EMBEDDED_ASSETS.TryGetValue(embeddedGuid, out asset))
+                asset = null;
         }
 
-        Log.Warn($"Could not get embedded asset for {typeof(T).Name}");
-        return new AssetRef<T>(Guid.Empty, true);
+        if (asset == null)
+        {
+            Log.Warn($"Could not get embedded asset for {typeof(T).Name} (key: {nameOrSuffix}).");
+            return new AssetRef<T>(Guid.Empty, true);
+        }
+
+        if (asset is not T)
+        {
+            Log.Warn($"Embedded asset type mismatch for '{nameOrSuffix}': expected {typeof(T).Name}, actual {asset.GetType().Name} (guid: {embeddedGuid}).");
+            return new AssetRef<T>(Guid.Empty, true);
+        }
+
+        return new AssetRef<T>(embeddedGuid, true);
     }
 
     internal static T? ResolveAssetRef<T>(AssetRef<T> assetRef) where T : InnoAsset
@@ -352,9 +375,9 @@ public static class AssetManager
         lock (SYNC)
         {
             if (assetRef.isEmbedded)
-                return EMBEDDED_ASSETS.TryGetValue(assetRef.guid, out var a) ? (T)a : null;
+                return EMBEDDED_ASSETS.TryGetValue(assetRef.guid, out var a) ? a as T : null;
 
-            return LOADED_ASSETS.TryGetValue(assetRef.guid, out var b) ? (T)b : null;
+            return LOADED_ASSETS.TryGetValue(assetRef.guid, out var b) ? b as T : null;
         }
     }
 
