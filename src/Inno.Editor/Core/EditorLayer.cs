@@ -12,7 +12,7 @@ using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
 
-public class EditorLayer(PlatformAPI platform) : Layer("EditorLayer")
+public class EditorLayer(PlatformRuntime platform) : Layer("EditorLayer")
 {
     private static readonly float MIN_ZOOM_RATE = 0.2f;
     private static readonly float MAX_ZOOM_RATE = 4.0f;

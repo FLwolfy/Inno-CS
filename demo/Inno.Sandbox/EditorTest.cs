@@ -39,7 +39,7 @@ public class EditorTest
         }
     }
     
-    private class TestEditorLayer(PlatformAPI platform) : EditorLayer(platform)
+    private class TestEditorLayer(PlatformRuntime platform) : EditorLayer(platform)
     {
         public override void OnAttach()
         {

@@ -13,7 +13,7 @@ namespace Inno.Runtime.Core;
 
 public abstract class EngineCore
 {
-    private readonly PlatformAPI m_platform;
+    private readonly PlatformRuntime m_platform;
     private readonly Shell m_gameShell;
     private readonly LayerStack m_layerStack;
     private readonly FileLogSink m_fileSink;
@@ -21,7 +21,7 @@ public abstract class EngineCore
     protected EngineCore()
     {
         // Initialize platforms
-        m_platform = new PlatformAPI
+        m_platform = PlatformAPI.CreatePlatform
         (
             new WindowInfo
             {
@@ -125,7 +125,7 @@ public abstract class EngineCore
     /// <summary>
     /// Get the platform implemented for this engine core.
     /// </summary>
-    public PlatformAPI GetImplementedPlatform() => m_platform;
+    public PlatformRuntime GetImplementedPlatform() => m_platform;
     
     /// <summary>
     /// Starts the main loop of the engine.
