@@ -2,16 +2,17 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 
-using Inno.Core.Serialization;
+using Inno.Assets.Core;
+using Inno.Assets.Serializer;
 
 namespace Inno.Assets.AssetType;
 
-public abstract class InnoAsset : ISerializable
+public abstract class InnoAsset
 {
-    [SerializableProperty] private string type { get; set; }
-    [SerializableProperty] public Guid guid { get; internal set; }
-    [SerializableProperty] internal string sourceHash { get; private set; } = string.Empty;
-    [SerializableProperty] internal string sourcePath { get; private set; } = string.Empty;
+    [AssetProperty] private string type { get; set; }
+    [AssetProperty] public Guid guid { get; internal set; }
+    [AssetProperty] internal string sourceHash { get; private set; } = string.Empty;
+    [AssetProperty] internal string sourcePath { get; private set; } = string.Empty;
 
     public string name => Path.GetFileName(sourcePath);
     public byte[] assetBinaries { get; internal set; } = [];

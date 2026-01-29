@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using Inno.Assets.AssetType;
 using Inno.Assets.Core;
+using Inno.Assets.Serializer;
 using Inno.Core.ECS;
 using Inno.Core.Serialization;
 

@@ -6,7 +6,7 @@ using System.Reflection;
 
 using Inno.Core.Serialization;
 
-namespace Inno.Assets.Core;
+namespace Inno.Assets.Serializer;
 
 /// <summary>
 /// Lossless YAML codec for SerializingState.
