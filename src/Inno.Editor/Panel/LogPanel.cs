@@ -14,6 +14,7 @@ namespace Inno.Editor.Panel;
 
 public sealed class LogPanel : EditorPanel, ILogSink
 {
+    private const string C_ELLIPSE = "...";
     private const int C_MAX_LOG_ENTRIES = 100;
 
     public override string title => "Log";
@@ -155,12 +156,16 @@ public sealed class LogPanel : EditorPanel, ILogSink
         var msgStartX = wrapStartX + GetLevelTokenWidth(entry.level) + style.ItemSpacing.X;
         var msgAvail = MathF.Max(1f, right - msgStartX);
 
-        var willWrap = open && ImGuiNet.CalcTextSize(entry.message).X > msgAvail;
+        var msg = entry.message;
+        var hasNewline = msg.IndexOfAny(['\n', '\r']) >= 0;
+        var willWrap = open && !hasNewline && ImGuiNet.CalcTextSize(msg).X > msgAvail;
         var headerContentH = !open
             ? lineH
-            : willWrap
-                ? MathF.Max(lineH, ImGuiNet.CalcTextSize(entry.message, false, msgAvail).Y)
-                : lineH;
+            : hasNewline
+                ? MathF.Max(lineH, ImGuiNet.CalcTextSize(msg, false, msgAvail).Y)
+                : willWrap
+                    ? MathF.Max(lineH, ImGuiNet.CalcTextSize(msg, false, msgAvail).Y)
+                    : lineH;
 
         var headerH = headerContentH + c_padY * 2f;
         var headerMax = new Vector2(headerMin.X + fullW, headerMin.Y + headerH);
@@ -189,7 +194,21 @@ public sealed class LogPanel : EditorPanel, ILogSink
             ImGuiNet.GetColorU32(ImGuiCol.Text)
         );
 
-        DrawHeaderText(entry, levelColor, levelIcon, headerMin, headerMax, wrapStartX, c_padY, repeatText, repeatW, msgStartX, msgAvail, open, willWrap);
+        DrawHeaderText(
+            entry,
+            levelColor, 
+            levelIcon, 
+            headerMin, 
+            headerMax,
+            wrapStartX,
+            c_padY, 
+            repeatText, 
+            repeatW, 
+            msgStartX, 
+            msgAvail, 
+            open, 
+            willWrap,
+            hasNewline);
 
         if (open) DrawDetailsBlock(entry, headerMin, headerMax, style, dl);
         else ImGuiNet.Dummy(new Vector2(0, 0));
@@ -210,7 +229,8 @@ public sealed class LogPanel : EditorPanel, ILogSink
         float msgStartX,
         float msgAvail,
         bool open,
-        bool willWrap)
+        bool willWrap,
+        bool hasNewline)
     {
         var style = ImGuiNet.GetStyle();
 
@@ -237,20 +257,34 @@ public sealed class LogPanel : EditorPanel, ILogSink
         ImGuiNet.SetCursorScreenPos(new Vector2(msgStartX, headerMin.y + padY));
         ImGuiNet.SetCursorPosY(baseCursor.Y);
 
+        var msg = entry.message;
+
         if (!open)
         {
-            DrawSingleLineEllipsis(entry.message, msgAvail);
-        }
-        else if (!willWrap)
-        {
-            ImGuiNet.TextUnformatted(entry.message);
+            if (!hasNewline)
+            {
+                DrawSingleLineEllipsis(msg, msgAvail);
+            }
+            else
+            {
+                var firstLine = GetFirstLine(msg);
+                DrawSingleLineEllipsisForcedSuffix(firstLine, msgAvail);
+            }
         }
         else
         {
-            ImGuiNet.PushTextWrapPos(ImGuiNet.GetCursorPosX() + msgAvail);
-            ImGuiNet.TextUnformatted(entry.message);
-            ImGuiNet.PopTextWrapPos();
+            if (!hasNewline && !willWrap)
+            {
+                ImGuiNet.TextUnformatted(msg);
+            }
+            else
+            {
+                ImGuiNet.PushTextWrapPos(ImGuiNet.GetCursorPosX() + msgAvail);
+                ImGuiNet.TextUnformatted(msg);
+                ImGuiNet.PopTextWrapPos();
+            }
         }
+
 
         if (repeatW > 0f)
             ImGuiNet.GetWindowDrawList().AddText(
@@ -376,15 +410,28 @@ public sealed class LogPanel : EditorPanel, ILogSink
             dl.AddTriangleFilled(p1, p2, p3, col);
         }
     }
+    
+    private static string GetFirstLine(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (c == '\n' || c == '\r')
+                return text[..i];
+        }
+
+        return text;
+    }
 
     private static void DrawSingleLineEllipsis(string text, float maxWidth)
     {
         if (string.IsNullOrEmpty(text) || maxWidth <= 1f) { ImGuiNet.TextUnformatted(""); return; }
         if (ImGuiNet.CalcTextSize(text).X <= maxWidth) { ImGuiNet.TextUnformatted(text); return; }
 
-        const string c_ell = "...";
-        var ellW = ImGuiNet.CalcTextSize(c_ell).X;
-        if (ellW >= maxWidth) { ImGuiNet.TextUnformatted(c_ell); return; }
+        var ellW = ImGuiNet.CalcTextSize(C_ELLIPSE).X;
+        if (ellW >= maxWidth) { ImGuiNet.TextUnformatted(C_ELLIPSE); return; }
 
         var lo = 0;
         var hi = text.Length;
@@ -400,6 +447,40 @@ public sealed class LogPanel : EditorPanel, ILogSink
         var cut = lo;
         while (cut > 0 && char.IsWhiteSpace(text[cut - 1])) cut--;
 
-        ImGuiNet.TextUnformatted(cut <= 0 ? c_ell : text[..cut] + c_ell);
+        ImGuiNet.TextUnformatted(cut <= 0 ? C_ELLIPSE : text[..cut] + C_ELLIPSE);
     }
+    
+    private static void DrawSingleLineEllipsisForcedSuffix(string text, float maxWidth)
+    {
+        if (maxWidth <= 1f)
+        {
+            ImGuiNet.TextUnformatted("");
+            return;
+        }
+
+        var sufW = ImGuiNet.CalcTextSize(C_ELLIPSE).X;
+        if (sufW >= maxWidth)
+        {
+            ImGuiNet.TextUnformatted(C_ELLIPSE);
+            return;
+        }
+
+        var lo = 0;
+        var hi = text.Length;
+
+        while (lo < hi)
+        {
+            var mid = (lo + hi + 1) >> 1;
+            var w = ImGuiNet.CalcTextSize(text.AsSpan(0, mid).ToString()).X;
+            if (w + sufW <= maxWidth) lo = mid;
+            else hi = mid - 1;
+        }
+
+        var cut = lo;
+        while (cut > 0 && char.IsWhiteSpace(text[cut - 1])) cut--;
+
+        var body = cut <= 0 ? string.Empty : text[..cut];
+        ImGuiNet.TextUnformatted(body + C_ELLIPSE);
+    }
+
 }
