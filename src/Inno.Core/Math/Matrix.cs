@@ -104,15 +104,16 @@ public struct Matrix : IEquatable<Matrix>
 
     public static Matrix CreatePerspectiveFieldOfView(float fov, float aspect, float near, float far)
     {
-        float f = 1f / MathF.Tan(fov / 2);
+        float f  = 1f / MathF.Tan(fov * 0.5f);
         float nf = 1f / (near - far);
 
         return new Matrix(
-            f / aspect, 0, 0,                         0,
-            0,          f, 0,                         0,
-            0,          0, (far + near) * nf,        -1,
-            0,          0, (2 * far * near) * nf,     0);
+            f / aspect, 0, 0,            0,
+            0,          f, 0,            0,
+            0,          0, far * nf,    -1,
+            0,          0, (near * far) * nf, 0);
     }
+
 
     /// <summary>
     /// Creates an orthographic projection matrix with the given width, height, near, and far planes.

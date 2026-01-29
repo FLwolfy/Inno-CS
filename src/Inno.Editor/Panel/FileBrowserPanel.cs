@@ -1500,6 +1500,7 @@ public sealed class FileBrowserPanel : EditorPanel
         {
             "PNG" => ImGuiIcon.Image,
             "SCENE" => ImGuiIcon.ObjectGroup,
+            "OBJ" => ImGuiIcon.Shapes,
             _ => ImGuiIcon.File
         };
     }
