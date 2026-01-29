@@ -8,6 +8,7 @@ using Inno.Editor.Panel;
 using Inno.ImGui;
 using Inno.Platform;
 
+using ImGuizmoNET;
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
@@ -99,12 +100,11 @@ public class EditorLayer(PlatformRuntime platform) : Layer("EditorLayer")
         EditorSceneAssetIO.SaveActiveScene();
     }
 
-
-
     public override void OnRender()
     {
         // Begin ImGui Layout
         ImGuiHost.BeginLayout(Time.renderDeltaTime);
+        ImGuizmo.BeginFrame();
         
         // DockSpace
         ImGuiNet.DockSpaceOverViewport(ImGuiNet.GetMainViewport().ID);

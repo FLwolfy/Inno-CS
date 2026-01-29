@@ -188,8 +188,7 @@ public class SceneViewPanel : EditorPanel
             ImGuiNet.Image(newTextureHandle, new Vector2(m_width, m_height));
             Vector2 min = ImGuiNet.GetItemRectMin();
             Vector2 max = ImGuiNet.GetItemRectMax();
-            m_viewRect = new Rect((int)min.x, (int)min.y, (int)(max.x - min.x),
-                (int)(max.y - min.y));
+            ImGuizmo.SetRect(min.x, min.y, max.x - min.x, max.y - min.y);
         }
     }
     
@@ -228,9 +227,6 @@ public class SceneViewPanel : EditorPanel
 
     private void DrawTransformGizmo()
     {
-        ImGuizmo.BeginFrame();
-        ImGuizmo.SetDrawlist();
-        ImGuizmo.SetRect(m_viewRect.x,  m_viewRect.y, m_viewRect.width, m_viewRect.height);
         ImGuizmo.SetOrthographic(true);
 
         if (EditorManager.selection.selectedObject is GameObject go)

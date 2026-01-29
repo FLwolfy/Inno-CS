@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Inno.Editor.Utility;
 
 using ImGuiNET;
+using ImGuizmoNET;
 using ImGuiNet = ImGuiNET.ImGui;
 
 namespace Inno.Editor.Core;
@@ -46,6 +47,7 @@ public static class EditorManager
             if (!panel.isOpen) continue;
 
             ImGuiNet.Begin(panel.title, ImGuiWindowFlags.NoCollapse);
+            ImGuizmo.SetDrawlist();
             panel.OnGUI();
             ImGuiNet.End();
         }
