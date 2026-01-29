@@ -1,6 +1,8 @@
 using System;
-
+using ImGuizmoNET;
+using Inno.Core.ECS;
 using Inno.Core.Events;
+using Inno.Core.Logging;
 using Inno.Core.Math;
 using Inno.Editor.Core;
 using Inno.Editor.Gizmo;
@@ -35,6 +37,11 @@ public class SceneViewPanel : EditorPanel
     
     private int m_width;
     private int m_height;
+    private Rect m_viewRect;
+    
+    private readonly float[] m_gizmoView  = new float[16];
+    private readonly float[] m_gizmoProj  = new float[16];
+    private readonly float[] m_gizmoModel = new float[16];
     
     internal SceneViewPanel()
     {
@@ -64,6 +71,9 @@ public class SceneViewPanel : EditorPanel
         
         // Draw axis gizmo
         DrawAxisGizmo();
+        
+        // Draw transform gizmo
+        DrawTransformGizmo();
     }
     
     private void EnsureSceneRenderTarget()
@@ -176,6 +186,10 @@ public class SceneViewPanel : EditorPanel
             }
             
             ImGuiNet.Image(newTextureHandle, new Vector2(m_width, m_height));
+            Vector2 min = ImGuiNet.GetItemRectMin();
+            Vector2 max = ImGuiNet.GetItemRectMax();
+            m_viewRect = new Rect((int)min.x, (int)min.y, (int)(max.x - min.x),
+                (int)(max.y - min.y));
         }
     }
     
@@ -210,6 +224,57 @@ public class SceneViewPanel : EditorPanel
         m_gridGizmo.coordsIncrement = new Vector2(newAxisInterval, newAxisInterval);
         
         m_gridGizmo.Draw();
+    }
+
+    private void DrawTransformGizmo()
+    {
+        ImGuizmo.BeginFrame();
+        ImGuizmo.SetDrawlist();
+        ImGuizmo.SetRect(m_viewRect.x,  m_viewRect.y, m_viewRect.width, m_viewRect.height);
+        ImGuizmo.SetOrthographic(true);
+
+        if (EditorManager.selection.selectedObject is GameObject go)
+        {
+            Matrix world = BuildWorldMatrix(go.transform);
+            
+            ToFloat16(m_editorCamera2D.viewMatrix, m_gizmoView);
+            ToFloat16(m_editorCamera2D.projectionMatrix, m_gizmoProj);
+            ToFloat16(world, m_gizmoModel);
+
+            bool usingGizmo = ImGuizmo.Manipulate(
+                ref m_gizmoView[0],
+                ref m_gizmoProj[0],
+                OPERATION.TRANSLATE,
+                MODE.WORLD,
+                ref m_gizmoModel[0]
+            );
+        }
+    }
+
+    public static void ToFloat16(Matrix m, float[] dst)
+    {
+        dst[0]  = m.m11; dst[1]  = m.m12; dst[2]  = m.m13; dst[3]  = m.m14;
+        dst[4]  = m.m21; dst[5]  = m.m22; dst[6]  = m.m23; dst[7]  = m.m24;
+        dst[8]  = m.m31; dst[9]  = m.m32; dst[10] = m.m33; dst[11] = m.m34;
+        dst[12] = m.m41; dst[13] = m.m42; dst[14] = m.m43; dst[15] = m.m44;
+    }
+
+    public static Matrix FromFloat16(float[] m)
+    {
+        return new Matrix(
+            m[0],  m[1],  m[2],  m[3],
+            m[4],  m[5],  m[6],  m[7],
+            m[8],  m[9],  m[10], m[11],
+            m[12], m[13], m[14], m[15]
+        );
+    }
+    
+    private static Matrix BuildWorldMatrix(Transform t)
+    {
+        return
+            Matrix.CreateScale(t.worldScale) *
+            Matrix.CreateFromQuaternion(t.worldRotation) *
+            Matrix.CreateTranslation(t.worldPosition);
     }
 
 }

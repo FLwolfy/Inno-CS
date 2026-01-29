@@ -14,7 +14,7 @@ namespace Inno.Editor.Panel;
 
 public sealed class LogPanel : EditorPanel, ILogSink
 {
-    private const int C_MAX_LOG_ENTRIES = 1000;
+    private const int C_MAX_LOG_ENTRIES = 100;
 
     public override string title => "Log";
 
