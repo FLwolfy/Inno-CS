@@ -80,10 +80,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: 0
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 1
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -175,10 +191,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: 45
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.38268346
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.9238795
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -326,10 +358,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: -45.000004
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: -0.38268346
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.9238795
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -477,10 +525,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: -45.000004
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: -0.38268346
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.9238795
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -628,10 +692,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: -45.000004
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: -0.38268346
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.9238795
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -779,10 +859,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: -45.000004
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: -0.38268346
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0.9238795
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -930,10 +1026,26 @@ $value:
                                   $kind: prim
                                   $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
                                   $value: 1
-                            localRotationZ:
-                              $kind: prim
-                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: 0
+                            localRotation:
+                              $kind: struct
+                              $type: Inno.Core.Math.Quaternion, Inno.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
+                              $fields:
+                                F:x:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:y:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:z:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 0
+                                F:w:
+                                  $kind: prim
+                                  $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                                  $value: 1
                             parentId:
                               $kind: prim
                               $type: System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e

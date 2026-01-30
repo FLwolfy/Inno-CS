@@ -47,7 +47,9 @@ public class EditorTest
         
         public override void Update()
         {
-            transform.localRotationZ += Time.deltaTime * rotationSpeed;
+            var localRotationEuler = transform.localRotation.ToEulerAnglesXYZDegrees();
+            var newRotationEuler = localRotationEuler + new Vector3(0, 0, Time.deltaTime * rotationSpeed);
+            transform.localRotation = Quaternion.FromEulerAnglesXYZDegrees(newRotationEuler);
         }
     }
 }

@@ -578,38 +578,11 @@ public static class EditorGuiLayout
     /// </summary>
     public static bool QuaternionField(string label, ref Quaternion value, bool enabled = true)
     {
-        bool changed = false;
-
-        using (new DrawScope(enabled))
-        {
-            BeginPropertyRow(label);
-
-            float x = value.x;
-            float y = value.y;
-            float z = value.z;
-            float w = value.w;
-
-            BeginColumns();
-
-            changed |= DrawAxisDrag("X", ref x, ImGuiNet.GetColumnWidth(), new Color(0.75f, 0.20f, 0.20f));
-            SplitColumns();
-            changed |= DrawAxisDrag("Y", ref y, ImGuiNet.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f));
-            SplitColumns();
-            changed |= DrawAxisDrag("Z", ref z, ImGuiNet.GetColumnWidth(), new Color(0.25f, 0.35f, 0.80f));
-            SplitColumns();
-            changed |= DrawAxisDrag("W", ref w, ImGuiNet.GetColumnWidth(), new Color(0.55f, 0.55f, 0.55f));
-
-            EndColumns();
-
-            if (changed)
-            {
-                value.x = x; value.y = y; value.z = z; value.w = w;
-            }
-
-            EndPropertyRow();
-        }
-
-        return changed;
+        var eulerDegrees = value.ToEulerAnglesXYZDegrees();
+        var result = Vector3Field(label, ref eulerDegrees, enabled);
+        value = Quaternion.FromEulerAnglesXYZDegrees(eulerDegrees);
+        
+        return result;
     }
 
     /// <summary>
