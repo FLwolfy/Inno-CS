@@ -1,8 +1,7 @@
-using System;
 using System.Linq;
+
 using Inno.Core.ECS;
 using Inno.Core.Math;
-using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Renderer;
 using Inno.Graphics.Targets;
@@ -23,17 +22,14 @@ public class RenderAlphaSpritePass(bool? requireCameraZCheck = null) : RenderPas
         var camera = scene.GetMainCamera();
         if (m_requireCameraZCheck && camera == null) return;
 
-        foreach (var (sr, depth) in scene.GetAllComponents<SpriteRenderer>()
+        foreach (var sr in scene.GetAllComponents<SpriteRenderer>()
                      .Where(sr => sr.isActive)
                      .Where(sr => sr.opacity < 1f || sr.color.a < 1f || sr.sprite.texture != null)
-                     .Select(sr => (sr, (sr.layerDepth + (float)((Math.Tanh(sr.transform.worldPosition.z / SpriteRenderer.MAX_LAYER_DEPTH) + 1) / 2)) / (SpriteRenderer.MAX_LAYER_DEPTH + 1)))
-                     .OrderByDescending(t => t.Item2))
+                     .OrderByDescending(sr => sr.layerDepth))
         {
-            if (m_requireCameraZCheck && sr.transform.worldPosition.z < camera!.transform.worldPosition.z) continue;
-            
             var t = Matrix.CreateScale(new Vector3(sr.sprite.size.x * sr.transform.worldScale.x, sr.sprite.size.y * sr.transform.worldScale.y, 1)) *
                     Matrix.CreateFromQuaternion(sr.transform.worldRotation) *
-                    Matrix.CreateTranslation(new Vector3(sr.transform.worldPosition.x, sr.transform.worldPosition.y, depth));
+                    Matrix.CreateTranslation(sr.transform.worldPosition);
 
             var s = sr.sprite;
             if (s.texture != null)

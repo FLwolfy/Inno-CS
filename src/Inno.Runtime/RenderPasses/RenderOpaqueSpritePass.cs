@@ -1,8 +1,7 @@
-using System;
 using System.Linq;
+
 using Inno.Core.ECS;
 using Inno.Core.Math;
-using Inno.Graphics;
 using Inno.Graphics.Pass;
 using Inno.Graphics.Renderer;
 using Inno.Graphics.Targets;
@@ -26,13 +25,14 @@ public class RenderOpaqueSpritePass(bool? requireCameraZCheck = null) : RenderPa
         foreach (var sr in scene.GetAllComponents<SpriteRenderer>()
                      .Where(sr => sr.isActive)
                      .Where(sr => sr.opacity >= 1f && sr.color.a >= 1f)
-                     .Where(sr => sr.sprite.texture == null))
+                     .Where(sr => sr.sprite.texture == null)
+                     .OrderByDescending(sr => sr.layerDepth))
         {
             if (m_requireCameraZCheck && sr.transform.worldPosition.z < camera!.transform.worldPosition.z) continue;
             
             var t = Matrix.CreateScale(new Vector3(sr.sprite.size.x * sr.transform.worldScale.x, sr.sprite.size.y * sr.transform.worldScale.y, 1)) *
                     Matrix.CreateFromQuaternion(sr.transform.worldRotation) *
-                    Matrix.CreateTranslation(new Vector3(sr.transform.worldPosition.x, sr.transform.worldPosition.y, (sr.layerDepth + (float)((Math.Tanh(sr.transform.worldPosition.z / SpriteRenderer.MAX_LAYER_DEPTH) + 1) / 2)) / (SpriteRenderer.MAX_LAYER_DEPTH + 1)));
+                    Matrix.CreateTranslation(sr.transform.worldPosition);
 
             // TODO: Add Opaque Sprite Check
             Renderer2D.DrawQuad(ctx, t, sr.color);
