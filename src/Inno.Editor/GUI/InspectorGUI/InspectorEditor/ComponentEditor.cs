@@ -21,7 +21,7 @@ public class ComponentEditor : IInspectorEditor
         
         if (EditorGuiLayout.CollapsingHeader(compName, onClose))
         {
-            var serializedProps = ((ISerializable)comp).GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
+            var serializedProps = ((ISerializable)comp).GetSerializedProperties();
             if (serializedProps.Count == 0)
             {
                 EditorGuiLayout.Label("No editable properties.");
@@ -31,7 +31,7 @@ public class ComponentEditor : IInspectorEditor
             {
                 if (PropertyRendererRegistry.TryGetRenderer(prop.propertyType, out var renderer))
                 {
-                    renderer!.Bind(prop.name, () => prop.GetValue(), val => prop.SetValue(val), prop.visibility == SerializedProperty.PropertyVisibility.Show);
+                    renderer!.Bind(prop.name, () => prop.GetValue(), val => prop.SetValue(val), (prop.visibility & PropertyVisibility.Readonly) != 0);
                 }
                 else
                 {

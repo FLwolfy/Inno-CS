@@ -574,16 +574,154 @@ public static class EditorGuiLayout
     }
 
     /// <summary>
-    /// Draws a Quaternion field with per-component drags.
+    /// Draws a Quaternion field as Euler angles (degrees) with stable UI editing.
     /// </summary>
+    /// <remarks>
+    /// Quaternion remains the source of truth. The editor shows XYZ degrees (Vector3-like),
+    /// while caching euler values in ImGui state storage to keep continuity (unwrap) and avoid jumps.
+    /// </remarks>
     public static bool QuaternionField(string label, ref Quaternion value, bool enabled = true)
     {
-        var eulerDegrees = value.ToEulerAnglesXYZDegrees();
-        var result = Vector3Field(label, ref eulerDegrees, enabled);
-        value = Quaternion.FromEulerAnglesXYZDegrees(eulerDegrees);
-        
-        return result;
+        bool changed = false;
+
+        using (new DrawScope(enabled))
+        {
+            BeginPropertyRow(label);
+
+            // Per-widget cache keyed by ImGui ID
+            uint id = ImGuiNet.GetID("##quat_euler_cache");
+            var storage = ImGuiNet.GetStateStorage();
+
+            uint kHas = id ^ 0xA13F_001u;
+            uint kQx  = id ^ 0xA13F_010u;
+            uint kQy  = id ^ 0xA13F_011u;
+            uint kQz  = id ^ 0xA13F_012u;
+            uint kQw  = id ^ 0xA13F_013u;
+            uint kEx  = id ^ 0xA13F_020u;
+            uint kEy  = id ^ 0xA13F_021u;
+            uint kEz  = id ^ 0xA13F_022u;
+
+            // Pack/unpack float into ImGui storage int slots
+            int Pack(float f) => BitConverter.SingleToInt32Bits(f);
+            float Unpack(int i) => BitConverter.Int32BitsToSingle(i);
+
+            bool hasCache = storage.GetBool(kHas, false);
+
+            Quaternion lastQ = hasCache
+                ? new Quaternion(
+                    Unpack(storage.GetInt(kQx, 0)),
+                    Unpack(storage.GetInt(kQy, 0)),
+                    Unpack(storage.GetInt(kQz, 0)),
+                    Unpack(storage.GetInt(kQw, Pack(1f))))
+                : Quaternion.identity;
+
+            Vector3 cachedEuler = hasCache
+                ? new Vector3(
+                    Unpack(storage.GetInt(kEx, 0)),
+                    Unpack(storage.GetInt(kEy, 0)),
+                    Unpack(storage.GetInt(kEz, 0)))
+                : Vector3.ZERO;
+
+            // If the quaternion changed externally, refresh the cached euler from quaternion
+            bool externalChanged = !hasCache || !value.Equals(lastQ);
+
+            Vector3 euler;
+            if (externalChanged)
+            {
+                // quaternion -> euler
+                euler = value.normalized.ToEulerAnglesXYZDegrees();
+
+                // normalize to [-180, 180]
+                float nx = euler.x % 360f; if (nx > 180f) nx -= 360f; if (nx < -180f) nx += 360f;
+                float ny = euler.y % 360f; if (ny > 180f) ny -= 360f; if (ny < -180f) ny += 360f;
+                float nz = euler.z % 360f; if (nz > 180f) nz -= 360f; if (nz < -180f) nz += 360f;
+
+                if (hasCache)
+                {
+                    // unwrap each axis to be closest to cachedEuler
+                    float rx = cachedEuler.x % 360f; if (rx > 180f) rx -= 360f; if (rx < -180f) rx += 360f;
+                    float ry = cachedEuler.y % 360f; if (ry > 180f) ry -= 360f; if (ry < -180f) ry += 360f;
+                    float rz = cachedEuler.z % 360f; if (rz > 180f) rz -= 360f; if (rz < -180f) rz += 360f;
+
+                    float dx = nx - rx; if (dx > 180f) nx -= 360f; else if (dx < -180f) nx += 360f;
+                    float dy = ny - ry; if (dy > 180f) ny -= 360f; else if (dy < -180f) ny += 360f;
+                    float dz = nz - rz; if (dz > 180f) nz -= 360f; else if (dz < -180f) nz += 360f;
+                }
+
+                euler = new Vector3(nx, ny, nz);
+                cachedEuler = euler;
+
+                // store cache (no helper method)
+                storage.SetBool(kHas, true);
+                storage.SetInt(kQx, Pack(value.x));
+                storage.SetInt(kQy, Pack(value.y));
+                storage.SetInt(kQz, Pack(value.z));
+                storage.SetInt(kQw, Pack(value.w));
+                storage.SetInt(kEx, Pack(cachedEuler.x));
+                storage.SetInt(kEy, Pack(cachedEuler.y));
+                storage.SetInt(kEz, Pack(cachedEuler.z));
+
+                hasCache = true;
+            }
+            else
+            {
+                euler = cachedEuler;
+            }
+
+            float x = euler.x;
+            float y = euler.y;
+            float z = euler.z;
+
+            BeginColumns();
+
+            changed |= DrawAxisDrag("X", ref x, ImGuiNet.GetColumnWidth(), new Color(0.75f, 0.20f, 0.20f));
+            SplitColumns();
+            changed |= DrawAxisDrag("Y", ref y, ImGuiNet.GetColumnWidth(), new Color(0.20f, 0.65f, 0.25f));
+            SplitColumns();
+            changed |= DrawAxisDrag("Z", ref z, ImGuiNet.GetColumnWidth(), new Color(0.25f, 0.35f, 0.80f));
+
+            EndColumns();
+
+            if (changed)
+            {
+                // normalize input to [-180, 180]
+                float nx = x % 360f; if (nx > 180f) nx -= 360f; if (nx < -180f) nx += 360f;
+                float ny = y % 360f; if (ny > 180f) ny -= 360f; if (ny < -180f) ny += 360f;
+                float nz = z % 360f; if (nz > 180f) nz -= 360f; if (nz < -180f) nz += 360f;
+
+                // unwrap relative to cachedEuler (keep continuity)
+                float rx = cachedEuler.x % 360f; if (rx > 180f) rx -= 360f; if (rx < -180f) rx += 360f;
+                float ry = cachedEuler.y % 360f; if (ry > 180f) ry -= 360f; if (ry < -180f) ry += 360f;
+                float rz = cachedEuler.z % 360f; if (rz > 180f) rz -= 360f; if (rz < -180f) rz += 360f;
+
+                float dx = nx - rx; if (dx > 180f) nx -= 360f; else if (dx < -180f) nx += 360f;
+                float dy = ny - ry; if (dy > 180f) ny -= 360f; else if (dy < -180f) ny += 360f;
+                float dz = nz - rz; if (dz > 180f) nz -= 360f; else if (dz < -180f) nz += 360f;
+
+                var newEuler = new Vector3(nx, ny, nz);
+
+                // euler -> quaternion
+                var newQ = Quaternion.FromEulerAnglesXYZDegrees(newEuler).normalized;
+                value = newQ;
+
+                // update cache
+                cachedEuler = newEuler;
+                storage.SetBool(kHas, true);
+                storage.SetInt(kQx, Pack(value.x));
+                storage.SetInt(kQy, Pack(value.y));
+                storage.SetInt(kQz, Pack(value.z));
+                storage.SetInt(kQw, Pack(value.w));
+                storage.SetInt(kEx, Pack(cachedEuler.x));
+                storage.SetInt(kEy, Pack(cachedEuler.y));
+                storage.SetInt(kEz, Pack(cachedEuler.z));
+            }
+
+            EndPropertyRow();
+        }
+
+        return changed;
     }
+
 
     /// <summary>
     /// Draws an input text field.

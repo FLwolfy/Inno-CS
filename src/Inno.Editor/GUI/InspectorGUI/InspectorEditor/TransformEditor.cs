@@ -16,16 +16,13 @@ public class TransformEditor : ComponentEditor
         
         if (EditorGuiLayout.CollapsingHeader(compName))
         {
-            var serializedProps = ((ISerializable)comp).GetSerializedProperties().Where(p => p.visibility != SerializedProperty.PropertyVisibility.Hide).ToList();
+            var serializedProps = ((ISerializable)comp).GetSerializedProperties();
             
             foreach (var prop in serializedProps)
             {
-                if (prop.visibility != SerializedProperty.PropertyVisibility.Show)
-                    continue;
-                
                 if (PropertyRendererRegistry.TryGetRenderer(prop.propertyType, out var renderer))
                 {
-                    renderer!.Bind(prop.name, () => prop.GetValue(), val => prop.SetValue(val), prop.visibility == SerializedProperty.PropertyVisibility.Show);
+                    renderer!.Bind(prop.name, () => prop.GetValue(), val => prop.SetValue(val), (prop.visibility & PropertyVisibility.Readonly) != 0);
                 }
             }
         }

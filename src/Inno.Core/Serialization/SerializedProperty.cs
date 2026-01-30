@@ -7,20 +7,6 @@ namespace Inno.Core.Serialization;
 /// </summary>
 public sealed class SerializedProperty
 {
-    #region Public Types
-
-    /// <summary>
-    /// Defines member participation rules for serialization and editor exposure.
-    /// </summary>
-    public enum PropertyVisibility
-    {
-        Show,
-        Hide,
-        ReadOnly
-    }
-
-    #endregion
-
     #region Backing Delegates
 
     private readonly Func<object?> m_getter;
@@ -71,25 +57,12 @@ public sealed class SerializedProperty
     /// Gets the current value.
     /// </summary>
     /// <returns>The value produced by the getter delegate.</returns>
-    /// <example>
-    /// <code>
-    /// var v = prop.GetValue();
-    /// </code>
-    /// </example>
     public object? GetValue() => m_getter();
 
     /// <summary>
     /// Sets the current value.
     /// </summary>
     /// <param name="value">The value to assign.</param>
-    /// <remarks>
-    /// For <see cref="PropertyVisibility.ReadOnly"/> members, the underlying setter may be a no-op.
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// prop.SetValue(123);
-    /// </code>
-    /// </example>
     public void SetValue(object? value) => m_setter(value);
 
     #endregion

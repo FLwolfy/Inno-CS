@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Inno.Core.Logging;
 
 namespace Inno.Core.Serialization;
 
@@ -13,7 +14,7 @@ namespace Inno.Core.Serialization;
 /// Marks an instance method to be invoked after <see cref="ISerializable.RestoreState"/> completes.
 /// </summary>
 /// <remarks>
-/// The method must be parameterless and return <see cref="void"/>. Invocation order is base-type to derived-type.
+/// The method must be parameterless and return void. Invocation order is base-type to derived-type.
 /// </remarks>
 [AttributeUsage(AttributeTargets.Method, Inherited = true)]
 public sealed class OnSerializableRestored : Attribute;
@@ -33,20 +34,6 @@ public interface ISerializable
     /// Returns the serialized properties declared on this instance type.
     /// </summary>
     /// <returns>A stable, ordered list of serialized properties for this instance.</returns>
-    /// <remarks>
-    /// The returned list applies <see cref="SerializedProperty.PropertyVisibility.Hide"/> and
-    /// <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> rules.
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// var props = obj.GetSerializedProperties();
-    /// foreach (var p in props)
-    /// {
-    ///     if (p.visibility == SerializedProperty.PropertyVisibility.ReadOnly) continue;
-    ///     Console.WriteLine($"{p.name} = {p.GetValue()}");
-    /// }
-    /// </code>
-    /// </example>
     public IReadOnlyList<SerializedProperty> GetSerializedProperties()
     {
         var slots = GetSlots(GetType());
@@ -54,11 +41,26 @@ public interface ISerializable
 
         foreach (var s in slots)
         {
+            if (s.visibility == PropertyVisibility.Hide)
+                continue;
+            
+            var noSetterAllowed = 
+                ((s.visibility & PropertyVisibility.RuntimeSet) == 0);
+            
             result.Add(new SerializedProperty(
                 s.name,
                 s.type,
                 () => s.getter(this),
-                v => s.setter(this, v),
+                v =>
+                {
+                    if (noSetterAllowed)
+                    {
+                        Log.Warn($"SerializedProperty {s.name} is not allowed to set its value.");
+                        return;
+                    }
+
+                    s.setter(this, v);
+                },
                 s.visibility));
         }
 
@@ -70,23 +72,20 @@ public interface ISerializable
     /// </summary>
     /// <returns>A <see cref="SerializingState"/> representing this instance.</returns>
     /// <exception cref="InvalidOperationException">Thrown when a member value is not supported by the serialization graph.</exception>
-    /// <remarks>
-    /// <see cref="SerializedProperty.PropertyVisibility.Hide"/> members are excluded.
-    /// <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> members are included in capture only.
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// SerializingState state = component.CaptureState();
-    /// byte[] bytes = SerializingState.Serialize(state);
-    /// </code>
-    /// </example>
     public SerializingState CaptureState()
     {
         var slots = GetSlots(GetType());
         var node = new Dictionary<string, object?>(slots.Length, StringComparer.Ordinal);
 
         foreach (var s in slots)
+        {
+            if ((s.visibility & PropertyVisibility.Serialize) == 0)
+            {
+                continue;
+            }
+            
             node[s.name] = CaptureValue(s.getter(this), s.type);
+        }
 
         return new SerializingState(node);
     }
@@ -98,15 +97,8 @@ public interface ISerializable
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="state"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when a state value cannot be converted to the declared member type.</exception>
     /// <remarks>
-    /// Members marked as <see cref="SerializedProperty.PropertyVisibility.ReadOnly"/> are not assigned during restore.
     /// After restoration, methods annotated with <see cref="OnSerializableRestored"/> are invoked.
     /// </remarks>
-    /// <example>
-    /// <code>
-    /// var state = SerializingState.Deserialize(bytes);
-    /// obj.RestoreState(state);
-    /// </code>
-    /// </example>
     public void RestoreState(SerializingState state)
     {
         if (state == null) throw new ArgumentNullException(nameof(state));
@@ -114,8 +106,10 @@ public interface ISerializable
         var slots = GetSlots(GetType());
         foreach (var s in slots)
         {
-            if (s.visibility == SerializedProperty.PropertyVisibility.ReadOnly)
+            if ((s.visibility & PropertyVisibility.Deserialize) == 0)
+            {
                 continue;
+            }
 
             if (!state.values.TryGetValue(s.name, out var raw))
                 continue;
@@ -182,7 +176,7 @@ public interface ISerializable
         Type type,
         Func<object, object?> getter,
         Action<object, object?> setter,
-        SerializedProperty.PropertyVisibility visibility,
+        PropertyVisibility visibility,
         int orderKey);
 
     private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
@@ -191,7 +185,7 @@ public interface ISerializable
 
     private static MemberSlot[] BuildSlots(Type type)
     {
-        const BindingFlags declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        const BindingFlags c_declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
         var chain = new List<Type>(8);
         for (var t = type; t != null && t != typeof(object); t = t.BaseType)
@@ -208,10 +202,10 @@ public interface ISerializable
         {
             var depth = chainIndex[t];
 
-            foreach (var p in t.GetProperties(declared))
+            foreach (var p in t.GetProperties(c_declared))
             {
                 var attr = p.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
-                if (attr == null || attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
+                if (attr == null)
                     continue;
 
                 if (p.GetIndexParameters().Length != 0)
@@ -220,40 +214,63 @@ public interface ISerializable
                 if (!p.CanRead)
                     throw new InvalidOperationException($"{type.FullName}.{p.Name} must be readable to be [SerializableProperty].");
 
-                var isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
-
-                if (!isReadOnly && p.GetSetMethod(nonPublic: true) == null)
-                    throw new InvalidOperationException($"{type.FullName}.{p.Name} must have setter when visibility=Show.");
-
+                var noSetterAllowed = (attr.propertyVisibility & PropertyVisibility.Deserialize) == 0;
+                var setMethod = p.GetSetMethod(nonPublic: true);
+                Action<object, object?> setter;
+                if (setMethod == null)
+                {
+                    setter = (_, _) => Log.Error($"SerializedProperty {p.Name} has no setter defined.");
+                }
+                else
+                {
+                    setter = setMethod.IsPublic
+                        ? (obj, value) => p.SetValue(obj, value)
+                        : (obj, value) => setMethod.Invoke(obj, [value]);
+                }
+                
+                if (!noSetterAllowed && setMethod == null)
+                    throw new InvalidOperationException($"{type.FullName}.{p.Name} must have setter for its [SerializableProperty].");
+                
                 SerializableGraph.ValidateAllowedTypeGraph(p.PropertyType, $"{type.FullName}.{p.Name}");
 
                 list.Add(new MemberSlot(
                     p.Name,
                     p.PropertyType,
                     obj => p.GetValue(obj),
-                    BuildPropertySetter(type, p, isReadOnly),
+                    setter,
                     attr.propertyVisibility,
                     (depth << 24) ^ p.MetadataToken));
             }
 
-            foreach (var f in t.GetFields(declared))
+            foreach (var f in t.GetFields(c_declared))
             {
                 var attr = f.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
-                if (attr == null || attr.propertyVisibility == SerializedProperty.PropertyVisibility.Hide)
+                if (attr == null)
                     continue;
 
-                var isReadOnly = attr.propertyVisibility == SerializedProperty.PropertyVisibility.ReadOnly;
+                var noSetterAllowed = 
+                    (attr.propertyVisibility & PropertyVisibility.Deserialize) == 0;
 
-                if (!isReadOnly && f.IsInitOnly)
-                    throw new InvalidOperationException($"{type.FullName}.{f.Name} is readonly; it must be writable when visibility=Show.");
-
+                Action<object, object?> setter;
+                if (f.IsInitOnly)
+                {
+                    setter = (_, _) => Log.Error($"SerializedProperty {f.Name} is initialized only.");
+                }
+                else
+                {
+                    setter = f.SetValue;
+                }
+                
+                if (!noSetterAllowed && f.IsInitOnly)
+                    throw new InvalidOperationException($"{type.FullName}.{f.Name} is readonly; it must be writable for its [SerializableProperty].");
+                
                 SerializableGraph.ValidateAllowedTypeGraph(f.FieldType, $"{type.FullName}.{f.Name}");
 
                 list.Add(new MemberSlot(
                     f.Name,
                     f.FieldType,
                     obj => f.GetValue(obj),
-                    (!isReadOnly && !f.IsInitOnly) ? (obj, v) => f.SetValue(obj, v) : static (_, _) => { },
+                    setter,
                     attr.propertyVisibility,
                     (depth << 24) ^ f.MetadataToken));
             }
@@ -264,20 +281,6 @@ public interface ISerializable
             .Select(g => g.OrderBy(x => x.orderKey).Last())
             .OrderBy(s => s.orderKey)
             .ToArray();
-    }
-
-    private static Action<object, object?> BuildPropertySetter(Type ownerType, PropertyInfo p, bool isReadOnly)
-    {
-        if (isReadOnly)
-            return static (_, _) => { };
-
-        var setMethod = p.GetSetMethod(nonPublic: true);
-        if (setMethod == null)
-            throw new InvalidOperationException($"{ownerType.FullName}.{p.Name} must have a setter when visibility=Show.");
-
-        return setMethod.IsPublic
-            ? (obj, v) => p.SetValue(obj, v)
-            : (obj, v) => setMethod.Invoke(obj, new[] { v });
     }
 
     #endregion
@@ -471,7 +474,7 @@ public interface ISerializable
 
     private void InvokeAfterRestoreHooks()
     {
-        const BindingFlags declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        const BindingFlags c_declared = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         var type = GetType();
 
         var chain = new List<Type>(8);
@@ -481,7 +484,7 @@ public interface ISerializable
 
         foreach (var t in chain)
         {
-            foreach (var m in t.GetMethods(declared))
+            foreach (var m in t.GetMethods(c_declared))
             {
                 if (m.GetCustomAttribute<OnSerializableRestored>(inherit: true) == null)
                     continue;

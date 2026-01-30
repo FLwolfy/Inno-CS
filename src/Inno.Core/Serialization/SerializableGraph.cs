@@ -98,12 +98,12 @@ internal static class SerializableGraph
 
     #region Member Visibility
 
-    internal static SerializedProperty.PropertyVisibility GetVisibilityOrShow(MemberInfo m) =>
-        m.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true)?.propertyVisibility ?? SerializedProperty.PropertyVisibility.Show;
+    internal static PropertyVisibility GetVisibilityOrShow(MemberInfo m) =>
+        m.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true)?.propertyVisibility ?? PropertyVisibility.Show;
 
     internal static FieldInfo[] GetStructSerializableFields(Type t) =>
         t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Where(f => GetVisibilityOrShow(f) != SerializedProperty.PropertyVisibility.Hide)
+            .Where(f => (GetVisibilityOrShow(f) & PropertyVisibility.Transient) != 0)
             .OrderBy(f => f.MetadataToken)
             .ToArray();
 
@@ -114,10 +114,10 @@ internal static class SerializableGraph
                 if (p.GetIndexParameters().Length != 0) return false;
 
                 var vis = GetVisibilityOrShow(p);
-                if (vis == SerializedProperty.PropertyVisibility.Hide) return false;
+                if ((vis & PropertyVisibility.Transient) == 0) return false;
                 if (!p.CanRead) return false;
 
-                return vis != SerializedProperty.PropertyVisibility.Show || p.GetSetMethod(nonPublic: true) != null;
+                return !((vis & PropertyVisibility.Deserialize) != 0 && p.GetSetMethod(nonPublic: true) == null);
             })
             .OrderBy(p => p.MetadataToken)
             .ToArray();

@@ -28,8 +28,6 @@ public class RenderOpaqueSpritePass(bool? requireCameraZCheck = null) : RenderPa
                      .Where(sr => sr.sprite.texture == null)
                      .OrderByDescending(sr => sr.layerDepth))
         {
-            if (m_requireCameraZCheck && sr.transform.worldPosition.z < camera!.transform.worldPosition.z) continue;
-            
             var t = Matrix.CreateScale(new Vector3(sr.sprite.size.x * sr.transform.worldScale.x, sr.sprite.size.y * sr.transform.worldScale.y, 1)) *
                     Matrix.CreateFromQuaternion(sr.transform.worldRotation) *
                     Matrix.CreateTranslation(sr.transform.worldPosition);

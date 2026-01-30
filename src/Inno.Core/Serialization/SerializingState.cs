@@ -448,7 +448,7 @@ public sealed record SerializingState
                 if (fieldMap.TryGetValue(key, out var fi))
                 {
                     var vis = SerializableGraph.GetVisibilityOrShow(fi);
-                    if (vis != SerializedProperty.PropertyVisibility.ReadOnly && !fi.IsInitOnly)
+                    if ((vis & PropertyVisibility.Deserialize) != 0 && !fi.IsInitOnly)
                         fi.SetValue(boxed, val);
                     continue;
                 }
@@ -456,7 +456,7 @@ public sealed record SerializingState
                 if (propMap.TryGetValue(key, out var pi))
                 {
                     var vis = SerializableGraph.GetVisibilityOrShow(pi);
-                    if (vis != SerializedProperty.PropertyVisibility.ReadOnly && pi.CanWrite)
+                    if ((vis & PropertyVisibility.Deserialize) != 0 && pi.CanWrite)
                         pi.SetValue(boxed, val);
                     continue;
                 }

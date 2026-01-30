@@ -43,14 +43,15 @@ public class EditorTest
     {
         public override ComponentTag orderTag => ComponentTag.Behavior;
 
-        [SerializableProperty] public float rotationSpeed = 100f;
+        [SerializableProperty] public float rotationSpeed = 10f;
         
         public override void Update()
         {
-            var localRotationEuler = transform.localRotation.ToEulerAnglesXYZDegrees();
-            var newRotationEuler = localRotationEuler + new Vector3(0, 0, Time.deltaTime * rotationSpeed);
-            transform.localRotation = Quaternion.FromEulerAnglesXYZDegrees(newRotationEuler);
+            float deltaDeg = rotationSpeed * Time.deltaTime;
+            var dq = Quaternion.FromEulerAnglesXYZ(Vector3.UP * deltaDeg).normalized;
+            transform.localRotation = (transform.localRotation * dq).normalized;
         }
+
     }
 }
 

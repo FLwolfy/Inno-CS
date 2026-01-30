@@ -11,11 +11,44 @@ namespace Inno.Runtime.Component;
 /// </summary>
 public class OrthographicCamera : GameCamera
 {
-    private const float C_NEAR = 0f;
-    private const float C_FAR = 1f;
-
+    private float m_near = -1000f;
+    private float m_far  = 1000f;
     private float m_size = 1080f;
 
+    /// <summary>
+    /// Near clipping plane.
+    /// </summary>
+    [SerializableProperty]
+    public float near
+    {
+        get => m_near;
+        set
+        {
+            if (!MathHelper.AlmostEquals(m_near, value))
+            {
+                m_near = value;
+                MarkDirty();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Far clipping plane.
+    /// </summary>
+    [SerializableProperty]
+    public float far
+    {
+        get => m_far;
+        set
+        {
+            if (!MathHelper.AlmostEquals(m_far, value))
+            {
+                m_far = value;
+                MarkDirty();
+            }
+        }
+    }
+    
     /// <summary>
     /// The size of the camera's view in world units.
     /// </summary>
@@ -32,13 +65,14 @@ public class OrthographicCamera : GameCamera
             }
         }
     }
-    
+
     protected override void RebuildMatrix(out Matrix view, out Matrix projection, out Rect visibleRect)
     {
         Vector2 cameraPos = new Vector2(
-            transform.worldPosition.x, 
+            transform.worldPosition.x,
             transform.worldPosition.y
         );
+
         float rotationZ = transform.worldRotation.ToEulerAnglesZYX().z;
 
         projection = CalculateProjectionMatrix();
@@ -54,8 +88,8 @@ public class OrthographicCamera : GameCamera
         return Matrix.CreateOrthographic(
             width: halfWidth * 2,
             height: halfHeight * 2,
-            C_NEAR,
-            C_FAR
+            m_near,
+            m_far
         );
     }
 

@@ -231,6 +231,9 @@ public class SceneViewPanel : EditorPanel
 
         if (EditorManager.selection.selectedObject is GameObject go)
         {
+            // Check destroy or not
+            if (go.transform == null) return;
+            
             Matrix world = BuildWorldMatrix(go.transform);
             
             ToFloat16(m_editorCamera2D.viewMatrix, m_gizmoView);

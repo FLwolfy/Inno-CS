@@ -116,6 +116,14 @@ $value:
                         componentState:
                           $kind: state
                           $value:
+                            near:
+                              $kind: prim
+                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                              $value: -1000
+                            far:
+                              $kind: prim
+                              $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
+                              $value: 1000
                             size:
                               $kind: prim
                               $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
@@ -1155,4 +1163,4 @@ $value:
                             rotationSpeed:
                               $kind: prim
                               $type: System.Single, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-                              $value: 100
+                              $value: 10
