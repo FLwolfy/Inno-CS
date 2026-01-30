@@ -12,7 +12,7 @@ namespace Inno.Editor.GUI;
 /// <summary>
 /// Minimal editor layout helpers built on top of ImGui.
 /// </summary>
-public static class EditorGuiLayout
+public static class EditorGUILayout
 {
     public enum LayoutAlign { Front, Center, Back }
     [Flags] public enum FontStyle { None, Bold, Italic }
@@ -35,7 +35,7 @@ public static class EditorGuiLayout
     #region Lifecycles
 
     /// <summary>
-    /// Begins a UI frame for EditorGuiLayout validation.
+    /// Begins a UI frame for EditorGUILayout validation.
     /// </summary>
     public static void BeginFrame()
     {

@@ -12,10 +12,10 @@ public class GameObjectEditor : IInspectorEditor
         if (target is not GameObject gameObject) { return; }
         
         // Render Components
-        EditorGuiLayout.BeginScope(gameObject.id.GetHashCode());
+        EditorGUILayout.BeginScope(gameObject.id.GetHashCode());
         OnShowComponents(gameObject);
         OnShowAddComponent(gameObject);
-        EditorGuiLayout.EndScope();
+        EditorGUILayout.EndScope();
     }
 
     private static void OnShowComponents(GameObject gameObject)
@@ -32,7 +32,7 @@ public class GameObjectEditor : IInspectorEditor
                 defaultEditor!.OnInspectorGUI(comp);
             }
             
-            EditorGuiLayout.Space(10f);
+            EditorGUILayout.Space(10f);
         }
     }
 
@@ -48,14 +48,14 @@ public class GameObjectEditor : IInspectorEditor
         
         var typeNames = componentTypes.Select(t => t.Name).ToArray();
 
-        EditorGuiLayout.BeginAlignment(EditorGuiLayout.LayoutAlign.Center);
+        EditorGUILayout.BeginAlignment(EditorGUILayout.LayoutAlign.Center);
 
-        if (EditorGuiLayout.PopupMenu("Add Component", "No available components to add.", typeNames, out var selectedIndex))
+        if (EditorGUILayout.PopupMenu("Add Component", "No available components to add.", typeNames, out var selectedIndex))
         {
             var selectedType = componentTypes[selectedIndex!.Value];
             gameObject.AddComponent(selectedType);
         }
 
-        EditorGuiLayout.EndAlignment();
+        EditorGUILayout.EndAlignment();
     }
 }

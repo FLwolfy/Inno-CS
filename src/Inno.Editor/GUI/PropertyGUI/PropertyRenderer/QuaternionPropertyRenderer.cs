@@ -8,7 +8,7 @@ public class QuaternionPropertyRenderer : PropertyRenderer<Quaternion>
     protected override void Bind(string name, Func<Quaternion> getter, Action<Quaternion> setter, bool enabled)
     {
         Quaternion value = getter.Invoke();
-        if (EditorGuiLayout.QuaternionField(name, ref value, enabled))
+        if (EditorGUILayout.QuaternionField(name, ref value, enabled))
         {
             setter.Invoke(value);
         }

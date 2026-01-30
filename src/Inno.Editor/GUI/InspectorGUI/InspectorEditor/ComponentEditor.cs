@@ -19,12 +19,12 @@ public class ComponentEditor : IInspectorEditor
         string compName = comp.GetType().Name;
         Action onClose = comp is Transform ? () => { } : () => comp.gameObject.RemoveComponent(comp);
         
-        if (EditorGuiLayout.CollapsingHeader(compName, onClose))
+        if (EditorGUILayout.CollapsingHeader(compName, onClose))
         {
             var serializedProps = ((ISerializable)comp).GetSerializedProperties();
             if (serializedProps.Count == 0)
             {
-                EditorGuiLayout.Label("No editable properties.");
+                EditorGUILayout.Label("No editable properties.");
             }
             
             foreach (var prop in serializedProps)
@@ -35,7 +35,7 @@ public class ComponentEditor : IInspectorEditor
                 }
                 else
                 {
-                    EditorGuiLayout.Label($"No renderer for {prop.name} ({prop.propertyType.Name})");
+                    EditorGUILayout.Label($"No renderer for {prop.name} ({prop.propertyType.Name})");
                 }
             }
         }

@@ -15,13 +15,13 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
         var sprite = getter.Invoke();
         if (sprite == null) return;
 
-        if (EditorGuiLayout.CollapsingLabel(name, true, enabled))
+        if (EditorGUILayout.CollapsingLabel(name, true, enabled))
         {
             // Texture Source
             Guid spriteGuid = sprite.texture?.guid ?? Guid.Empty;
             string? displayName = sprite.texture?.name;
-            EditorGuiLayout.Indent(16);
-            if (EditorGuiLayout.GuidRef("source", FileBrowserPanel.ASSET_GUID_PAYLOAD_TYPE, ref spriteGuid, displayName, enabled))
+            EditorGUILayout.Indent(16);
+            if (EditorGUILayout.GuidRef("source", FileBrowserPanel.ASSET_GUID_PAYLOAD_TYPE, ref spriteGuid, displayName, enabled))
             {
                 if (spriteGuid == Guid.Empty)
                 {
@@ -42,12 +42,12 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
             }
             
             // Size
-            EditorGuiLayout.Indent(16);
-            EditorGuiLayout.Vector2Field("size", ref sprite.size);
+            EditorGUILayout.Indent(16);
+            EditorGUILayout.Vector2Field("size", ref sprite.size);
             
             // UV
-            EditorGuiLayout.Indent(16);
-            EditorGuiLayout.Vector4Field("uv", ref sprite.uv);
+            EditorGUILayout.Indent(16);
+            EditorGUILayout.Vector4Field("uv", ref sprite.uv);
         }
     }
 }
