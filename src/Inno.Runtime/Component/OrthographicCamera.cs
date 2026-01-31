@@ -10,44 +10,16 @@ namespace Inno.Runtime.Component;
 /// Orthographic camera component (3D transform: position/rotation),
 /// with orthographic projection.
 /// </summary>
-public class OrthographicCamera : GameCamera
+public sealed class OrthographicCamera : Camera
 {
-    private float m_near = -1000f;
-    private float m_far  = 1000f;
     private float m_size = 1080f;
 
-    /// <summary>
-    /// Near clipping plane.
-    /// </summary>
-    [SerializableProperty]
-    public float near
+    public override void OnAttach()
     {
-        get => m_near;
-        set
-        {
-            if (!MathHelper.AlmostEquals(m_near, value))
-            {
-                m_near = value;
-                MarkDirty();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Far clipping plane.
-    /// </summary>
-    [SerializableProperty]
-    public float far
-    {
-        get => m_far;
-        set
-        {
-            if (!MathHelper.AlmostEquals(m_far, value))
-            {
-                m_far = value;
-                MarkDirty();
-            }
-        }
+        base.OnAttach();
+        
+        near = -1000f;
+        far = 1000f;
     }
 
     /// <summary>
@@ -86,8 +58,8 @@ public class OrthographicCamera : GameCamera
         return Matrix.CreateOrthographic(
             width:  halfWidth * 2f,
             height: halfHeight * 2f,
-            m_near,
-            m_far
+            near,
+            far
         );
     }
 

@@ -20,7 +20,7 @@ public class GameScene : ISerializable
     private bool m_isRunning;
     private bool m_isUpdating;
 
-    internal GameCamera? mainCamera;
+    internal Camera? mainCamera;
 
     internal GameScene() {}
     
@@ -157,7 +157,7 @@ public class GameScene : ISerializable
     /// <summary>
     /// Gets the main camera of the current game scene.
     /// </summary>
-    public GameCamera? GetMainCamera() => mainCamera;
+    public Camera? GetMainCamera() => mainCamera;
 
     /// <summary>
     /// Registers a GameObject to this scene.

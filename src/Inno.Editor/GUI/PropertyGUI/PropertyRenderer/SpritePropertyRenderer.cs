@@ -47,7 +47,7 @@ public class SpritePropertyRenderer : PropertyRenderer<Sprite>
             
             // UV
             EditorGUILayout.Indent(16);
-            EditorGUILayout.Vector4Field("uv", ref sprite.uv);
+            EditorGUILayout.Vector4Field("UV", ref sprite.uv);
         }
     }
 }

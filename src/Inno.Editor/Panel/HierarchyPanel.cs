@@ -144,7 +144,7 @@ public class HierarchyPanel : EditorPanel
             ImGuiNet.EndDragDropTarget();
         }
 
-        bool isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(GameCamera)));
+        bool isCamera = obj.GetAllComponents().Any(c => c.GetType().IsAssignableTo(typeof(Camera)));
         ImGuiNet.SameLine();
         EditorImGuiEx.DrawIconAndText(isCamera ? ImGuiIcon.Camera : ImGuiIcon.Cube, obj.name);
 

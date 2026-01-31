@@ -3,17 +3,20 @@ using System.Runtime.Serialization;
 
 namespace Inno.Core.Math;
 
-/// <summary>
-/// Represents a 4x4 matrix used for affine and projective transformations.
-/// </summary>
 /// <remarks>
 /// Conventions used by this type:
 /// <list type="bullet">
-///   <item><description>Row-major storage (m11..m14 is the first row, m41..m44 is the last row).</description></item>
-///   <item><description>Translation is stored in the last row: (m41, m42, m43).</description></item>
-///   <item><description>Matrix multiplication is the standard form: C = A * B.</description></item>
+///   <item><description><b>Row-major storage</b> (m11..m14 is first row, m41..m44 is last row).</description></item>
+///   <item><description><b>Row-vector math</b>: points/vectors are treated as row vectors on the left: <c>v' = v * M</c>.</description></item>
+///   <item><description><b>Translation is stored in the last row</b>: (m41, m42, m43).</description></item>
+///   <item><description>Matrix multiplication follows standard form: <c>C = A * B</c> (apply A then B in row-vector convention: <c>v * A * B</c>).</description></item>
 /// </list>
-/// Ensure your CPU/GPU convention (row/column major, vector orientation) is consistent when uploading matrices to shaders.
+/// <para>
+/// Note on handedness:
+/// This <see cref="Matrix"/> type is <b>handedness-agnostic</b>. Handedness is determined by the specific factory
+/// (e.g. <see cref="CreateLookAt"/> and <see cref="CreatePerspectiveFieldOfView"/> are currently <b>right-handed</b>).
+/// If your engine convention is left-handed (+Z forward), add/use explicit LH variants (e.g. CreateLookAtLH / CreatePerspectiveFieldOfViewLH).
+/// </para>
 /// </remarks>
 [DataContract]
 public struct Matrix : IEquatable<Matrix>
@@ -228,7 +231,7 @@ public struct Matrix : IEquatable<Matrix>
     #region Projection
 
     /// <summary>
-    /// Creates a perspective projection matrix (right-handed, depth range 0..1).
+    /// Creates a left-handed, perspective projection matrix ( depth range 0..1).
     /// </summary>
     /// <param name="fov">Vertical field of view in radians.</param>
     /// <param name="aspect">Viewport aspect ratio (width / height).</param>
@@ -238,13 +241,13 @@ public struct Matrix : IEquatable<Matrix>
     public static Matrix CreatePerspectiveFieldOfView(float fov, float aspect, float near, float far)
     {
         float f  = 1f / MathF.Tan(fov * 0.5f);
-        float nf = 1f / (near - far);
+        float nf = 1f / (far - near);
 
         return new Matrix(
             f / aspect, 0, 0,                 0,
             0,          f, 0,                 0,
-            0,          0, far * nf,         -1,
-            0,          0, (near * far) * nf, 0);
+            0,          0, far * nf,          1,
+            0,          0, -near * far * nf,  0);
     }
 
     /// <summary>
@@ -275,7 +278,7 @@ public struct Matrix : IEquatable<Matrix>
     #region View
 
     /// <summary>
-    /// Creates a right-handed view matrix that looks from <paramref name="eye"/> to <paramref name="target"/>.
+    /// Creates a left-handed view matrix that looks from <paramref name="eye"/> to <paramref name="target"/>.
     /// </summary>
     /// <param name="eye">Camera position in world space.</param>
     /// <param name="target">Target position in world space.</param>
@@ -283,9 +286,10 @@ public struct Matrix : IEquatable<Matrix>
     /// <returns>A view matrix.</returns>
     public static Matrix CreateLookAt(Vector3 eye, Vector3 target, Vector3 up)
     {
-        Vector3 z = (eye - target).normalized;
-        Vector3 x = Vector3.Cross(up, z).normalized;
-        Vector3 y = Vector3.Cross(z, x);
+        // LH: forward points from eye to target
+        Vector3 z = (target - eye).normalized;          // forward (+Z)
+        Vector3 x = Vector3.Cross(up, z).normalized;    // right
+        Vector3 y = Vector3.Cross(z, x);                // up
 
         return new Matrix(
             x.x, y.x, z.x, 0,
@@ -293,6 +297,7 @@ public struct Matrix : IEquatable<Matrix>
             x.z, y.z, z.z, 0,
             -Vector3.Dot(x, eye), -Vector3.Dot(y, eye), -Vector3.Dot(z, eye), 1);
     }
+
 
     #endregion
 

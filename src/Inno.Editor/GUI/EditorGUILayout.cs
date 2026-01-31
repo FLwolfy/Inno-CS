@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 using Inno.Core.Math;
 using Inno.ImGui;
@@ -128,7 +129,6 @@ public static class EditorGUILayout
         COLUMN_PAD_STACK.Push(pushedPad);
     }
 
-
     /// <summary>
     /// Ends the current column layout.
     /// </summary>
@@ -165,7 +165,6 @@ public static class EditorGUILayout
         m_columnDepth--;
     }
 
-
     /// <summary>
     /// Adds the next column in the current layout.
     /// </summary>
@@ -187,7 +186,6 @@ public static class EditorGUILayout
             COLUMN_WEIGHT_MAP[layoutKey].Add(nextColumnWeight);
         }
     }
-
 
     /// <summary>
     /// Inserts vertical spacing.
@@ -255,151 +253,6 @@ public static class EditorGUILayout
         ImGuiNet.EndGroup();
     }
 
-    private readonly struct DrawScope : IDisposable
-    {
-        private readonly bool m_enabled;
-
-        public DrawScope(bool enabled)
-        {
-            m_enabled = enabled;
-            if (!enabled) ImGuiNet.BeginDisabled();
-        }
-
-        public void Dispose()
-        {
-            if (!m_enabled) ImGuiNet.EndDisabled();
-        }
-    }
-
-    private static float GetAlignedOffsetX(float itemWidth, float availWidth)
-    {
-        if (ALIGN_STACK.Count == 0) return 0f;
-
-        var align = ALIGN_STACK.Peek();
-        return align switch
-        {
-            LayoutAlign.Center => (availWidth - itemWidth) * 0.5f,
-            LayoutAlign.Back => (availWidth - itemWidth),
-            _ => 0f
-        };
-    }
-
-    private static void SetAlignedCursorPosX(float itemWidth)
-    {
-        if (ALIGN_STACK.Count == 0) return;
-
-        var align = ALIGN_STACK.Peek();
-        var cursorPos = ImGuiNet.GetCursorPos();
-        var avail = ImGuiNet.GetContentRegionAvail();
-
-        float offsetX = align switch
-        {
-            LayoutAlign.Center => (avail.X - itemWidth) * 0.5f,
-            LayoutAlign.Back => (avail.X - itemWidth),
-            _ => 0f
-        };
-
-        ImGuiNet.SetCursorPosX(cursorPos.X + offsetX);
-    }
-
-    private static float MeasureWidth(Action onMeasure)
-    {
-        ImGuiHost.BeginInvisible();
-        ImGuiNet.PushID("__measure__");
-        onMeasure.Invoke();
-        ImGuiNet.PopID();
-        ImGuiHost.EndInvisible();
-
-        return ImGuiHost.GetInvisibleItemSize().x;
-    }
-
-    private static void BeginPropertyRow(string label)
-    {
-        ImGuiNet.PushID(label);
-
-        BeginColumns(2f);
-        if (m_nextIndentWidth != 0)
-        {
-            ImGuiNet.Dummy(new Vector2(m_nextIndentWidth, 0));
-            ImGuiNet.SameLine();
-            m_nextIndentWidth = 0;
-        }
-        Label(label);
-
-        SplitColumns(3f);
-
-        if (!COLUMN_DIRTY_STACK.Peek())
-            ImGuiNet.TableSetColumnIndex(1);
-    }
-
-    private static void EndPropertyRow()
-    {
-        EndColumns();
-        ImGuiNet.PopID();
-    }
-
-    private static bool DrawAxisDrag(string axis, ref float value, float fieldW, Color tagColor)
-    {
-        bool changed = false;
-        float gap = ImGuiNet.GetStyle().ItemSpacing.X;
-        float h = ImGuiNet.GetFrameHeight();
-        var tagSize = new Vector2(h, h);
-
-        var dl = ImGuiNet.GetWindowDrawList();
-        Vector2 p0 = ImGuiNet.GetCursorScreenPos();
-        Vector2 p1 = new Vector2(p0.x + tagSize.x, p0.y + tagSize.y);
-
-        ImGuiNet.InvisibleButton($"##tag_{axis}", tagSize);
-        bool hovered = ImGuiNet.IsItemHovered();
-        bool held = ImGuiNet.IsItemActive();
-
-        Vector4 bg = new Vector4(tagColor.r, tagColor.g, tagColor.b, tagColor.a);
-        if (held)
-        {
-            bg = new Vector4(tagColor.r * 0.90f, tagColor.g * 0.90f, tagColor.b * 0.90f, tagColor.a);
-        }
-        else if (hovered)
-        {
-            bg = new Vector4(
-                MathF.Min(1f, tagColor.r + 0.10f),
-                MathF.Min(1f, tagColor.g + 0.10f),
-                MathF.Min(1f, tagColor.b + 0.10f),
-                tagColor.a);
-        }
-
-        float rounding = ImGuiNet.GetStyle().FrameRounding;
-        dl.AddRectFilled(p0, p1, ImGuiNet.ColorConvertFloat4ToU32(bg), rounding);
-
-        Vector2 textSize = ImGuiNet.CalcTextSize(axis);
-        Vector2 textPos = new Vector2(
-            p0.x + (tagSize.x - textSize.x) * 0.5f,
-            p0.y + (tagSize.y - textSize.y) * 0.5f);
-        dl.AddText(textPos, ImGuiNet.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), axis);
-
-        if (held)
-        {
-            float speed = 0.02f;
-            var io = ImGuiNet.GetIO();
-            if (io.KeyShift) speed *= 0.2f;
-            if (io.KeyCtrl) speed *= 5.0f;
-
-            float delta = io.MouseDelta.X * speed;
-            if (delta != 0f)
-            {
-                value += delta;
-                changed = true;
-            }
-
-            ImGuiNet.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
-        }
-
-        ImGuiNet.SameLine(0f, gap);
-        ImGuiNet.SetNextItemWidth(fieldW);
-        changed |= ImGuiNet.InputFloat($"##{axis}", ref value);
-
-        return changed;
-    }
-
     #endregion
 
     #region Widgets
@@ -409,6 +262,8 @@ public static class EditorGUILayout
     /// </summary>
     public static void Label(string text, bool enabled = true)
     {
+        var labelText = ToInspectorLabel(text);
+        
         // Keep using frame height so each property row aligns to standard widgets.
         float rowH = ImGuiNet.GetFrameHeight();
 
@@ -419,7 +274,7 @@ public static class EditorGUILayout
         ImGuiNet.Dummy(new Vector2(1, rowH));
 
         // Horizontal alignment (your existing alignment stack)
-        Vector2 textSize = ImGuiNet.CalcTextSize(text);
+        Vector2 textSize = ImGuiNet.CalcTextSize(labelText);
         float offsetX = GetAlignedOffsetX(textSize.x, availW);
 
         // Vertical center inside the reserved row height
@@ -430,7 +285,7 @@ public static class EditorGUILayout
         ImGuiNet.GetWindowDrawList().AddText(
             new Vector2(p0.x + offsetX, textY),
             col,
-            text);
+            labelText);
     }
 
     /// <summary>
@@ -721,7 +576,6 @@ public static class EditorGUILayout
 
         return changed;
     }
-
 
     /// <summary>
     /// Draws an input text field.
@@ -1030,5 +884,195 @@ public static class EditorGUILayout
         return changed;
     }
 
+    #endregion
+    
+    #region Helpers
+    
+        private readonly struct DrawScope : IDisposable
+    {
+        private readonly bool m_enabled;
+
+        public DrawScope(bool enabled)
+        {
+            m_enabled = enabled;
+            if (!enabled) ImGuiNet.BeginDisabled();
+        }
+
+        public void Dispose()
+        {
+            if (!m_enabled) ImGuiNet.EndDisabled();
+        }
+    }
+
+    private static float GetAlignedOffsetX(float itemWidth, float availWidth)
+    {
+        if (ALIGN_STACK.Count == 0) return 0f;
+
+        var align = ALIGN_STACK.Peek();
+        return align switch
+        {
+            LayoutAlign.Center => (availWidth - itemWidth) * 0.5f,
+            LayoutAlign.Back => (availWidth - itemWidth),
+            _ => 0f
+        };
+    }
+
+    private static void SetAlignedCursorPosX(float itemWidth)
+    {
+        if (ALIGN_STACK.Count == 0) return;
+
+        var align = ALIGN_STACK.Peek();
+        var cursorPos = ImGuiNet.GetCursorPos();
+        var avail = ImGuiNet.GetContentRegionAvail();
+
+        float offsetX = align switch
+        {
+            LayoutAlign.Center => (avail.X - itemWidth) * 0.5f,
+            LayoutAlign.Back => (avail.X - itemWidth),
+            _ => 0f
+        };
+
+        ImGuiNet.SetCursorPosX(cursorPos.X + offsetX);
+    }
+
+    private static float MeasureWidth(Action onMeasure)
+    {
+        ImGuiHost.BeginInvisible();
+        ImGuiNet.PushID("__measure__");
+        onMeasure.Invoke();
+        ImGuiNet.PopID();
+        ImGuiHost.EndInvisible();
+
+        return ImGuiHost.GetInvisibleItemSize().x;
+    }
+
+    private static void BeginPropertyRow(string label)
+    {
+        ImGuiNet.PushID(label);
+
+        BeginColumns(2f);
+        if (m_nextIndentWidth != 0)
+        {
+            ImGuiNet.Dummy(new Vector2(m_nextIndentWidth, 0));
+            ImGuiNet.SameLine();
+            m_nextIndentWidth = 0;
+        }
+        Label(label);
+
+        SplitColumns(3f);
+
+        if (!COLUMN_DIRTY_STACK.Peek())
+            ImGuiNet.TableSetColumnIndex(1);
+    }
+
+    private static void EndPropertyRow()
+    {
+        EndColumns();
+        ImGuiNet.PopID();
+    }
+
+    private static bool DrawAxisDrag(string axis, ref float value, float fieldW, Color tagColor)
+    {
+        bool changed = false;
+        float gap = ImGuiNet.GetStyle().ItemSpacing.X;
+        float h = ImGuiNet.GetFrameHeight();
+        var tagSize = new Vector2(h, h);
+
+        var dl = ImGuiNet.GetWindowDrawList();
+        Vector2 p0 = ImGuiNet.GetCursorScreenPos();
+        Vector2 p1 = new Vector2(p0.x + tagSize.x, p0.y + tagSize.y);
+
+        ImGuiNet.InvisibleButton($"##tag_{axis}", tagSize);
+        bool hovered = ImGuiNet.IsItemHovered();
+        bool held = ImGuiNet.IsItemActive();
+
+        Vector4 bg = new Vector4(tagColor.r, tagColor.g, tagColor.b, tagColor.a);
+        if (held)
+        {
+            bg = new Vector4(tagColor.r * 0.90f, tagColor.g * 0.90f, tagColor.b * 0.90f, tagColor.a);
+        }
+        else if (hovered)
+        {
+            bg = new Vector4(
+                MathF.Min(1f, tagColor.r + 0.10f),
+                MathF.Min(1f, tagColor.g + 0.10f),
+                MathF.Min(1f, tagColor.b + 0.10f),
+                tagColor.a);
+        }
+
+        float rounding = ImGuiNet.GetStyle().FrameRounding;
+        dl.AddRectFilled(p0, p1, ImGuiNet.ColorConvertFloat4ToU32(bg), rounding);
+
+        Vector2 textSize = ImGuiNet.CalcTextSize(axis);
+        Vector2 textPos = new Vector2(
+            p0.x + (tagSize.x - textSize.x) * 0.5f,
+            p0.y + (tagSize.y - textSize.y) * 0.5f);
+        dl.AddText(textPos, ImGuiNet.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 1)), axis);
+
+        if (held)
+        {
+            float speed = 0.02f;
+            var io = ImGuiNet.GetIO();
+            if (io.KeyShift) speed *= 0.2f;
+            if (io.KeyCtrl) speed *= 5.0f;
+
+            float delta = io.MouseDelta.X * speed;
+            if (delta != 0f)
+            {
+                value += delta;
+                changed = true;
+            }
+
+            ImGuiNet.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+        }
+
+        ImGuiNet.SameLine(0f, gap);
+        ImGuiNet.SetNextItemWidth(fieldW);
+        changed |= ImGuiNet.InputFloat($"##{axis}", ref value);
+
+        return changed;
+    }
+    
+    private static string ToInspectorLabel(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return string.Empty;
+
+        var sb = new StringBuilder(name.Length * 2);
+
+        sb.Append(char.ToUpper(name[0]));
+
+        for (int i = 1; i < name.Length; i++)
+        {
+            char curr = name[i];
+            char prev = name[i - 1];
+            char prevPrev = i > 1 ? name[i - 2] : '\0';
+
+            bool currUpper = char.IsUpper(curr);
+            bool prevUpper = char.IsUpper(prev);
+            bool currLower = char.IsLower(curr);
+            bool currDigit = char.IsDigit(curr);
+            bool prevDigit = char.IsDigit(prev);
+
+            bool needSpace =
+                // lower -> upper (positionX)
+                (!prevUpper && currUpper)
+
+                // acronym end: URLValue
+                || (prevUpper && currLower && i > 1 && char.IsUpper(prevPrev))
+
+                // letter <-> digit
+                || (!prevDigit && currDigit)
+                || (prevDigit && !currDigit);
+
+            if (needSpace)
+                sb.Append(' ');
+
+            sb.Append(curr);
+        }
+
+        return sb.ToString();
+    }
+    
     #endregion
 }

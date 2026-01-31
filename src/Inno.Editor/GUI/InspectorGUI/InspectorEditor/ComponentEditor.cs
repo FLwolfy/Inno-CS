@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using Inno.Core.ECS;
 using Inno.Core.Serialization;
 using Inno.Editor.GUI.PropertyGUI;
@@ -17,7 +18,7 @@ public class ComponentEditor : IInspectorEditor
         if (target is not GameComponent comp) { return; }
         
         string compName = comp.GetType().Name;
-        Action onClose = comp is Transform ? () => { } : () => comp.gameObject.RemoveComponent(comp);
+        Action? onClose = comp is Transform ? null : () => comp.gameObject.RemoveComponent(comp);
         
         if (EditorGUILayout.CollapsingHeader(compName, onClose))
         {

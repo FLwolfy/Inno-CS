@@ -4,7 +4,7 @@ using Inno.Core.Serialization;
 
 namespace Inno.Core.ECS;
 
-public abstract class GameCamera : GameComponent
+public abstract class Camera : GameComponent
 {
     public sealed override ComponentTag orderTag => ComponentTag.Camera;
 
@@ -13,7 +13,10 @@ public abstract class GameCamera : GameComponent
     private Matrix m_cachedViewMatrix;
     private Matrix m_cachedProjectionMatrix;
     private Rect m_cachedViewRect;
-    private float m_aspectRatio = 1.7777f;
+    
+    private float m_aspectRatio = 16f / 9f;
+    private float m_near = 0f;
+    private float m_far  = 1000f;
 
     /// <summary>
     /// Sets or gets whether this camera is the main camera in the scene.
@@ -45,6 +48,40 @@ public abstract class GameCamera : GameComponent
             if (MathF.Abs(m_aspectRatio - value) > 0.0001f)
             {
                 m_aspectRatio = value;
+                MarkDirty();
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Near clipping plane.
+    /// </summary>
+    [SerializableProperty]
+    public float near
+    {
+        get => m_near;
+        set
+        {
+            if (!MathHelper.AlmostEquals(m_near, value))
+            {
+                m_near = value;
+                MarkDirty();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Far clipping plane.
+    /// </summary>
+    [SerializableProperty]
+    public float far
+    {
+        get => m_far;
+        set
+        {
+            if (!MathHelper.AlmostEquals(m_far, value))
+            {
+                m_far = value;
                 MarkDirty();
             }
         }
