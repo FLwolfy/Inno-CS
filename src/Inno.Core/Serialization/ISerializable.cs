@@ -177,7 +177,7 @@ public interface ISerializable
         Func<object, object?> getter,
         Action<object, object?> setter,
         PropertyVisibility visibility,
-        int orderKey);
+        long sortKey);
 
     private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
 
@@ -239,7 +239,7 @@ public interface ISerializable
                     obj => p.GetValue(obj),
                     setter,
                     attr.propertyVisibility,
-                    (depth << 24) ^ p.MetadataToken));
+                    (((long)depth) << 32) | (uint)p.MetadataToken));
             }
 
             foreach (var f in t.GetFields(c_declared))
@@ -272,14 +272,14 @@ public interface ISerializable
                     obj => f.GetValue(obj),
                     setter,
                     attr.propertyVisibility,
-                    (depth << 24) ^ f.MetadataToken));
+                    (((long)depth) << 32) | (uint)f.MetadataToken));
             }
         }
 
         return list
             .GroupBy(s => s.name, StringComparer.Ordinal)
-            .Select(g => g.OrderBy(x => x.orderKey).Last())
-            .OrderBy(s => s.orderKey)
+            .Select(g => g.OrderBy(x => x.sortKey).Last())
+            .OrderBy(s => s.sortKey)
             .ToArray();
     }
 
