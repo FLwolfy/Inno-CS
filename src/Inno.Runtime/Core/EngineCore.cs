@@ -70,6 +70,7 @@ public abstract class EngineCore
         
         // Graphics Resources
         Renderer2D.LoadResources();
+        Renderer3D.LoadResources();
     }
 
     private void OnSetup()
