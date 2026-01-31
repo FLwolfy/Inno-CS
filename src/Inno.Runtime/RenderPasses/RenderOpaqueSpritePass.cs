@@ -9,10 +9,8 @@ using Inno.Runtime.Component;
 
 namespace Inno.Runtime.RenderPasses;
 
-public class RenderOpaqueSpritePass(bool? requireCameraZCheck = null) : RenderPass
+public class RenderOpaqueSpritePass() : RenderPass
 {
-    private readonly bool m_requireCameraZCheck = requireCameraZCheck ?? false;
-    
     public override RenderPassTag orderTag => RenderPassTag.Geometry;
 
     public override void OnRender(RenderContext ctx)
@@ -20,7 +18,7 @@ public class RenderOpaqueSpritePass(bool? requireCameraZCheck = null) : RenderPa
         var scene = SceneManager.GetActiveScene();
         if (scene == null) return;
         var camera = scene.GetMainCamera();
-        if (m_requireCameraZCheck && camera == null) return;
+        if (camera == null) return;
 
         foreach (var sr in scene.GetAllComponents<SpriteRenderer>()
                      .Where(sr => sr.isActive)

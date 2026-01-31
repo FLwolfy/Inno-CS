@@ -109,6 +109,7 @@ public class SceneViewPanel : EditorPanel
     {
         m_renderPasses = new RenderPassStack();
         m_renderPasses.PushPass(new ClearScreenPass(Color.LIGHTGRAY));
+        m_renderPasses.PushPass(new RenderOpaqueMeshPass()); 
         m_renderPasses.PushPass(new RenderOpaqueSpritePass());
         m_renderPasses.PushPass(new RenderAlphaSpritePass());
     }

@@ -80,8 +80,8 @@ public class GameViewPanel : EditorPanel
         m_renderPasses = new RenderPassStack();
         m_renderPasses.PushPass(new ClearScreenPass());
         m_renderPasses.PushPass(new RenderOpaqueMeshPass()); 
-        m_renderPasses.PushPass(new RenderOpaqueSpritePass(true));
-        m_renderPasses.PushPass(new RenderAlphaSpritePass(true));
+        m_renderPasses.PushPass(new RenderOpaqueSpritePass());
+        m_renderPasses.PushPass(new RenderAlphaSpritePass());
     }
 
     private void CheckRegionChange()
