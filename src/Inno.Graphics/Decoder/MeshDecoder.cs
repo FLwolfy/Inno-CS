@@ -59,6 +59,7 @@ internal sealed class MeshDecoder : ResourceDecoder<Mesh, MeshAsset>
             indices[i] = br.ReadUInt32();
         mesh.SetIndices(indices);
         
+        // TODO
         // segments 先不做：MeshGpuCompiler 會自動補 whole segment
         return mesh;
     }
