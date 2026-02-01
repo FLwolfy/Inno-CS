@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+
 using Inno.Core.Logging;
 
 namespace Inno.Core.Serialization;
@@ -43,10 +44,10 @@ public interface ISerializable
         {
             if (s.visibility == PropertyVisibility.Hide)
                 continue;
-            
-            var noSetterAllowed = 
+
+            var noSetterAllowed =
                 ((s.visibility & PropertyVisibility.RuntimeSet) == 0);
-            
+
             result.Add(new SerializedProperty(
                 s.name,
                 s.type,
@@ -83,7 +84,7 @@ public interface ISerializable
             {
                 continue;
             }
-            
+
             node[s.name] = CaptureValue(s.getter(this), s.type);
         }
 
@@ -177,11 +178,42 @@ public interface ISerializable
         Func<object, object?> getter,
         Action<object, object?> setter,
         PropertyVisibility visibility,
+        int declOrder,
         long sortKey);
 
     private static readonly ConcurrentDictionary<Type, MemberSlot[]> SLOT_CACHE = new();
 
     private static MemberSlot[] GetSlots(Type type) => SLOT_CACHE.GetOrAdd(type, BuildSlots);
+
+    // Cache generated order map per declaring type (so BuildSlots is cheap).
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, int>> DECL_ORDER_CACHE = new();
+
+    private static IReadOnlyDictionary<string, int> GetDeclOrderMap(Type declaringType)
+    {
+        return DECL_ORDER_CACHE.GetOrAdd(declaringType, static t =>
+        {
+            // Try generator registry first
+            if (GeneratedOrderRegistry.TryGetOrder(t, out var orderList))
+            {
+                var map = new Dictionary<string, int>(orderList.Length, StringComparer.Ordinal);
+                for (var i = 0; i < orderList.Length; i++)
+                {
+                    // if duplicates (shouldn't happen), keep first
+                    if (!map.ContainsKey(orderList[i]))
+                        map[orderList[i]] = i;
+                }
+                return map;
+            }
+
+            return new Dictionary<string, int>(0, StringComparer.Ordinal);
+        });
+    }
+
+    private static int GetDeclOrderIndex(Type declaringType, string memberName)
+    {
+        var map = GetDeclOrderMap(declaringType);
+        return map.TryGetValue(memberName, out var idx) ? idx : int.MaxValue;
+    }
 
     private static MemberSlot[] BuildSlots(Type type)
     {
@@ -201,7 +233,9 @@ public interface ISerializable
         foreach (var t in chain)
         {
             var depth = chainIndex[t];
+            var declMap = GetDeclOrderMap(t);
 
+            // Properties
             foreach (var p in t.GetProperties(c_declared))
             {
                 var attr = p.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
@@ -227,11 +261,22 @@ public interface ISerializable
                         ? (obj, value) => p.SetValue(obj, value)
                         : (obj, value) => setMethod.Invoke(obj, [value]);
                 }
-                
+
                 if (!noSetterAllowed && setMethod == null)
                     throw new InvalidOperationException($"{type.FullName}.{p.Name} must have setter for its [SerializableProperty].");
-                
+
                 SerializableGraph.ValidateAllowedTypeGraph(p.PropertyType, $"{type.FullName}.{p.Name}");
+
+                var declOrder = declMap.TryGetValue(p.Name, out var idx) ? idx : int.MaxValue;
+
+                // sortKey priority:
+                // 1) depth (base -> derived)
+                // 2) declaration order within declaring type (field + property mixed)
+                // 3) metadata token tie-break (deterministic)
+                long sortKey =
+                    (((long)depth) << 48) |
+                    (((long)(uint)declOrder) << 16) |
+                    (uint)p.MetadataToken;
 
                 list.Add(new MemberSlot(
                     p.Name,
@@ -239,16 +284,18 @@ public interface ISerializable
                     obj => p.GetValue(obj),
                     setter,
                     attr.propertyVisibility,
-                    (((long)depth) << 32) | (uint)p.MetadataToken));
+                    declOrder,
+                    sortKey));
             }
 
+            // Fields
             foreach (var f in t.GetFields(c_declared))
             {
                 var attr = f.GetCustomAttribute<SerializablePropertyAttribute>(inherit: true);
                 if (attr == null)
                     continue;
 
-                var noSetterAllowed = 
+                var noSetterAllowed =
                     (attr.propertyVisibility & PropertyVisibility.Deserialize) == 0;
 
                 Action<object, object?> setter;
@@ -260,11 +307,18 @@ public interface ISerializable
                 {
                     setter = f.SetValue;
                 }
-                
+
                 if (!noSetterAllowed && f.IsInitOnly)
                     throw new InvalidOperationException($"{type.FullName}.{f.Name} is readonly; it must be writable for its [SerializableProperty].");
-                
+
                 SerializableGraph.ValidateAllowedTypeGraph(f.FieldType, $"{type.FullName}.{f.Name}");
+
+                var declOrder = declMap.TryGetValue(f.Name, out var idx) ? idx : int.MaxValue;
+
+                long sortKey =
+                    (((long)depth) << 48) |
+                    (((long)(uint)declOrder) << 16) |
+                    (uint)f.MetadataToken;
 
                 list.Add(new MemberSlot(
                     f.Name,
@@ -272,13 +326,17 @@ public interface ISerializable
                     obj => f.GetValue(obj),
                     setter,
                     attr.propertyVisibility,
-                    (((long)depth) << 32) | (uint)f.MetadataToken));
+                    declOrder,
+                    sortKey));
             }
         }
 
+        // Same-name resolution:
+        // Keep the one with greatest sortKey (derived overrides base).
+        // Final ordering by sortKey.
         return list
             .GroupBy(s => s.name, StringComparer.Ordinal)
-            .Select(g => g.OrderBy(x => x.sortKey).Last())
+            .Select(g => g.MaxBy(x => x.sortKey)!)
             .OrderBy(s => s.sortKey)
             .ToArray();
     }
@@ -495,6 +553,69 @@ public interface ISerializable
                     throw new InvalidOperationException($"{type.FullName}.{m.Name} must return void.");
 
                 m.Invoke(this, null);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Generated Order Registry Bridge (internal, no API exposure)
+
+    /// <summary>
+    /// Bridge to source-generated declaration-order registry.
+    /// If generator is not referenced, it simply returns false and we fallback to deterministic ordering.
+    /// </summary>
+    private static class GeneratedOrderRegistry
+    {
+        // We avoid compile-time dependency on generated types by using reflection once.
+        private static readonly Func<Type, (bool ok, string[]? order)> s_tryGetOrder = BuildResolver();
+
+        public static bool TryGetOrder(Type type, out string[] order)
+        {
+            var (ok, arr) = s_tryGetOrder(type);
+            if (ok && arr != null)
+            {
+                order = arr;
+                return true;
+            }
+
+            order = Array.Empty<string>();
+            return false;
+        }
+
+        private static Func<Type, (bool ok, string[]? order)> BuildResolver()
+        {
+            try
+            {
+                // Generator emits:
+                // internal static class Inno.Core.Serialization.Generated.SerializableDeclOrderRegistry
+                // {
+                //     internal static bool TryGetOrder(Type t, out string[] order) { ... }
+                // }
+                var registryType = Type.GetType("Inno.Core.Serialization.Generated.SerializableDeclOrderRegistry");
+                if (registryType == null)
+                    return _ => (false, null);
+
+                var mi = registryType.GetMethod(
+                    "TryGetOrder",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    types: new[] { typeof(Type), typeof(string[]).MakeByRefType() },
+                    modifiers: null);
+
+                if (mi == null)
+                    return _ => (false, null);
+
+                return t =>
+                {
+                    object?[] args = { t, null! };
+                    var ok = (bool)mi.Invoke(null, args)!;
+                    return ok ? (true, (string[])args[1]!) : (false, null);
+                };
+            }
+            catch
+            {
+                return _ => (false, null);
             }
         }
     }

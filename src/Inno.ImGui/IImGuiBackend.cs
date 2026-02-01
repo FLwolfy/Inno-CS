@@ -71,7 +71,7 @@ internal interface IImGuiBackend : IDisposable
     /// Tries to accept a drag-drop payload.
     /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
     /// </summary>
-    bool TryAcceptDragPayloadImpl<T>(string type, out T value);
+    bool TryAcceptDragPayloadImpl<T>(string type, out T value, Predicate<T>? condition);
     
     /// <summary>
     /// Begins an invisible drawing area.

@@ -10,8 +10,36 @@ namespace Inno.Graphics.Resources.CpuResources;
 public sealed class Sprite : ISerializable
 {
     public Texture? texture { get; private set; }
-
-    [SerializableProperty] private AssetRef<TextureAsset>? m_textureAsset;
+    
+    [SerializableProperty]
+    private AssetRef<TextureAsset> source
+    {
+        get
+        {
+            if (texture == null)
+            {
+                return default;
+            }
+            
+            return AssetManager.Get<TextureAsset>(texture.guid);
+        }
+        set
+        { 
+            if (value.isValid)
+            {
+                var asset = value.Resolve();
+                if (asset != null)
+                {
+                    texture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(asset);
+                }
+            }
+            else
+            {
+                texture = null;
+            }
+        }
+    }
+    
     [SerializableProperty] public Vector4 uv;
     [SerializableProperty] public Vector2 size;
 
@@ -20,7 +48,7 @@ public sealed class Sprite : ISerializable
         this.texture = texture;
         if (texture != null)
         {
-            m_textureAsset = AssetManager.Get<TextureAsset>(texture.guid);
+            source = AssetManager.Get<TextureAsset>(texture.guid);
         }
         
         this.uv = uv;
@@ -45,19 +73,6 @@ public sealed class Sprite : ISerializable
             new Vector4(0, 0, 1, 1),
             size
         );
-    }
-
-    [OnSerializableRestored]
-    private void OnAfterRestore()
-    {
-        if (m_textureAsset != null)
-        {
-            var asset = m_textureAsset.Value.Resolve();
-            if (asset != null)
-            {
-                texture = ResourceDecoder.DecodeBinaries<Texture, TextureAsset>(asset);
-            }
-        }
     }
         
 }

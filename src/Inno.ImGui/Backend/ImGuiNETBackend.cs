@@ -420,7 +420,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    SetDragPayloadObject(type, data!);
 	}
 
-	public bool TryAcceptDragPayloadImpl<T>(string type, out T value)
+	public bool TryAcceptDragPayloadImpl<T>(string type, out T value, Predicate<T>? predicate = null)
 	{
 	    ClearDragPayloadCache();
 
@@ -435,10 +435,44 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    }
 	#endif
 
-	    if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-	        return TryAcceptDragPayloadRaw(type, out value);
+	    if (!TryPeekDragPayload<T>(type, out var peek))
+	    {
+	        value = default!;
+	        return false;
+	    }
 
-	    if (TryAcceptDragPayloadObject(type, out var obj) && obj is T t)
+	    if (predicate != null && !predicate(peek))
+	    {
+	        value = default!;
+	        return false;
+	    }
+
+	    return TryDeliverDragPayload(type, out value);
+	}
+
+	private bool TryPeekDragPayload<T>(string type, out T value)
+	{
+	    if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+	        return TryPeekDragPayloadRaw(type, out value);
+
+	    if (TryPeekDragPayloadObject(type, out var obj) && obj is T t)
+	    {
+	        value = t;
+	        return true;
+	    }
+
+	    value = default!;
+	    return false;
+	}
+
+	private bool TryDeliverDragPayload<T>(string type, out T value)
+	{
+	    var flags = ImGuiDragDropFlags.AcceptBeforeDelivery;
+
+	    if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+	        return TryAcceptDragPayloadRaw(type, out value, flags);
+
+	    if (TryAcceptDragPayloadObject(type, out var obj, flags) && obj is T t)
 	    {
 	        value = t;
 	        return true;
@@ -456,10 +490,33 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    ImGuiNET.ImGui.SetDragDropPayload(type, (IntPtr)buf, (uint)size);
 	}
 
-	private unsafe bool TryAcceptDragPayloadRaw<T>(string type, out T value)
+	private unsafe bool TryPeekDragPayloadRaw<T>(string type, out T value)
 	{
-	    var payload = ImGuiNET.ImGui.AcceptDragDropPayload(type);
-	    if (payload.NativePtr == null || payload.Data == IntPtr.Zero || payload.DataSize <= 0)
+	    var payload = ImGuiNET.ImGui.GetDragDropPayload();
+	    if (payload.NativePtr == null || !payload.IsDataType(type) || payload.Data == IntPtr.Zero || payload.DataSize <= 0)
+	    {
+	        value = default!;
+	        return false;
+	    }
+
+	    int size = Unsafe.SizeOf<T>();
+	    if (payload.DataSize < size)
+	    {
+	        value = default!;
+	        return false;
+	    }
+
+	    value = Unsafe.ReadUnaligned<T>(payload.Data.ToPointer());
+	    return true;
+	}
+
+	private unsafe bool TryAcceptDragPayloadRaw<T>(
+	    string type,
+	    out T value,
+	    ImGuiNET.ImGuiDragDropFlags flags)
+	{
+	    var payload = ImGuiNET.ImGui.AcceptDragDropPayload(type, flags);
+	    if (payload.NativePtr == null || payload.Data == IntPtr.Zero || payload.DataSize <= 0 || !payload.Delivery)
 	    {
 	        value = default!;
 	        return false;
@@ -483,22 +540,43 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	    SetDragPayloadRaw(type, id);
 	}
 
-	private bool TryAcceptDragPayloadObject(string type, out object obj)
+	private bool TryPeekDragPayloadObject(string type, out object obj)
 	{
-	    if (TryAcceptDragPayloadRaw(type, out int pid) && m_payloadObjects.TryGetValue(pid, out obj!))
+	    obj = null!;
+	    return TryPeekDragPayloadRaw(type, out int pid) && m_payloadObjects.TryGetValue(pid, out obj!);
+	}
+
+	private bool TryAcceptDragPayloadObject(
+	    string type,
+	    out object obj,
+	    ImGuiDragDropFlags flags)
+	{
+	    obj = null!;
+	    var payload = ImGuiNET.ImGui.AcceptDragDropPayload(type, flags);
+	    unsafe
 	    {
-	        // one-shot consume to avoid unbounded growth
+		    if (payload.NativePtr == null || payload.Data == IntPtr.Zero || payload.DataSize < sizeof(int))
+			    return false;
+
+	        int pid = Unsafe.ReadUnaligned<int>(payload.Data.ToPointer());
+	        if (!m_payloadObjects.TryGetValue(pid, out obj!))
+	            return false;
+
+	        if (!payload.Delivery)
+	        {
+	            obj = null!;
+	            return false;
+	        }
+
 	        m_payloadObjects.Remove(pid);
 	        return true;
 	    }
-
-	    obj = null!;
-	    return false;
 	}
 
 	private void ClearDragPayloadCache()
 	{
-	    if (m_payloadObjects.Count == 0) return;
+	    if (m_payloadObjects.Count == 0)
+	        return;
 
 	    unsafe
 	    {
@@ -508,6 +586,7 @@ internal sealed class ImGuiNETBackend : IImGuiBackend
 	}
 
 	#endregion
+
 
 	#region Invisible
 

@@ -132,7 +132,7 @@ public static class ImGuiHost
     /// Tries to accept a drag-drop payload.
     /// Auto-selects unmanaged payload when T has no managed references; otherwise uses object payload.
     /// </summary>
-    public static bool TryAcceptDragPayload<T>(string type, out T value) => impl.TryAcceptDragPayloadImpl(type, out value);
+    public static bool TryAcceptDragPayload<T>(string type, out T value, Predicate<T>? condition = null) => impl.TryAcceptDragPayloadImpl(type, out value, condition);
 
     /// <summary>
     /// Begins an invisible drawing area.

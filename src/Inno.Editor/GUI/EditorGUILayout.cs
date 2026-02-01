@@ -804,13 +804,14 @@ public static class EditorGUILayout
     }
 
     /// <summary>
-    /// Draws a GUID drop target field.
+    /// Draws a drop reference target field.
     /// </summary>
-    public static bool GuidRef(
+    public static bool DropRef<T>(
         string label,
+        string displayText,
         string payloadType,
-        ref Guid value,
-        string? displayText = null,
+        ref T? value,
+        Predicate<T>? condition = null,
         bool enabled = true)
     {
         bool changed = false;
@@ -845,7 +846,7 @@ public static class EditorGUILayout
 
             if (enabled && ImGuiNet.BeginDragDropTarget())
             {
-                if (ImGuiHost.TryAcceptDragPayload(payloadType, out Guid incoming))
+                if (ImGuiHost.TryAcceptDragPayload(payloadType, out T incoming, condition))
                 {
                     value = incoming;
                     changed = true;
@@ -858,25 +859,20 @@ public static class EditorGUILayout
             {
                 if (ImGuiNet.MenuItem("Clear"))
                 {
-                    if (value != Guid.Empty)
-                    {
-                        value = Guid.Empty;
-                        changed = true;
-                    }
+                    value = default;
+                    changed = true;
                 }
                 ImGuiNet.EndPopup();
             }
 
-            string text = value == Guid.Empty ? "None (Drop Guid Here)" : (displayText ?? value.ToString());
-
-            Vector2 textSize = ImGuiNet.CalcTextSize(text);
+            Vector2 textSize = ImGuiNet.CalcTextSize(displayText);
             Vector2 pad = ImGuiNet.GetStyle().FramePadding;
 
             float textX = p0.x + pad.x;
             float textY = p0.y + (h - textSize.y) * 0.5f;
 
             uint textCol = ImGuiNet.GetColorU32(ImGuiCol.Text);
-            dl.AddText(new Vector2(textX, textY), textCol, text);
+            dl.AddText(new Vector2(textX, textY), textCol, displayText);
 
             EndPropertyRow();
         }

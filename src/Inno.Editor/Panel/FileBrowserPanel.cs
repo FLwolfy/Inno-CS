@@ -13,6 +13,8 @@ using Inno.Editor.GUI;
 using Inno.ImGui;
 
 using ImGuiNET;
+using Inno.Assets.AssetType;
+using Inno.Assets.Core;
 using Inno.Platform;
 using ImGuiNet = ImGuiNET.ImGui;
 
@@ -24,12 +26,6 @@ public sealed class FileBrowserPanel : EditorPanel
     /// Gets the panel title.
     /// </summary>
     public override string title => "File";
-
-    /// <summary>
-    /// Drag payload type for asset GUID dragging (files only).
-    /// </summary>
-    public const string ASSET_GUID_PAYLOAD_TYPE = "PAYLOAD:FileAssetGuid";
-    private const string MOVE_PATH_PAYLOAD_TYPE = "PAYLOAD:FileMovePath";
 
     private const float C_SPLITTER_WIDTH = 3f;
     private const float C_LEFT_MIN_WIDTH = 10f;
@@ -1194,7 +1190,7 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         var guid = e.guid.Value;
-        ImGuiHost.SetDragPayload(ASSET_GUID_PAYLOAD_TYPE, guid);
+        ImGuiHost.SetDragPayload(EditorPayloadType.ASSET_REF_PAYLOAD, AssetManager.Get<InnoAsset>(guid));
         ImGuiNet.TextUnformatted(e.name);
 
         ImGuiNet.EndDragDropSource();
@@ -1211,7 +1207,7 @@ public sealed class FileBrowserPanel : EditorPanel
             rel = AssetManager.NormalizeRelativePath(rel);
 
             if (!string.IsNullOrWhiteSpace(rel))
-                ImGuiHost.SetDragPayload(MOVE_PATH_PAYLOAD_TYPE, rel);
+                ImGuiHost.SetDragPayload(EditorPayloadType.PATH_PAYLOAD, rel);
         }
         catch
         {
@@ -1234,16 +1230,19 @@ public sealed class FileBrowserPanel : EditorPanel
             if (!Directory.Exists(ToNativePath(fullPathNormalizedFolder)))
                 return false;
 
-            if (ImGuiHost.TryAcceptDragPayload(ASSET_GUID_PAYLOAD_TYPE, out Guid guidPayload))
+            if (ImGuiHost.TryAcceptDragPayload(EditorPayloadType.ASSET_REF_PAYLOAD, out AssetRef<InnoAsset> assetRef))
             {
-                if (!m_relByGuid.TryGetValue(guidPayload, out var rel) || string.IsNullOrWhiteSpace(rel))
+                if (!assetRef.isValid)
+                    return false;
+                
+                if (!m_relByGuid.TryGetValue(assetRef.guid, out var rel) || string.IsNullOrWhiteSpace(rel))
                     return false;
 
                 srcRel = AssetManager.NormalizeRelativePath(rel);
                 return true;
             }
             
-            if (ImGuiHost.TryAcceptDragPayload(MOVE_PATH_PAYLOAD_TYPE, out string pathPayload))
+            if (ImGuiHost.TryAcceptDragPayload(EditorPayloadType.PATH_PAYLOAD, out string pathPayload))
             {
                 if (string.IsNullOrWhiteSpace(pathPayload))
                     return false;
