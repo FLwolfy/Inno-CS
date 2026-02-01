@@ -44,6 +44,10 @@ public sealed class FileBrowserPanel : EditorPanel
     private readonly string m_rootPathNative;
     private string m_currentDirNative;
     private string? m_selectedPath;
+    
+    private bool m_navPending;
+    private string m_navTarget = "";
+    private bool m_navPushHistory;
 
     private readonly HashSet<string> m_revealOpenPaths = new(StringComparer.OrdinalIgnoreCase);
     private bool m_revealOpenPending;
@@ -116,6 +120,8 @@ public sealed class FileBrowserPanel : EditorPanel
         float bodyH = Math.Max(0f, avail.Y - statusH - 6f);
 
         ImGuiNet.BeginChild("##FileBrowserBody", new Vector2(0, bodyH));
+        
+        CommitPendingNavigate();
 
         var region = ImGuiNet.GetContentRegionAvail();
         float totalW = Math.Max(0f, region.X);
@@ -236,7 +242,7 @@ public sealed class FileBrowserPanel : EditorPanel
             SelectFolder(pathNormalized);
 
         if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-            NavigateTo(pathNormalized, pushHistory: true);
+            RequestNavigate(pathNormalized, pushHistory: true);
 
         if (!IsSamePath(pathNormalized, m_rootPath))
         {
@@ -452,7 +458,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
         if (hovered && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
         {
-            if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+            if (e.isDir) RequestNavigate(e.fullPath, pushHistory: true);
             else TryOpenFile(e.fullPath);
         }
 
@@ -575,7 +581,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
             if (ImGuiNet.IsItemHovered() && ImGuiNet.IsMouseDoubleClicked(ImGuiMouseButton.Left))
             {
-                if (e.isDir) NavigateTo(e.fullPath, pushHistory: true);
+                if (e.isDir) RequestNavigate(e.fullPath, pushHistory: true);
                 else TryOpenFile(e.fullPath);
             }
 
@@ -674,7 +680,7 @@ public sealed class FileBrowserPanel : EditorPanel
         if (e.isDir)
         {
             if (ImGuiNet.MenuItem("Open"))
-                NavigateTo(e.fullPath, pushHistory: true);
+                RequestNavigate(e.fullPath, pushHistory: true);
         }
 
         if (ImGuiNet.MenuItem("Reveal in Explorer"))
@@ -701,28 +707,71 @@ public sealed class FileBrowserPanel : EditorPanel
     #endregion
 
     #region Navigation
-
-    private void NavigateTo(string dirNormalized, bool pushHistory)
+    
+    private void RequestNavigate(string dirNormalized, bool pushHistory)
     {
         dirNormalized = NormalizePath(dirNormalized);
-
-        if (IsSamePath(dirNormalized, m_currentDir))
+        if (string.IsNullOrWhiteSpace(dirNormalized))
             return;
 
-        string dirNative = ToNativePath(dirNormalized);
+        m_navPending = true;
+        m_navTarget = dirNormalized;
+        m_navPushHistory = pushHistory;
+    }
+    
+    private void CommitPendingNavigate()
+    {
+        if (!m_navPending)
+            return;
+
+        m_navPending = false;
+        
+        if (IsSamePath(m_navTarget, m_currentDir))
+            return;
+
+        string dirNative = ToNativePath(m_navTarget);
         if (!Directory.Exists(dirNative))
             return;
 
-        m_currentDir = dirNormalized;
+        m_currentDir = m_navTarget;
         m_currentDirNative = dirNative;
 
         ClearSelection();
+        RevealFolderInTree(m_navTarget);
 
-        if (pushHistory)
-            PushHistory(dirNormalized);
+        if (m_navPushHistory)
+            PushHistory(m_navTarget);
 
         RefreshSnapshot(force: true);
     }
+
+    private void RevealFolderInTree(string folderNormalized)
+    {
+        m_revealOpenPaths.Clear();
+        m_revealOpenPending = false;
+
+        if (string.IsNullOrWhiteSpace(folderNormalized))
+            return;
+
+        folderNormalized = NormalizePath(folderNormalized);
+
+        if (!IsAncestorOrSelf(m_rootPath, folderNormalized))
+            return;
+
+        string running = m_rootPath.TrimEnd('/');
+        var parts = SplitPathRelativeToRoot(folderNormalized, m_rootPath);
+
+        m_revealOpenPaths.Add(m_rootPath);
+
+        foreach (var part in parts)
+        {
+            running = NormalizePath(Path.Combine(running, part));
+            m_revealOpenPaths.Add(running);
+        }
+
+        m_revealOpenPending = true;
+    }
+
 
     private void PushHistory(string dir)
     {
@@ -740,7 +789,7 @@ public sealed class FileBrowserPanel : EditorPanel
             return;
 
         m_historyIndex = next;
-        NavigateTo(m_history[m_historyIndex], pushHistory: false);
+        RequestNavigate(m_history[m_historyIndex], pushHistory: false);
     }
 
     #endregion
@@ -1295,7 +1344,7 @@ public sealed class FileBrowserPanel : EditorPanel
             ImGuiWindowFlags.HorizontalScrollbar);
 
         if (ImGuiNet.SmallButton("Assets##sb_root"))
-            NavigateTo(m_rootPath, pushHistory: true);
+            RequestNavigate(m_rootPath, pushHistory: true);
 
         string running = m_rootPath;
         var parts = SplitPathRelativeToRoot(m_currentDir, m_rootPath);
@@ -1308,7 +1357,7 @@ public sealed class FileBrowserPanel : EditorPanel
 
             running = NormalizePath(Path.Combine(running, parts[i]));
             if (ImGuiNet.SmallButton($"{parts[i]}##sb_{i}"))
-                NavigateTo(running, pushHistory: true);
+                RequestNavigate(running, pushHistory: true);
         }
 
         ImGuiNet.EndChild();

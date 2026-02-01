@@ -60,7 +60,7 @@ internal sealed class MeshDecoder : ResourceDecoder<Mesh, MeshAsset>
         mesh.SetIndices(indices);
         
         // TODO
-        // segments 先不做：MeshGpuCompiler 會自動補 whole segment
+        // Implement Segments
         return mesh;
     }
 }
