@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Veldrid.SDL2" Version="4.9.0" PrivateAssets="compile" />
+    <PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0" PrivateAssets="compile" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core\Inno.Core.Events\Inno.Core.Events.csproj" />
+    <ProjectReference Include="..\..\core\Inno.Core.Input\Inno.Core.Input.csproj" />
+    <ProjectReference Include="..\..\core\Inno.Core.Mathematics\Inno.Core.Mathematics.csproj" />
+    <ProjectReference Include="..\Inno.Platform.Graphics\Inno.Platform.Graphics.csproj" />
+  </ItemGroup>
+
+</Project>

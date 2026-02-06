@@ -5,22 +5,10 @@ using System.Runtime.InteropServices;
 
 using Inno.Core.Logging;
 using Inno.Platform.Display;
-using Inno.Platform.Display.Bridge;
 using Inno.Platform.Graphics;
-using Inno.Platform.Window;
-using Inno.Platform.Window.Bridge;
 
 namespace Inno.Platform;
 
-/// <summary>
-/// Enumeration of supported platform backends.
-/// A platform backend defines how windowing, display, and graphics systems
-/// are created and wired together for a specific runtime environment.
-/// </summary>
-public enum PlatformBackend
-{
-    Veldrid_Sdl2
-}
 
 /// <summary>
 /// Static platform-level utilities and OS integration helpers.
@@ -151,45 +139,5 @@ public static class PlatformAPI
         {
             Log.Error($"RevealInSystem failed: {e.Message}");
         }
-    }
-}
-
-/// <summary>
-/// Owns and manages all platform subsystems for a running application instance.
-/// </summary>
-public sealed class PlatformRuntime : IDisposable
-{
-    public readonly IWindowSystem windowSystem;
-    public readonly IDisplaySystem displaySystem;
-    public readonly IGraphicsDevice graphicsDevice;
-
-    internal PlatformRuntime(
-        WindowInfo mainWindowInfo,
-        PlatformBackend platformBackend,
-        GraphicsBackend graphicsBackend)
-    {
-        switch (platformBackend)
-        {
-            case PlatformBackend.Veldrid_Sdl2:
-            {
-                windowSystem = new VeldridSdl2WindowSystem(
-                    mainWindowInfo,
-                    graphicsBackend,
-                    out var vgd);
-
-                displaySystem = new VeldridSdl2DisplaySystem();
-                graphicsDevice = vgd;
-                return;
-            }
-        }
-
-        throw new PlatformNotSupportedException($"Platform backend {platformBackend} is not supported.");
-    }
-
-    public void Dispose()
-    {
-        windowSystem.Dispose();
-        displaySystem.Dispose();
-        graphicsDevice.Dispose();
     }
 }

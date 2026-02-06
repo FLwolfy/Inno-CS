@@ -2,15 +2,17 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Veldrid" Version="4.9.0" PrivateAssets="compile" />
-    <PackageReference Include="Veldrid.SDL2" Version="4.9.0" PrivateAssets="compile" />
-    <PackageReference Include="Veldrid.SPIRV" Version="1.0.15" PrivateAssets="compile" />
-    <PackageReference Include="Veldrid.StartupUtilities" Version="4.9.0" PrivateAssets="compile" />
+    <ProjectReference Include="..\..\core\Inno.Core.Logging\Inno.Core.Logging.csproj" PrivateAssets="compile"/>
+  </ItemGroup>
+    
+  <ItemGroup>
+    <ProjectReference Include="..\Inno.Platform.Display\Inno.Platform.Display.csproj" />
+    <ProjectReference Include="..\Inno.Platform.Graphics\Inno.Platform.Graphics.csproj" />
   </ItemGroup>
 
 </Project>
