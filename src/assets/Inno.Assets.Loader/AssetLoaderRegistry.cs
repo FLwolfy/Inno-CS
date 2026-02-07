@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Inno.Core.Utility;
+
+using Inno.Core.Reflection;
 
 namespace Inno.Assets.Loader;
 

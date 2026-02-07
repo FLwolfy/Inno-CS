@@ -1,8 +1,7 @@
 using Inno.Assets.Core;
-using Inno.Assets.Serializer;
 using Inno.Platform.Graphics;
 
-namespace Inno.Assets.AssetType;
+namespace Inno.Assets.Types;
 
 public class ShaderAsset : InnoAsset
 {

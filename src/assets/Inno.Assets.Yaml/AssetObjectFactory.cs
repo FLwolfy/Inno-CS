@@ -5,9 +5,9 @@ using System.Runtime.CompilerServices;
 
 using YamlDotNet.Serialization;
 
-namespace Inno.Assets.Serializer;
+namespace Inno.Assets.Yaml;
 
-public class AssetObjectFactory : IObjectFactory
+internal class AssetObjectFactory : IObjectFactory
 {
     public object Create(Type type)
     {

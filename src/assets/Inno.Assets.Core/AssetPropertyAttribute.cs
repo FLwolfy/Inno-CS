@@ -1,6 +1,6 @@
 using System;
 
-namespace Inno.Assets.Serializer;
+namespace Inno.Assets.Core;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class AssetPropertyAttribute : Attribute

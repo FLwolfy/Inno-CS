@@ -2,10 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 
-using Inno.Assets.Core;
-using Inno.Assets.Serializer;
-
-namespace Inno.Assets.AssetType;
+namespace Inno.Assets.Core;
 
 public abstract class InnoAsset
 {
@@ -23,22 +20,10 @@ public abstract class InnoAsset
         guid = Guid.NewGuid();
     }
     
-    internal void RecomputeHash(string relativePath)
+    internal void RecomputeHash(Stream inputStream)
     {
-        using var stream = File.OpenRead(Path.Combine(AssetManager.assetDirectory, relativePath));
         using var sha = SHA256.Create();
-        var hashBytes = sha.ComputeHash(stream);
+        var hashBytes = sha.ComputeHash(inputStream);
         sourceHash = Convert.ToHexString(hashBytes);
-    }
-
-    internal void RecomputeHash(byte[] bytes)
-    {
-        var hashBytes = SHA256.HashData(bytes);
-        sourceHash = Convert.ToHexString(hashBytes);
-    }
-
-    internal void SetSourcePath(string relativePath)
-    {
-        sourcePath = relativePath;
     }
 }

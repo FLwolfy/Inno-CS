@@ -3,49 +3,23 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+
 using Inno.Core.Logging;
 
-namespace Inno.Assets.Core;
-
-public enum AssetDirectoryChangeKind
-{
-    Created,
-    Changed,
-    Deleted,
-    Renamed
-}
-
-public readonly struct AssetDirectoryChange
-{
-    public readonly AssetDirectoryChangeKind kind;
-    public readonly string fullPath;
-    public readonly string relativePath;
-    public readonly string? oldFullPath;
-    public readonly string? oldRelativePath;
-
-    public AssetDirectoryChange(
-        AssetDirectoryChangeKind kind,
-        string fullPath,
-        string relativePath,
-        string? oldFullPath = null,
-        string? oldRelativePath = null)
-    {
-        this.kind = kind;
-        this.fullPath = fullPath;
-        this.relativePath = relativePath;
-        this.oldFullPath = oldFullPath;
-        this.oldRelativePath = oldRelativePath;
-    }
-}
-
-public delegate void AssetDirectoryChangedHandler(in AssetDirectoryChange change);
-public delegate void AssetDirectoryChangesFlushedHandler(IReadOnlyList<AssetDirectoryChange> changes);
+namespace Inno.Assets.IO;
 
 /// <summary>
 /// Observes the asset directory (watcher + coalescing) and provides asset-aware file operations.
 /// </summary>
-internal sealed class AssetFileSystem : IDisposable
+public sealed class AssetFileSystem : IDisposable
 {
+    #region Constants
+    
+    public const string ASSET_POSTFIX = ".asset";
+    public const string BINARY_ASSET_POSTFIX = ".bin";
+    
+    #endregion
+    
     #region Events
 
     public event AssetDirectoryChangedHandler? AssetDirectoryChanged;
@@ -461,7 +435,7 @@ internal sealed class AssetFileSystem : IDisposable
         {
             metaFiles = Directory.GetFiles(
                 movedAbsFolder,
-                "*" + AssetManager.C_ASSET_POSTFIX,
+                "*" + ASSET_POSTFIX,
                 SearchOption.AllDirectories);
         }
         catch
@@ -567,10 +541,10 @@ internal sealed class AssetFileSystem : IDisposable
         => Path.Combine(rootDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
     private string AbsMeta(string relativeFilePath)
-        => AbsAsset(relativeFilePath) + AssetManager.C_ASSET_POSTFIX;
+        => AbsAsset(relativeFilePath) + ASSET_POSTFIX;
 
     private string AbsBin(string relativeFilePath)
-        => Path.Combine(AbsBinDir(Path.GetDirectoryName(relativeFilePath) ?? ""), Path.GetFileName(relativeFilePath) + AssetManager.C_BINARY_ASSET_POSTFIX);
+        => Path.Combine(AbsBinDir(Path.GetDirectoryName(relativeFilePath) ?? ""), Path.GetFileName(relativeFilePath) + BINARY_ASSET_POSTFIX);
 
     private string AbsBinDir(string relativeDirectory)
     {

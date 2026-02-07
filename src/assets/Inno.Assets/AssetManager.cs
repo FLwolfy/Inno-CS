@@ -28,9 +28,6 @@ public static class AssetManager
     public static string binDirectory { get; private set; } = null!;
     public static string assetDirectory { get; private set; } = null!;
 
-    public const string C_ASSET_POSTFIX = ".asset";
-    public const string C_BINARY_ASSET_POSTFIX = ".bin";
-
     #region Notifications
 
     /// <summary>

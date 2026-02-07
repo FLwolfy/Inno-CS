@@ -1,14 +1,13 @@
 using System;
-
-using Inno.Assets.AssetType;
-using Inno.Core.Serialization;
-
+using Inno.Assets.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace Inno.Assets.Serializer;
+using Inno.Core.Serialization;
 
-internal static class AssetYamlSerializer
+namespace Inno.Assets.Yaml;
+
+public static class AssetYamlSerializer
 {
     // ---------------------------------------------------------------------
     // Inno Asset <-> YAML

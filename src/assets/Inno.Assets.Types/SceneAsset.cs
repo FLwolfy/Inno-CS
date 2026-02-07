@@ -1,6 +1,7 @@
+using Inno.Assets.Core;
 using Inno.Core.Serialization;
 
-namespace Inno.Assets.AssetType;
+namespace Inno.Assets.Types;
 
 /// <summary>
 /// Scene asset.
@@ -10,7 +11,7 @@ public sealed class SceneAsset : InnoAsset
     /// <summary>
     /// This scene state 
     /// </summary>
-    internal readonly SerializingState sceneState;
+    public readonly SerializingState sceneState;
 
     public SceneAsset(SerializingState sceneState)
     {

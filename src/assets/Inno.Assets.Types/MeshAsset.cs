@@ -1,7 +1,7 @@
-using Inno.Assets.Serializer;
+using Inno.Assets.Core;
 using Inno.Platform.Graphics;
 
-namespace Inno.Assets.AssetType;
+namespace Inno.Assets.Types;
 
 public sealed class MeshAsset : InnoAsset
 {
@@ -9,7 +9,7 @@ public sealed class MeshAsset : InnoAsset
     [AssetProperty] public int indexCount { get; private set; }
     [AssetProperty] public PrimitiveTopology topology { get; private set; } = PrimitiveTopology.TriangleList;
 
-    internal MeshAsset(int vertexCount, int indexCount, PrimitiveTopology topology)
+    public MeshAsset(int vertexCount, int indexCount, PrimitiveTopology topology)
     {
         this.vertexCount = vertexCount;
         this.indexCount = indexCount;

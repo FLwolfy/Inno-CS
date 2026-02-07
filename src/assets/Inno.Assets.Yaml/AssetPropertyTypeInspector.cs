@@ -2,25 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-
-using Inno.Assets.AssetType;
-
+using Inno.Assets.Core;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.TypeInspectors;
 
-namespace Inno.Assets.Serializer;
+namespace Inno.Assets.Yaml;
 
-public sealed class AssetPropertyTypeInspector : TypeInspectorSkeleton
+internal sealed class AssetPropertyTypeInspector : TypeInspectorSkeleton
 {
     public override string GetEnumName(Type enumType, string name) => name;
     public override string GetEnumValue(object enumValue) => enumValue.ToString()!;
 
     public override IEnumerable<IPropertyDescriptor> GetProperties(Type type, object? container)
     {
-        if (!type.IsAssignableTo(typeof(InnoAsset)))
-            throw new ArgumentException($"{nameof(type)} must be assignable to {nameof(InnoAsset)}");
-
         foreach (var member in GetAllMembers(type))
         {
             var attr = member.GetCustomAttribute<AssetPropertyAttribute>();
