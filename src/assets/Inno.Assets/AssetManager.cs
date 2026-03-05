@@ -7,7 +7,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
-using Inno.Assets.AssetType;
 using Inno.Assets.Core;
 using Inno.Assets.Loader;
 using Inno.Core.Logging;

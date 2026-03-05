@@ -34,15 +34,15 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             byte[] raw = File.ReadAllBytes(requestedAbsSourcePath);
 
             string assetName = Path.GetFileName(relativePath);
-            byte[] bin = OnLoadBinaries(assetName, raw, out T asset);
+            byte[] payload = OnLoadBinaries(assetName, raw, out T asset);
 
             asset.SetSourcePath(relativePath);
             asset.RecomputeHash(relativePath);
 
             WriteMeta(assetMetaPath, asset);
-            WriteBin(assetBinPath, bin);
+            WriteBin(assetBinPath, AssetBinaryCodec.Write(asset, payload));
 
-            asset.assetBinaries = bin;
+            asset.assetBinaries = payload;
             return asset;
         }
 
@@ -85,16 +85,16 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             byte[] raw = File.ReadAllBytes(recordedAbsSourcePath);
 
             string assetName = Path.GetFileName(recordedRelSourcePath);
-            byte[] bin = OnLoadBinaries(assetName, raw, out T rebuilt);
+            byte[] payload = OnLoadBinaries(assetName, raw, out T rebuilt);
 
             rebuilt.guid = assetLoaded.guid;
             rebuilt.SetSourcePath(recordedRelSourcePath);
             rebuilt.RecomputeHash(recordedRelSourcePath);
 
             WriteMeta(assetMetaPath, rebuilt);
-            WriteBin(assetBinPath, bin);
+            WriteBin(assetBinPath, AssetBinaryCodec.Write(rebuilt, payload));
 
-            rebuilt.assetBinaries = bin;
+            rebuilt.assetBinaries = payload;
             return rebuilt;
         }
 
@@ -104,14 +104,15 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
             byte[] raw = File.ReadAllBytes(recordedAbsSourcePath);
 
             string assetName = Path.GetFileName(recordedRelSourcePath);
-            byte[] bin = OnLoadBinaries(assetName, raw, out _);
+            byte[] payload = OnLoadBinaries(assetName, raw, out var rebuilt);
 
-            WriteBin(assetBinPath, bin);
+            WriteBin(assetBinPath, AssetBinaryCodec.Write(rebuilt, payload));
         }
 
         // -------------------- Attach binaries --------------------
         byte[] data = File.ReadAllBytes(assetBinPath);
-        assetLoaded.assetBinaries = data;
+        AssetBinaryCodec.TryReadPayload(data, out var payloadBytes);
+        assetLoaded.assetBinaries = payloadBytes;
         return assetLoaded;
     }
 
@@ -130,12 +131,12 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
     
     public InnoAsset LoadRaw(string assetName, Guid assetGuid, byte[] rawBytes)
     {
-        byte[] bin = OnLoadBinaries(assetName, rawBytes, out T asset);
+        byte[] payload = OnLoadBinaries(assetName, rawBytes, out T asset);
 
         asset.guid = assetGuid;
         asset.SetSourcePath(VIRTUAL_SOURCE_NAME + "/" + assetName);
         asset.RecomputeHash(rawBytes);
-        asset.assetBinaries = bin;
+        asset.assetBinaries = payload;
         return asset;
     }
     
@@ -176,16 +177,16 @@ internal abstract class InnoAssetLoader<T> : IAssetLoader where T : InnoAsset
         File.WriteAllBytes(absSourcePath, raw);
 
         // 3) Rebuild runtime binaries deterministically from raw bytes
-        byte[] bin = OnLoadBinaries(assetName, raw, out _);
+        byte[] payload = OnLoadBinaries(assetName, raw, out var rebuilt);
         typed.SetSourcePath(relativePath);
         typed.RecomputeHash(raw);
 
         // 5) Persist meta + bin
         WriteMeta(assetMetaPath, typed);
-        WriteBin(assetBinPath, bin);
+        WriteBin(assetBinPath, AssetBinaryCodec.Write(rebuilt, payload));
 
         // 6) Update in-memory runtime payload
-        typed.assetBinaries = bin;
+        typed.assetBinaries = payload;
     }
 
     /// <summary>
